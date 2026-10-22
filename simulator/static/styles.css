@@ -1097,3 +1097,13 @@ body:not(.is3d) .ring-pop { width: 128px; } /* 2D: stays inside the Ring's colum
   .reveal { opacity: 1; transform: none; }
   .display .wd > span { transform: none; }
 }
+
+/* top bar: one fast-forward toggle instead of three speeds; the tagline stays on one line */
+.ff-btn { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px 0 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, .28); color: var(--mist); font-family: var(--mono); font-size: 11px;
+  letter-spacing: .08em; text-transform: uppercase; transition: color .3s, background-color .3s, border-color .3s; }
+.ff-btn svg { width: 14px; height: 14px; }
+.ff-btn:hover { color: var(--ivory); border-color: rgba(244, 238, 230, .3); }
+.ff-btn[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+.brand-sub { white-space: nowrap; }
+@media (max-width: 1500px) { .brand-sub { display: none; } }

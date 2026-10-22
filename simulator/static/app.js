@@ -2594,13 +2594,20 @@ const notifications = {
 
 /* ================================================================== top bar */
 
+const FAST_FORWARD = 120; // one minute of household time every half second
+
+// short names for the bar; the full label stays in the tooltip
+function shortBrain(label) {
+  const s = String(label || "");
+  if (/offline router/i.test(s)) return "Offline router";
+  return s.replace(/\s*·\s*Amazon Bedrock$/i, "") || "Unknown";
+}
+
 const topbar = {
   lastText: "",
   init() {
-    $("#speedSeg").addEventListener("click", (e) => {
-      const b = e.target.closest("[data-speed]");
-      if (b) this.setSpeed(Number(b.dataset.speed));
-    });
+    // one control: normal time, or fast-forward (the API still takes any speed, e.g. for the recorder)
+    $("#ffBtn").addEventListener("click", () => this.setSpeed(clock.speed > 1 ? 1 : FAST_FORWARD));
     this.render();
   },
 
@@ -2617,13 +2624,11 @@ const topbar = {
     }
     const lapse = clock.speed > 1;
     document.body.classList.toggle("lapse", lapse);
-    $("#hhLapse").hidden = !lapse;
-    $("#hhLapseX").textContent = `${Math.round(clock.speed)}×`;
-    const btns = [...document.querySelectorAll("#speedSeg [data-speed]")];
-    let idx = btns.findIndex((b) => Math.abs(Number(b.dataset.speed) - clock.speed) < 0.01);
-    btns.forEach((b, i) => b.setAttribute("aria-checked", String(i === idx)));
-    if (idx < 0) idx = 0;
-    $("#speedSeg").style.setProperty("--i", idx);
+    const ff = $("#ffBtn");
+    if (ff) {
+      ff.setAttribute("aria-pressed", String(lapse));
+      ff.title = lapse ? `Fast-forwarding (${Math.round(clock.speed)}×). Click for normal time.` : "Fast-forward the household clock";
+    }
   },
 
   async post(body) {
@@ -3109,14 +3114,14 @@ const status = {
     const bp = $("#brainPill");
     const name = String(brain.name || "").toLowerCase();
     bp.dataset.state = !name ? "off" : name === "bedrock" ? "bedrock" : name === "rules" || name === "none" ? "rules" : "ok";
-    $("#brainLabel").textContent = brain.label || brain.name || "Unknown";
+    $("#brainLabel").textContent = shortBrain(brain.label || brain.name);
     bp.title = `Agent brain: ${brain.label || brain.name || "unknown"}`;
 
     const m = isObj(s.mcp) ? s.mcp : {};
     const tools = arr(m.tools);
     const mp = $("#mcpPill");
     mp.dataset.state = m.connected ? "ok" : "off";
-    $("#mcpLabel").textContent = m.connected ? `${tools.length} tools · ${m.protocol_version || "live"}` : "Not connected";
+    $("#mcpLabel").textContent = m.connected ? `${tools.length} tools` : "Not connected";
     mp.title = m.url ? `Nova MCP server at ${m.url}` : "Nova MCP server";
     this.renderPopover();
   },
@@ -3147,7 +3152,7 @@ const status = {
 
   noteBrain(b) {
     const label = brainName(b);
-    if (label) $("#brainLabel").textContent = label;
+    if (label) $("#brainLabel").textContent = shortBrain(label);
   },
 };
 
@@ -3677,7 +3682,7 @@ function wireChrome() {
 
   window.addEventListener("pointermove", trackTilt, { passive: true });
   window.addEventListener("resize", () => { clearTimeout(wireChrome.rt); wireChrome.rt = setTimeout(layout, 120); });
-  magnetic($("#speedSeg"), "button");
+  magnetic($(".bar-clock"), ".ff-btn");
   if (!SR) document.body.classList.add("no-speech");
 }
 

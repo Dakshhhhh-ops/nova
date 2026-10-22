@@ -39,14 +39,11 @@
     <div class="hh-big"><span class="hh-time" id="hhTime">--:--</span><span class="hh-ampm" id="hhAmPm"></span></div>
     <div class="hh-meta">
       <span class="mono" id="hhDay">Columbus</span>
-      <span class="mono hh-lapse" id="hhLapse" hidden><span class="ff" aria-hidden="true"><i></i><i></i></span>Time-lapse <b id="hhLapseX">60×</b></span>
     </div>
-    <div class="seg" id="speedSeg" role="radiogroup" aria-label="Clock speed">
-      <i class="seg-thumb" aria-hidden="true"></i>
-      <button type="button" role="radio" data-speed="1" aria-checked="true">1×</button>
-      <button type="button" role="radio" data-speed="60" aria-checked="false">60×</button>
-      <button type="button" role="radio" data-speed="300" aria-checked="false">300×</button>
-    </div>
+    <button class="ff-btn" id="ffBtn" type="button" aria-pressed="false" title="Fast-forward the household clock">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5v11l7.5-5.5zM12.5 6.5v11l7.5-5.5z" fill="currentColor"/></svg>
+      <span>Fast-forward</span>
+    </button>
   </div>
 
   <div class="bar-right">
@@ -65,7 +62,7 @@
       <svg class="ico-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
     <button class="text-btn" id="resetBtn" type="button" title="Re-seed the demo household">Reset</button>
-    <button class="text-btn hood-btn" id="hoodBtn" type="button" title="Under the hood: the live MCP trace (I)">Under the hood <kbd>I</kbd></button>
+    <button class="text-btn hood-btn" id="hoodBtn" type="button" title="Under the hood: the live MCP trace (press I)">Under the hood</button>
   </div>
 </header>
 

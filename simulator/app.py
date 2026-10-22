@@ -20,6 +20,8 @@ from fastapi.staticfiles import StaticFiles
 from mcp_types import ElicitRequestParams, ElicitResult
 from pydantic import BaseModel
 
+from nova_server.store import now as household_now
+
 from .agent import Agent, Device, new_id, result_json, structured_of
 
 log = logging.getLogger("nova.simulator")
@@ -157,6 +159,7 @@ async def status() -> dict[str, Any]:
         await connect_all()
     agent: Agent = state["agent"]
     return {
+        "household_now": household_now().isoformat(),
         "brain": agent.brain_info(),
         "mcp": {"url": MCP_URL, "connected": state["connected"], "error": state["error"],
                 "server_name": state["server"].get("title") or state["server"].get("name"), **state["server"]},

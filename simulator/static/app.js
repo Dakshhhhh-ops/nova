@@ -525,6 +525,7 @@ class Device {
       caption: q(".caption-text"), cardFrame: q(".card-frame"), cardClose: q(".card-close"), elicit: q(".elicit-layer"),
       form: q(".composer"), input: q(".say"), send: q(".send"), mic: q(".mic"), chips: q(".chips"),
     };
+    this.gen = 0; // bumped on reset so late replies from before the reset are dropped
     this.busy = false;
     this.micOn = false;
     this.light = "idle";
@@ -755,6 +756,7 @@ class Device {
     setTimeout(() => { if (this.busy && this.light === "listening" && !this.elicit && !this.micOn) this.setLight("thinking"); }, 450);
 
     const rec = inspector.beginTurn(this.id, text, source);
+    const gen = this.gen;
     const t0 = performance.now();
     let reply = "", cards = [], failed = false;
     try {
@@ -772,6 +774,7 @@ class Device {
 
     this.pendingTurn = null;
     this.setBusy(false);
+    if (gen !== this.gen) { this.settleLight(); return; } // the demo was reset mid-turn
     this.hideElicit(); // the turn is over, so any open prompt is moot
     this.fillReply(turn, reply, failed);
     if (cards.length) this.showCard(cards[cards.length - 1], reply);
@@ -897,6 +900,7 @@ class Device {
   }
 
   reset() {
+    this.gen++;
     clearTimeout(this.idleTimer);
     this.closeCard();
     this.hideElicit();

@@ -51,7 +51,8 @@
   .sec-title .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.07); color: var(--text-2); font-size: 12px; letter-spacing: 0; }
   .summary { font-size: 18.5px; line-height: 1.5; color: var(--text); margin: 0; max-width: 62ch; }
 
-  .cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+  .cols > .sec { border-bottom: 0; }
   .cols > .sec + .sec { border-left: 1px solid var(--line); }
   @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } .cols > .sec + .sec { border-left: 0; } }
 
@@ -81,7 +82,7 @@
   .fill.mid { background: var(--amber); }
   .fill.low { background: var(--red); }
   .adh b { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 40px; }
-  .changed { display: inline-block; margin-top: 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--amber); }
+  .changed { display: block; width: fit-content; margin-top: 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--amber); }
 
   /* Bring list */
   .bring { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 18px; }

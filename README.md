@@ -68,6 +68,7 @@ Front-door events arrive through a webhook and become care signals:
 - **Consent first**: *"Would you like me to let Maya and Leo know you're feeling dizzy?"* (MCP elicitation). Emergencies skip the question.
 - **Rose is in charge**: she decides what the circle sees (`set_sharing`); only she can change it.
 - **Blood pressure by voice**, checked against the limits Dr. Patel wrote.
+- **Refills before they run out**: Nova counts pills, nudges at 10 AM when a bottle has five days left, sends the refill to the pharmacy, and says when it's ready and who can pick it up.
 - **Doctor-visit brief** with adherence, symptoms with first-seen dates, and questions to ask.
 
 ## Architecture
@@ -87,7 +88,7 @@ flowchart LR
     V["Polly voice"]
   end
   subgraph Nova["nova_server/ (MCP server)"]
-    T["21 tools · 8 resources · 2 prompts<br/>5 ui:// views"]
+    T["22 tools · 8 resources · 2 prompts<br/>5 ui:// views"]
     E["Care engine<br/>(household clock)"]
     X["Insight engine"]
     S["Vision: pill check,<br/>reconciliation"]
@@ -160,6 +161,12 @@ Open the simulator in Chrome (for the microphone and camera). Try:
 - **stdio** (Claude Desktop, Kiro, Claude Code): `uv run python -m nova_server --stdio --as rose`.
 - **Docker**: `docker build -t nova-mcp . && docker run -p 8765:8765 -e NOVA_PUBLIC_URL=https://your.host nova-mcp`.
 
+### Record the demo video
+```bash
+uv run --with playwright --with imageio-ffmpeg --with boto3 python scripts/record_demo.py --url http://127.0.0.1:8080
+```
+It drives the story in real Chrome, captures Alexa's spoken replies, adds an Amazon Polly narrator, and writes `demo/nova-demo.mp4` (under 3 minutes).
+
 ### Tests
 ```bash
 uv run pytest -q
@@ -181,6 +188,7 @@ uv run pytest -q
 | `check_medication` | both | "Did I take…", "what's the pink pill for?" |
 | `daily_checkin` | Rose | Free-form check-in → structured signals, red flags, consent |
 | `log_vitals` | both | Blood pressure by voice, checked against the doctor's limits |
+| `request_refill` | both | Refill to the pharmacy, with pickup plan; pill supply is tracked automatically |
 | `send_message` / `read_messages` | both | Circle messaging, delivered live as announcements |
 | `read_notifications` / `snooze_reminder` | both | "What are my notifications?", "Remind me in 10 minutes" |
 | `ask_care_notes` | both | Grounded answers from doctors' notes, with sources |

@@ -85,6 +85,7 @@ class CareEngine:
             fired += self._appointments(elder, last, t)
             fired += self._wellness(elder, last, t)
             fired += self._refills(elder, last, t)
+            fired += self._digest(elder, last, t)
         self.fired += fired
         return fired
 
@@ -259,6 +260,44 @@ class CareEngine:
                 )
             self.store.add_alert(elder["id"], "urgent", f"quiet-{t.date()}",
                                  f"No activity at {elder['short_name']}'s home this morning and no answer to Nova's check-in.")
+        return fired
+
+    # -- Sunday family digest -------------------------------------------------
+    def weekly_digest(self, elder: dict[str, Any], t: datetime) -> str:
+        name = elder["short_name"]
+        adh = ins.adherence(self.store, elder["id"], 7, t)
+        parts = [f"Here's {name}'s week. She took {adh['pct']} percent of her doses"]
+        if adh.get("morning_pct") is not None and adh.get("evening_pct") is not None and adh["morning_pct"] - adh["evening_pct"] >= 20:
+            parts[-1] += f": mornings {adh['morning_pct']} percent, evenings {adh['evening_pct']}"
+        parts[-1] += "."
+        bps = self.store.bp(elder["id"], t - timedelta(days=7))
+        if bps:
+            sys_ = round(sum(b["systolic"] for b in bps) / len(bps))
+            dia = round(sum(b["diastolic"] for b in bps) / len(bps))
+            parts.append(f"Blood pressure averaged {sys_} over {dia}.")
+        found = [i for i in ins.detect_insights(self.store, elder["id"], t) if i["severity"] != "info"]
+        if found:
+            parts.append(f"The main thing to watch: {found[0]['title'][:1].lower() + found[0]['title'][1:]}.")
+        visits = [s for s in self.store.signals(elder["id"], t - timedelta(days=7)) if s["kind"] == "ding" and s["who"] == "grace"]
+        if visits:
+            parts.append(f"Grace visited {len(visits)} time{'s' if len(visits) > 1 else ''}.")
+        medical = [a for a in self.store.appointments(elder["id"], t, t + timedelta(days=7))
+                   if not (a["provider"] and a["provider"].split()[0] in a["title"])]
+        if medical:
+            a = medical[0]
+            parts.append(f"Coming up: {a['title']} with {a['provider']}, {ins.mid_sentence(ins.when_label(parse(a['at']), t))}.")
+        return " ".join(parts)
+
+    def _digest(self, elder: dict[str, Any], last: datetime, t: datetime) -> list[str]:
+        at = t.replace(hour=18, minute=0, second=0)
+        if t.weekday() != 6 or not self._crossed(at, last, t):
+            return []
+        text = self.weekly_digest(elder, t)
+        fired: list[str] = []
+        for cg in self._family():
+            fired += self._fire(f"digest:{t.date()}:{cg['id']}", cg["id"], "info", f"{elder['short_name']}'s week",
+                                text, due_at=at, expects_reply=True,
+                                replies=["How's Mom doing?", "Prepare a brief for Mom's cardiology visit"])
         return fired
 
     # -- refills --------------------------------------------------------------

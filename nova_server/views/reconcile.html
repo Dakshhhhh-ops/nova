@@ -403,6 +403,10 @@ bridge.on("ui/notifications/tool-result", (params) => {
 });
 bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
 bridge.on("ui/notifications/host-context-changed", () => {});
+// Host automation (demo recording): press our own Approve / Discard button.
+bridge.on("nova/demo-action", (p) => {
+  if (p && (p.action === "approve" || p.action === "discard")) decide(p.action === "approve");
+});
 
 renderSkeleton();
 reportSize();

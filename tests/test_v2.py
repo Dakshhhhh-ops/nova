@@ -198,6 +198,16 @@ def test_bp_prompt_only_after_doctor_asks():
     assert any(k.startswith("bp:") for k in run(eng2, at(7, 45), at(7, 50)))
 
 
+# -- weekly digest ----------------------------------------------------------
+def test_sunday_digest_reaches_the_family():
+    sunday = TODAY + timedelta(days=(6 - TODAY.weekday()) % 7)
+    eng = freeze_and_seed(sunday.replace(hour=17, minute=50))
+    fired = run(eng, sunday.replace(hour=17, minute=55), sunday.replace(hour=18, minute=5))
+    assert {k.split(":")[-1] for k in fired if k.startswith("digest:")} == {"maya", "leo"}
+    text = next(a for a in server.store.announcements("maya") if a["title"] == "Rose's week")["speech"]
+    assert "percent of her doses" in text and "Blood pressure averaged" in text
+
+
 # -- refills ----------------------------------------------------------------
 async def test_low_supply_nudge_refill_and_pharmacy_ready():
     eng = freeze_and_seed(at(9, 50))

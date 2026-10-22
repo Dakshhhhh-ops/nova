@@ -159,6 +159,20 @@
 
   .empty { color: var(--muted); font-size: 16px; padding: 6px 2px; }
 
+  /* Supply */
+  .sups { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .sup { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); }
+  .sup.low { border-color: rgba(255,181,71,.45); background: linear-gradient(90deg, rgba(255,181,71,.10), transparent 75%); }
+  .pill-tile.sm { width: 40px; height: 40px; border-radius: 11px; flex: none; }
+  .pill-tile.sm svg { width: 30px; height: 30px; }
+  .sup-main { min-width: 0; }
+  .sup-name { font-family: var(--serif); font-size: 19px; line-height: 1.15; }
+  .sup-meta { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+  .sup.low .sup-meta { color: var(--amber); }
+  .rf { display: inline-block; margin-top: 5px; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+  .rf.req { color: var(--accent); }
+  .rf.ready { color: var(--green); }
+
   /* Skeleton */
   .sk { background: linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.05) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
   @keyframes shimmer { to { background-position: -200% 0; } }
@@ -434,6 +448,27 @@ function render() {
       }).join("")
     : '<div class="empty">Nothing on the calendar.</div>';
 
+  // Supply: pills left per medicine, with refill status (warning at 5 days or fewer).
+  const refills = arr(d.refills).filter((r) => r && typeof r === "object");
+  const refillFor = (name) => refills.find((r) => String(r.name || "").toLowerCase() === String(name || "").toLowerCase());
+  const supply = arr(d.supply).filter((s) => s && typeof s === "object" && (s.name || s.med_id));
+  const supplyItems = supply.map((s) => {
+    const days = Number(s.days_left), left = Number(s.left);
+    const low = Number.isFinite(days) && days <= 5;
+    const look = doses.find((x) => x.med_id && x.med_id === s.med_id);
+    const r = refillFor(s.name);
+    const rf = r ? `<span class="rf ${r.status === "ready" ? "ready" : "req"}">${r.status === "ready" ? "Ready" : "Requested"}${r.pharmacy ? " · " + esc(r.pharmacy) : ""}</span>` : "";
+    return `<div class="sup${low ? " low" : ""}"><div class="pill-tile sm">${pillSVG(look ? look.appearance : "")}</div>
+      <div class="sup-main"><div class="sup-name">${esc(s.name || s.med_id)}</div>
+      <div class="sup-meta">${Number.isFinite(left) ? `${left} left` : ""}${Number.isFinite(days) ? `${Number.isFinite(left) ? " · " : ""}${days} day${days === 1 ? "" : "s"}` : ""}</div>${rf}</div></div>`;
+  });
+  for (const r of refills) {
+    if (supply.some((s) => String(s.name || "").toLowerCase() === String(r.name || "").toLowerCase())) continue;
+    supplyItems.push(`<div class="sup"><div class="sup-main"><div class="sup-name">${esc(r.name || "Refill")}</div>
+      <span class="rf ${r.status === "ready" ? "ready" : "req"}">${r.status === "ready" ? "Ready" : "Requested"}${r.pharmacy ? " · " + esc(r.pharmacy) : ""}</span></div></div>`);
+  }
+  const supplyHtml = supplyItems.length ? `<section aria-label="Supply" style="margin-top:4px"><div class="section-title">Supply</div><div class="sups">${supplyItems.join("")}</div></section>` : "";
+
   const unread = Number(d.unread_messages) || 0;
   const msgs = `<div class="tile msgs">
       <div class="msgs-ico">${ICON.mail}${unread ? `<span class="badge">${unread}</span>` : ""}</div>
@@ -449,6 +484,7 @@ function render() {
     </header>
     ${hero}
     <section aria-label="Medicines"><div class="section-title">Today's medicines</div>${slotHtml}</section>
+    ${supplyHtml}
     <div class="bottom">
       <section><div class="section-title">Coming up</div><div class="tile" style="padding:6px 16px">${apptHtml}</div></section>
       <section><div class="section-title">Messages</div>${msgs}</section>
@@ -498,6 +534,10 @@ async function markTaken(i) {
       if (row === dose) clickedHandled = true;
     }
     if (!clickedHandled && !logged.length) { dose.status = "taken"; dose.logged_at = new Date().toISOString(); }
+    for (const ls of arr(sc.low_supply)) {
+      const row = arr(model.supply).find((s) => s && String(s.name || "").toLowerCase() === String(ls && ls.name || "").toLowerCase());
+      if (row && Number.isFinite(Number(ls.left))) row.left = Number(ls.left);
+    }
     busy.delete(i);
     render();
     const el = document.querySelector(`[data-row="${i}"]`);

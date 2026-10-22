@@ -152,15 +152,17 @@ class Device:
         self.client = None
 
     def tool_specs(self) -> list[dict[str, Any]]:
-        """Tools the model may call. App-only tools (camera, screen buttons) are left out (`_meta.ui.visibility`)."""
+        """Tools the model may call. App-only tools (camera, screen buttons) are left out (`_meta.ui.visibility`),
+        and so are caregiver-only tools on the older adult's own Echo: fewer tokens, fewer wrong picks."""
         def model_visible(t: Any) -> bool:
             vis = ((t.meta or {}).get("ui") or {}).get("visibility")
             return not vis or "model" in vis
 
+        skip = CAREGIVER_ONLY if self.person.get("role") == "elder" else set()
         return [
             {"name": t.name, "description": t.description or t.title or t.name,
              "input_schema": t.input_schema or {"type": "object", "properties": {}}}
-            for t in self.tools if model_visible(t)
+            for t in self.tools if model_visible(t) and t.name not in skip
         ]
 
     def ui_uri(self, tool_name: str) -> str | None:
@@ -173,6 +175,9 @@ class Device:
 
 
 SPEECH_FIRST = os.getenv("NOVA_SPEECH_FIRST", "1") not in ("0", "false", "no")
+# Tools for the family and the aide; Rose's Echo doesn't offer them to the model.
+CAREGIVER_ONLY = {"care_briefing", "list_alerts", "resolve_alert", "visit_checklist", "recent_activity",
+                  "apply_care_changes"}
 OFFER = "Want the details?"
 
 HOUSEHOLD: dict[str, Any] = {"now": None, "speed": 1.0}  # kept fresh by the simulator's clock poller

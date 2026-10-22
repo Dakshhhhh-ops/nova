@@ -269,11 +269,17 @@ def match_doses(elder: dict[str, Any], medication: str, time_of_day: str, t) -> 
     """Resolve 'my morning pills', 'the pink one', 'blood pressure pill', '8 AM' to today's doses."""
     doses = ins.doses_for_day(store, elder["id"], t, t)
     meds = {m["id"]: m for m in store.medications(elder["id"])}
-    q = (medication or "").lower().strip()
+    filler = {"my", "her", "his", "their", "your", "the", "our", "a", "an", "pill", "pills", "tablet", "tablets",
+              "medicine", "medicines", "meds", "medication", "medications", "dose", "doses", "one", "all", "everything",
+              "morning", "evening", "night", "bedtime", "dinner", "breakfast", "tonight", "today"}
+    q = " ".join(w for w in (medication or "").lower().replace("?", "").split() if w not in filler).strip()
     tod = (time_of_day or "").lower().strip()
+    if not tod:
+        tod = next((w for w in ("morning", "evening", "bedtime", "night", "dinner", "breakfast", "tonight")
+                    if w in (medication or "").lower()), "")
 
     def med_matches(d: dict[str, Any]) -> bool:
-        if not q or q in ("pills", "my pills", "medicine", "medication", "medications", "all", "everything", "meds"):
+        if not q:
             return True
         m = meds[d["med_id"]]
         hay = " ".join([m["id"], m["name"], m["purpose"] or "", m["appearance"] or ""]).lower()
@@ -286,7 +292,7 @@ def match_doses(elder: dict[str, Any], medication: str, time_of_day: str, t) -> 
         at = parse(d["scheduled_for"])
         if "morn" in tod or "breakfast" in tod:
             return at.hour < 12
-        if "even" in tod or "dinner" in tod or "night" in tod or "bed" in tod or "supper" in tod:
+        if any(w in tod for w in ("even", "dinner", "night", "bed", "supper", "tonight")):
             return at.hour >= 17
         if "after" in tod or "lunch" in tod or "noon" in tod:
             return 12 <= at.hour < 17
@@ -302,7 +308,7 @@ def match_doses(elder: dict[str, Any], medication: str, time_of_day: str, t) -> 
             if not cur or dist < abs((parse(cur["scheduled_for"]) - t).total_seconds()):
                 best[d["med_id"]] = d
         cands = list(best.values())
-        if not q or q in ("pills", "my pills", "medicine", "medication", "medications", "meds", "all", "everything"):
+        if not q:
             # "I took my pills": only the doses in the slot closest to now.
             closest = min(cands, key=lambda d: abs((parse(d["scheduled_for"]) - t).total_seconds()))
             slot = ins.slot_of(parse(closest["scheduled_for"]))

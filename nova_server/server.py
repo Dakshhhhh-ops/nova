@@ -279,7 +279,8 @@ def match_doses(elder: dict[str, Any], medication: str, time_of_day: str, t) -> 
     meds = {m["id"]: m for m in store.medications(elder["id"])}
     filler = {"my", "her", "his", "their", "your", "the", "our", "a", "an", "pill", "pills", "tablet", "tablets",
               "medicine", "medicines", "meds", "medication", "medications", "dose", "doses", "one", "all", "everything",
-              "morning", "evening", "night", "bedtime", "dinner", "breakfast", "tonight", "today"}
+              "morning", "evening", "night", "bedtime", "dinner", "breakfast", "tonight", "today",
+              "it", "them", "those", "these", "yes", "i"}
     q = " ".join(w for w in (medication or "").lower().replace("?", "").split() if w not in filler).strip()
     tod = (time_of_day or "").lower().strip()
     if not tod:
@@ -994,7 +995,7 @@ def recent_activity(hours: Annotated[int, Field(description="How far back", ge=1
     ring = [i for i in items if i["kind"] == "ring"]
     if ring:
         r = ring[0]
-        parts.append(f"Last front-door activity: {r['text'][:1].lower() + r['text'][1:]}, "
+        parts.append(f"Last front-door activity: {r['text']}, "
                      f"{ins.mid_sentence(ins.when_label(parse(r['at']), t))}.")
     doses = [i for i in items if i["kind"] == "dose"]
     if doses:

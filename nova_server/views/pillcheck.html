@@ -226,7 +226,7 @@ function render(d) {
       </div>`
     : `<div class="card"><div class="card-k">${ICON.list}Your medicine list</div>
         <div class="nomatch">${verdict === "unclear" ? "Nothing to compare yet" : "No match on your list"}</div>
-        <div class="card-line">${verdict === "unclear" ? "Hold the label up to the camera and ask again." : "Check with your pharmacist or Dr. Moore before taking it."}</div></div>`;
+        <div class="card-line">${verdict === "unclear" ? "Hold the label up to the camera and ask again." : "Check with your pharmacist or doctor before taking it."}</div></div>`;
 
   $app.innerHTML = `
     <section class="verdict ${verdict}">

@@ -231,7 +231,8 @@ def read_document(store: Store, elder: dict[str, Any], by: dict[str, Any], image
         c = real[0]
         what = (f"{c['name']} goes from {c['from'].split(' (')[0]} to {c['to'].split(' (')[0]}" if c["op"] == "change"
                 else f"{c['op']} {c['name']}")
-        speech = (f"I read {source.get('provider') or 'the'} {source.get('title') or 'document'}. "
+        doc = (source.get("title") or "document").lower()
+        speech = (f"I read {source['provider'] + chr(39) + 's' if source.get('provider') else 'the'} {doc}. "
                   f"There {'is' if len(real) == 1 else 'are'} {len(real)} change{'s' if len(real) > 1 else ''}: {what}"
                   f"{' because of ' + c['reason'] if c.get('reason') else ''}. Want me to update {elder['short_name']}'s plan?")
     else:

@@ -135,6 +135,7 @@ class Device:
             client_info=Implementation(name="nova-alexa-plus-simulator", version="0.1.0"),
             extensions=[advertise(APPS_EXTENSION, {"mimeTypes": [APP_MIME]})],
             read_timeout_seconds=120,
+            cache=None,  # announcements are a live queue; never serve them from cache
         )
         self.client = await self._stack.enter_async_context(client)
         self.tools = (await self.client.list_tools()).tools
@@ -145,10 +146,15 @@ class Device:
         self.client = None
 
     def tool_specs(self) -> list[dict[str, Any]]:
+        """Tools the model may call. App-only tools (camera, screen buttons) are left out (`_meta.ui.visibility`)."""
+        def model_visible(t: Any) -> bool:
+            vis = ((t.meta or {}).get("ui") or {}).get("visibility")
+            return not vis or "model" in vis
+
         return [
             {"name": t.name, "description": t.description or t.title or t.name,
              "input_schema": t.input_schema or {"type": "object", "properties": {}}}
-            for t in self.tools
+            for t in self.tools if model_visible(t)
         ]
 
     def ui_uri(self, tool_name: str) -> str | None:
@@ -160,9 +166,12 @@ class Device:
         return None
 
 
+HOUSEHOLD: dict[str, Any] = {"now": None, "speed": 1.0}  # kept fresh by the simulator's clock poller
+
+
 def system_prompt(device: Device) -> str:
     p = device.person
-    t = household_now()
+    t = HOUSEHOLD["now"] or household_now()
     if p["role"] == "elder":
         who = (f"{p['name']} ({p['short_name']}), 81, who lives alone in {p['location']}. She is the person being cared for. "
                "Speak slowly and simply, be warm and patient, never patronizing.")
@@ -178,6 +187,11 @@ def system_prompt(device: Device) -> str:
         "- When Rose says she took (or skipped) a pill, call log_medication. If she asks whether she took it, call check_medication.\n"
         "- 'How is Mom doing?' and similar from family: call care_briefing.\n"
         "- To tell someone something, call send_message.\n"
+        "- Replies to Nova's reminders ('I took it', 'remind me in 10 minutes', 'not yet') refer to the latest "
+        "announcement in the conversation; 'remind me later' means snooze_reminder.\n"
+        "- 'Approve the changes' after a document scan means apply_care_changes with that change_set_id.\n"
+        "- You can't place phone calls in this simulation; if asked to call someone, say you're calling their Echo "
+        "and suggest send_message.\n"
         "Answer in one to three short spoken sentences, no markdown or lists. Prefer the tool's `speech` text; you "
         "may shorten it. Never invent medical facts, doses or advice. If there is an emergency, tell them to call 911."
     )
@@ -265,6 +279,46 @@ class Agent:
             "reply": reply, "cards": cards, "trace": trace, "brain": brain.label,
             "latency_ms": int((time.perf_counter() - t_start) * 1000),
         }
+
+    async def run_direct(self, device: Device, tool: str, args: dict[str, Any], said: str, emit: Emit) -> dict[str, Any]:
+        """A device action that isn't speech (the camera): call one tool and show its card."""
+        async with device.lock:
+            assert device.client is not None
+            t_start = time.perf_counter()
+            trace: list[dict[str, Any]] = []
+
+            async def push(item: dict[str, Any]) -> None:
+                item = {"at": now_iso(), **item}
+                trace.append(item)
+                await emit({"type": "trace", "device": device.id, "item": item})
+
+            shown = {k: (v[:48] + "…" if isinstance(v, str) and len(v) > 60 else v) for k, v in args.items()}
+            await push({"kind": "user", "text": said})
+            await push({"kind": "tool_call", "name": tool, "args": shown})
+            t0 = time.perf_counter()
+            result = await device.client.call_tool(tool, args)
+            data = structured_of(result)
+            ok = not getattr(result, "is_error", False)
+            uri = device.ui_uri(tool) if ok else None
+            await push({"kind": "tool_result", "name": tool, "ok": ok, "speech": data.get("speech"), "structured": data,
+                        "ui": uri, "ms": int((time.perf_counter() - t0) * 1000)})
+            cards = []
+            if uri:
+                cards.append({"tool": tool, "resource_uri": uri, "html": await self.read_ui(device, uri),
+                              "input": shown, "result": result_json(result)})
+            reply = data.get("speech") or ("Done." if ok else "Sorry, I couldn't read that.")
+            call_id = f"cam_{new_id()}"
+            device.history += [
+                {"role": "user", "text": said},
+                {"role": "assistant", "text": "", "tool_calls": [{"id": call_id, "name": tool, "args": {"image": "(photo)"}}]},
+                {"role": "tool", "id": call_id, "name": tool, "result": for_model(data, False) if ok else {"error": "failed"},
+                 "error": not ok},
+                {"role": "assistant", "text": reply},
+            ]
+            self._trim(device)
+            await push({"kind": "reply", "text": reply})
+            return {"reply": reply, "cards": cards, "trace": trace, "brain": data.get("generated_by", ""),
+                    "latency_ms": int((time.perf_counter() - t_start) * 1000)}
 
     async def read_ui(self, device: Device, uri: str) -> str:
         assert device.client is not None

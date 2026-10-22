@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Care plan update</title>
+<style>
+  :root {
+    --bg: #0A1322;
+    --paper: #0F1A2C;
+    --surface: #101B2E;
+    --surface-2: #15233A;
+    --line: rgba(255, 255, 255, .09);
+    --text: #F3F6FB;
+    --text-2: #BCC7D8;
+    --muted: #8291A8;
+    --accent: #00CAFF;
+    --accent-soft: rgba(0, 202, 255, .13);
+    --green: #3DDC97;
+    --amber: #FFB547;
+    --red: #FF7A7A;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--text); }
+  body {
+    margin: 0;
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px; line-height: 1.45; -webkit-font-smoothing: antialiased;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 8px; }
+  button { font: inherit; color: inherit; }
+  #app { padding: 0; }
+
+  .head { position: relative; padding: 20px 24px 16px; background: linear-gradient(180deg, rgba(0,202,255,.10), rgba(0,202,255,0)); border-bottom: 1px solid var(--line); }
+  .head::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--accent), rgba(0,202,255,.2)); }
+  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .eyebrow svg { width: 16px; height: 16px; }
+  h1 { margin: 6px 0 6px; font-size: 26px; line-height: 1.15; font-weight: 600; letter-spacing: -.01em; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-2); font-size: 14.5px; }
+  .status { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .status svg { width: 14px; height: 14px; }
+  .status.pending { background: rgba(255,181,71,.14); color: var(--amber); }
+  .status.applied { background: rgba(61,220,151,.14); color: var(--green); }
+  .status.discarded { background: rgba(255,255,255,.08); color: var(--text-2); }
+  .tally { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .tally span { font-size: 13px; color: var(--text-2); padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.05); }
+  .tally b { color: var(--text); }
+
+  .sec { padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  .sec-title { font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 0 0 10px; }
+
+  /* Diff rows */
+  .chg { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; padding: 12px 0; align-items: start; }
+  .chg + .chg { border-top: 1px solid var(--line); }
+  .op { display: inline-flex; justify-content: center; align-items: center; gap: 6px; width: 96px; padding: 5px 0; border-radius: 999px; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .op svg { width: 13px; height: 13px; }
+  .op.change { background: rgba(255,181,71,.15); color: var(--amber); }
+  .op.start { background: rgba(61,220,151,.15); color: var(--green); }
+  .op.stop { background: rgba(255,122,122,.15); color: var(--red); }
+  .op.continue { background: rgba(255,255,255,.07); color: var(--text-2); }
+  .chg-name { font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .diff { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; font-size: 15.5px; }
+  .from { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(255,122,122,.7); }
+  .to { color: var(--text); font-weight: 600; }
+  .arrow { color: var(--muted); }
+  .arrow svg { width: 16px; height: 16px; display: block; }
+  .reason { margin-top: 5px; font-size: 13.5px; color: var(--muted); }
+  .reason b { color: var(--text-2); font-weight: 600; }
+
+  .instr { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .instr li { display: flex; gap: 10px; font-size: 15.5px; }
+  .instr li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; margin-top: .55em; }
+
+  /* Sticky action bar */
+  .actions { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px;
+    background: linear-gradient(180deg, rgba(10,19,34,.82), rgba(10,19,34,.98)); backdrop-filter: blur(6px); border-top: 1px solid var(--line); }
+  .actions .note { font-size: 13.5px; color: var(--muted); }
+  .btns { display: flex; gap: 10px; }
+  .btn { border: 0; cursor: pointer; border-radius: 999px; padding: 11px 22px; font-size: 16px; font-weight: 600; background: var(--accent); color: #00202B;
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; transition: transform .12s, filter .2s; }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: scale(.97); }
+  .btn.ghost { background: rgba(255,255,255,.08); color: var(--text); }
+  .btn[disabled] { opacity: .6; cursor: default; }
+  .btn svg { width: 17px; height: 17px; }
+  .spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result */
+  .done { display: flex; gap: 14px; align-items: center; margin: 16px 24px 4px; padding: 14px 16px; border-radius: 16px; animation: rise .4s ease both; }
+  .done.applied { background: rgba(61,220,151,.12); border: 1px solid rgba(61,220,151,.32); }
+  .done.discarded { background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+  .done-ico { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .done.applied .done-ico { background: var(--green); color: #0A1322; }
+  .done.discarded .done-ico { background: rgba(255,255,255,.12); color: var(--text-2); }
+  .done-ico svg { width: 22px; height: 22px; }
+  .done-title { font-size: 18px; font-weight: 600; }
+  .done-sub { font-size: 14.5px; color: var(--text-2); }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+  .plan { width: 100%; border-collapse: collapse; }
+  .plan td { padding: 9px 10px 9px 0; border-top: 1px solid var(--line); vertical-align: middle; font-size: 15.5px; }
+  .plan tr:first-child td { border-top: 0; }
+  .plan .nm { font-weight: 600; }
+  .plan .ds { color: var(--text-2); }
+  .pill-tile { width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,.06); display: grid; place-items: center; }
+  .pill-tile svg { width: 30px; height: 30px; }
+  .times { display: flex; flex-wrap: wrap; gap: 5px; }
+  .time { font-size: 13px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+  .new-tag { margin-left: 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--green); }
+
+  footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12.5px; padding: 12px 24px 14px; flex-wrap: wrap; }
+  footer svg { width: 14px; height: 14px; color: var(--accent); vertical-align: -2px; margin-right: 6px; }
+  .empty { color: var(--muted); font-size: 15px; }
+
+  .sk { background: linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.05) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .state { min-height: 220px; display: grid; place-items: center; text-align: center; padding: 30px; }
+  .state h2 { margin: 10px 0 6px; font-size: 21px; font-weight: 600; }
+  .state p { margin: 0; font-size: 15px; color: var(--muted); max-width: 440px; }
+  .state svg { color: var(--text-2); }
+  .toast { position: fixed; left: 50%; bottom: 76px; transform: translate(-50%, 20px); opacity: 0; background: rgba(20,34,56,.96); border: 1px solid rgba(255,255,255,.12);
+    padding: 9px 16px; border-radius: 999px; font-size: 14px; max-width: calc(100% - 40px); box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    transition: opacity .25s, transform .25s; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 600px) { .chg { grid-template-columns: 1fr; gap: 6px; } .actions { flex-direction: column; align-items: stretch; } .btns { justify-content: flex-end; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app" aria-live="polite"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26), postMessage JSON-RPC ---------- */
+const bridge = (() => {
+  const handlers = {};
+  const pending = new Map();
+  let seq = 0;
+  const post = (msg) => { try { window.parent.postMessage(msg, "*"); } catch (_) { /* detached */ } };
+  window.addEventListener("message", (ev) => {
+    if (ev.source !== window.parent) return;
+    const m = ev.data;
+    if (!m || typeof m !== "object" || m.jsonrpc !== "2.0") return;
+    if (m.method === undefined && m.id !== undefined) {
+      const p = pending.get(m.id);
+      if (!p) return;
+      pending.delete(m.id);
+      if (m.error) p.reject(new Error(m.error.message || "Request failed"));
+      else p.resolve(m.result);
+      return;
+    }
+    if (m.id !== undefined && m.id !== null) {
+      if (m.method === "ping" || m.method === "ui/resource-teardown") post({ jsonrpc: "2.0", id: m.id, result: {} });
+      else post({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Method not found: " + m.method } });
+      return;
+    }
+    const h = handlers[m.method];
+    if (h) { try { h(m.params || {}); } catch (err) { showState("Something went wrong", String(err && err.message || err)); } }
+  });
+  return {
+    on(method, fn) { handlers[method] = fn; },
+    notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); },
+    request(method, params, timeoutMs = 30000) {
+      const id = ++seq;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { pending.delete(id); reject(new Error("The request timed out")); }, timeoutMs);
+        pending.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v); }, reject: (e) => { clearTimeout(timer); reject(e); } });
+        post({ jsonrpc: "2.0", id, method, params: params || {} });
+      });
+    },
+  };
+})();
+
+/* ---------- helpers ---------- */
+const $app = document.getElementById("app");
+const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const arr = (v) => (Array.isArray(v) ? v : []);
+const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+function structuredFrom(r) {
+  if (!r || typeof r !== "object") return null;
+  if (r.structuredContent && typeof r.structuredContent === "object") return r.structuredContent;
+  for (const b of arr(r.content)) {
+    if (b && b.type === "text" && typeof b.text === "string") { try { const v = JSON.parse(b.text); if (v && typeof v === "object") return v; } catch (_) { /* not JSON */ } }
+  }
+  return null;
+}
+function textFrom(r) { const b = arr(r && r.content).find((c) => c && c.type === "text"); return b ? String(b.text || "") : ""; }
+let toastTimer = 0;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = "toast"; }, 3600);
+}
+
+const ICON = {
+  doc: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5h6.5L15 6v11.5H5z"/><path d="M11 2.5V6.5h4M7.5 10h5M7.5 13h5"/></svg>',
+  arrow: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h11M11 5.5L15.5 10 11 14.5"/></svg>',
+  check: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3L13 4.5"/></svg>',
+  x: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  clock: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.2l2 1.3"/></svg>',
+  change: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5h9.5L10 3M13 10.5H3.5L6 13"/></svg>',
+  start: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>',
+  stop: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3.5 8h9"/></svg>',
+  continue: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h8.5M9 5l3 3-3 3"/></svg>',
+  spark: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z"/></svg>',
+  big: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>',
+};
+const PILL_COLORS = [["pink", "#F7A8C4"], ["yellow", "#F6CF52"], ["orange", "#F6A04D"], ["blue", "#7DB4FF"], ["red", "#F27C7C"],
+  ["green", "#8EDBA9"], ["purple", "#B9A2F5"], ["brown", "#C49A6C"], ["peach", "#F8C3A0"], ["gray", "#C2C8D2"], ["grey", "#C2C8D2"], ["white", "#ECEFF4"]];
+function pillSVG(appearance) {
+  const a = String(appearance || "").toLowerCase();
+  const hit = PILL_COLORS.find(([k]) => a.includes(k));
+  const c = hit ? hit[1] : "#DDE3EC";
+  let body;
+  if (/softgel|gel cap|gelcap/.test(a)) body = `<ellipse cx="22" cy="21" rx="15" ry="9.5" fill="${c}" opacity=".92"/><ellipse cx="17" cy="17.5" rx="6" ry="2.4" fill="#fff" opacity=".55"/>`;
+  else if (/oblong|long|caplet|capsule/.test(a)) body = `<rect x="5" y="14" width="34" height="14" rx="7" fill="${c}"/><path d="M22 15.5v11" stroke="rgba(0,0,0,.18)" stroke-width="1.4"/>`;
+  else if (/round|circle/.test(a)) body = `<circle cx="22" cy="21" r="11" fill="${c}"/><path d="M13.5 21h17" stroke="rgba(0,0,0,.16)" stroke-width="1.4"/>`;
+  else body = `<ellipse cx="22" cy="21" rx="14" ry="9.5" fill="${c}"/><ellipse cx="17.5" cy="17" rx="5" ry="2.2" fill="#fff" opacity=".5"/>`;
+  return `<svg viewBox="0 0 44 44" aria-hidden="true"><ellipse cx="22" cy="35" rx="13" ry="2.6" fill="rgba(0,0,0,.35)"/><g transform="rotate(-18 22 21)">${body}</g></svg>`;
+}
+
+/* ---------- state + rendering ---------- */
+let model = null;
+let phase = "pending"; // pending | busy-approve | busy-discard | applied | discarded
+let outcome = null;    // apply_care_changes structuredContent
+
+const OPS = ["change", "start", "stop", "continue"];
+const opOf = (c) => (OPS.includes(String(c && c.op)) ? c.op : "change");
+
+function render() {
+  const d = model || {};
+  const src = obj(d.source) || {};
+  const changes = arr(d.changes).filter((c) => obj(c));
+  const instructions = arr(d.instructions).filter(Boolean);
+  const status = phase === "applied" || phase === "discarded" ? phase : (["applied", "discarded"].includes(d.status) ? d.status : "pending");
+
+  const counts = {};
+  for (const c of changes) counts[opOf(c)] = (counts[opOf(c)] || 0) + 1;
+  const tally = OPS.filter((o) => counts[o]).map((o) => `<span><b>${counts[o]}</b> ${o === "continue" ? "unchanged" : o === "change" ? (counts[o] === 1 ? "change" : "changes") : o}</span>`).join("");
+
+  const statusChip = {
+    pending: `<span class="status pending">${ICON.clock}Needs review</span>`,
+    applied: `<span class="status applied">${ICON.check}Applied</span>`,
+    discarded: `<span class="status discarded">${ICON.x}Discarded</span>`,
+  }[status];
+
+  const rows = changes.length ? changes.map((c) => {
+    const op = opOf(c);
+    const from = c.from ? `<span class="from">${esc(c.from)}</span>` : "";
+    const to = c.to ? `<span class="to">${esc(c.to)}</span>` : "";
+    let diff = "";
+    if (op === "change") diff = `${from}${from && to ? `<span class="arrow">${ICON.arrow}</span>` : ""}${to}`;
+    else if (op === "start") diff = to || from;
+    else if (op === "stop") diff = from || to;
+    else diff = `<span class="to" style="font-weight:400;color:var(--text-2)">${esc(c.to || c.from || "")}</span>`;
+    return `<div class="chg ${op}"><span class="op ${op}">${ICON[op]}${op}</span>
+      <div style="min-width:0"><div class="chg-name">${esc(c.name || "")}</div>${diff ? `<div class="diff">${diff}</div>` : ""}
+      ${c.reason ? `<div class="reason"><b>Why:</b> ${esc(c.reason)}</div>` : ""}</div></div>`;
+  }).join("") : '<div class="empty">No medication changes found in this document.</div>';
+
+  // After approval: the updated plan from the result.
+  let resultHtml = "";
+  if (phase === "applied" || phase === "discarded") {
+    const sc = outcome || {};
+    const plan = arr(sc.plan).filter((p) => obj(p));
+    const changedNames = new Set(arr(sc.applied).concat(changes).filter((c) => obj(c) && opOf(c) !== "continue").map((c) => String(c.name || "").toLowerCase()));
+    resultHtml = `<div class="done ${phase}"><div class="done-ico">${phase === "applied" ? ICON.check : ICON.x}</div>
+      <div><div class="done-title">${phase === "applied" ? "Care plan updated" : "Changes discarded"}</div>
+      <div class="done-sub">${esc(sc.speech || (phase === "applied" ? "Reminders now follow the new plan." : "The care plan was left as it was."))}</div></div></div>
+      ${plan.length ? `<section class="sec"><div class="sec-title">Updated plan</div><table class="plan"><tbody>
+        ${plan.map((p) => `<tr><td style="width:48px"><div class="pill-tile">${pillSVG(p.appearance)}</div></td>
+          <td><span class="nm">${esc(p.name || "")}</span>${changedNames.has(String(p.name || "").toLowerCase()) ? '<span class="new-tag">Updated</span>' : ""}</td>
+          <td class="ds">${esc(p.dose || "")}</td>
+          <td><div class="times">${arr(p.times).map((t) => `<span class="time">${esc(t)}</span>`).join("")}</div></td></tr>`).join("")}
+      </tbody></table></section>` : ""}`;
+  }
+
+  const busy = phase === "busy-approve" || phase === "busy-discard";
+  const actions = status === "pending" && changes.length ? `<div class="actions"><span class="note">Nothing changes until you approve.</span><div class="btns">
+      <button class="btn ghost" data-act="discard" ${busy ? "disabled" : ""}>${phase === "busy-discard" ? '<span class="spinner"></span>' : ""}Discard</button>
+      <button class="btn" data-act="approve" ${busy ? "disabled" : ""}>${phase === "busy-approve" ? '<span class="spinner"></span>Applying' : ICON.check + "Approve changes"}</button>
+    </div></div>` : "";
+
+  const meta = [src.provider, src.facility, src.date].filter(Boolean).map((m) => `<span>${esc(m)}</span>`).join("");
+
+  $app.innerHTML = `
+    <header class="head"><div class="head-row"><div style="min-width:0">
+      <div class="eyebrow">${ICON.doc}Care plan update</div>
+      <h1>${esc(src.title || "Care document")}</h1>${meta ? `<div class="meta">${meta}</div>` : ""}</div>${statusChip}</div>
+      ${tally ? `<div class="tally">${tally}</div>` : ""}
+    </header>
+    ${resultHtml}
+    <section class="sec"><div class="sec-title">Medication changes</div>${rows}</section>
+    ${instructions.length ? `<section class="sec"><div class="sec-title">Instructions</div><ul class="instr">${instructions.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></section>` : ""}
+    <footer><span>${d.generated_by ? `${ICON.spark}Read by ${esc(d.generated_by)}` : ""}</span><span>${d.change_set_id ? "Change set " + esc(d.change_set_id) : ""}</span></footer>
+    ${actions}`;
+}
+
+function renderSkeleton() {
+  const row = '<div class="chg"><div class="sk" style="height:26px;border-radius:999px"></div><div><div class="sk" style="height:18px;width:40%"></div><div class="sk" style="height:14px;width:70%;margin-top:8px"></div></div></div>';
+  $app.innerHTML = `<header class="head"><div class="sk" style="height:12px;width:150px"></div><div class="sk" style="height:26px;width:55%;margin-top:12px"></div><div class="sk" style="height:14px;width:60%;margin-top:10px"></div></header>
+    <section class="sec">${row}${row}${row}</section>`;
+}
+
+function showState(title, detail) {
+  $app.innerHTML = `<div class="state"><div>${ICON.big}<h2>${esc(title)}</h2><p>${esc(detail || "")}</p></div></div>`;
+}
+
+/* ---------- actions ---------- */
+async function decide(approve) {
+  if (!model || phase.startsWith("busy") || phase === "applied" || phase === "discarded") return;
+  if (!model.change_set_id) { toast("This document has no change set to apply."); return; }
+  phase = approve ? "busy-approve" : "busy-discard";
+  render();
+  try {
+    const res = await bridge.request("tools/call", { name: "apply_care_changes", arguments: { change_set_id: model.change_set_id, approve } }, 45000);
+    if (!res || res.isError) throw new Error(textFrom(res) || "Couldn't update the care plan.");
+    outcome = structuredFrom(res) || {};
+    phase = outcome.status === "discarded" || !approve ? "discarded" : "applied";
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) {
+    phase = "pending";
+    render();
+    toast(String(err && err.message || err));
+  }
+}
+
+$app.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-act]");
+  if (b) decide(b.getAttribute("data-act") === "approve");
+});
+
+/* ---------- size reporting ---------- */
+let lastH = 0, lastW = 0, rafId = 0;
+function reportSize() {
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(() => {
+    const rect = $app.getBoundingClientRect();
+    const h = Math.ceil(rect.height), w = Math.ceil(rect.width);
+    if (h === lastH && w === lastW) return;
+    lastH = h; lastW = w;
+    bridge.notify("ui/notifications/size-changed", { width: w, height: h });
+  });
+}
+if ("ResizeObserver" in window) new ResizeObserver(reportSize).observe($app);
+
+/* ---------- lifecycle ---------- */
+bridge.on("ui/notifications/tool-input", () => {});
+bridge.on("ui/notifications/tool-result", (params) => {
+  if (params && params.isError) { showState("I couldn't read that document", textFrom(params) || "Please try again in a moment."); return; }
+  const data = structuredFrom(params);
+  if (!data) { showState("I couldn't read that document", "Nova didn't send any details this time."); return; }
+  model = data;
+  phase = ["applied", "discarded"].includes(data.status) ? data.status : "pending";
+  outcome = null;
+  render();
+});
+bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
+bridge.on("ui/notifications/host-context-changed", () => {});
+
+renderSkeleton();
+reportSize();
+if (window.parent === window) {
+  showState("Open this from Alexa", "Scan a care document and Nova will show the medication changes for review.");
+} else {
+  bridge.request("ui/initialize", {
+    appCapabilities: { availableDisplayModes: ["inline"] },
+    clientInfo: { name: "nova-reconcile", version: "0.2.0" },
+    protocolVersion: "2026-01-26",
+  }, 10000).then(() => bridge.notify("ui/notifications/initialized", {}))
+    .catch(() => showState("Couldn't connect", "This view needs an MCP Apps host."));
+}
+</script>
+</body>
+</html>

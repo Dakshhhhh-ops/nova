@@ -35,8 +35,28 @@ def _med_phrase(text: str) -> str:
     return phrase
 
 
-def route(text: str, role: str) -> dict[str, Any] | None:
+def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     t = text.lower().strip()
+    m = re.search(r"remind me (?:again )?in (\d+)", t)
+    if m or re.search(r"remind me later|snooze", t):
+        return _call("snooze_reminder", minutes=int(m.group(1)) if m else 10)
+    if re.search(r"approve|apply (the )?changes|update (mom'?s |her |the )?plan|yes,? update", t):
+        cs = _latest_change_set(history or [])
+        if cs:
+            return _call("apply_care_changes", change_set_id=cs, approve=True)
+    if re.search(r"discard|don'?t update|keep the old plan", t):
+        cs = _latest_change_set(history or [])
+        if cs:
+            return _call("apply_care_changes", change_set_id=cs, approve=False)
+    if re.search(r"notifications?\b", t):
+        return _call("read_notifications")
+    if role != "elder" and re.search(r"remind (mom|her) again", t):
+        return _call("send_message", to="Mom", message="Maya asked me to remind you to take your medicines. Love you!")
+    m = re.search(r"\bask (grace|leo|maya) to (.+)", text, flags=re.I)
+    if m:
+        return _call("send_message", to=m.group(1), message=f"Could you {m.group(2).rstrip('.')}?")
+    if role != "elder" and re.search(r"last (open|opened)|front door|been by|activity|has grace|visited", t):
+        return _call("recent_activity", hours=24)
     if re.search(r"\bhelp me\b|call for help|i need help|emergency", t):
         return _call("get_help", reason=text)
     if re.search(r"i (fell|have fallen|fall)|chest pain|can't breathe|fainted|passed out", t):
@@ -69,15 +89,22 @@ def route(text: str, role: str) -> dict[str, Any] | None:
         return _call("care_briefing", period="today" if "today" in t else "week")
     if re.search(r"did (i|she|he|mom|rose) take|have (i|you) taken|has (she|mom|rose) taken|what('s| is) the .*(pill|for)|when do i take|what is .* for", t):
         return _call("check_medication", medication=_med_phrase(t.replace("did i take", "took").replace("did mom take", "took")), time_of_day=_tod(t))
-    if re.search(r"\b(took|taken|just had|had my|skipped)\b", t):
+    if re.search(r"\b(took|taken|just had|had my|skipped|skip)\b", t) and not re.search(r"\bnot yet\b", t):
         return _call("log_medication", medication=_med_phrase(t), time_of_day=_tod(t),
                      status="skipped" if "skip" in t else "taken")
     if re.search(r"doctor (say|said)|can i (take|have|eat)|should i|allowed|instructions|what did .* say|how much salt|pharmacy|allerg", t):
         return _call("ask_care_notes", question=text)
-    if role == "elder" and re.search(r"\bfeel|feeling|slept|sleep|tired|dizzy|woozy|pain|hurts|ache|mood|lonely|sad|great day|good day|bad day", t):
+    if role == "elder" and re.search(r"\bfeel|feeling|slept|sleep|tired|dizzy|woozy|pain|hurts|ache|mood|lonely|sad|great day|good day|bad day|i'?m fine|resting", t):
         return _call("daily_checkin", how_are_you_feeling=text)
     if re.search(r"today|schedule|what('s| is) next|my day|pills (now|today)|what do i take", t):
         return _call("get_today")
+    return None
+
+
+def _latest_change_set(history: list[dict[str, Any]]) -> str | None:
+    for m in reversed(history):
+        if m["role"] == "tool" and isinstance(m.get("result"), dict) and m["result"].get("change_set_id"):
+            return m["result"]["change_set_id"]
     return None
 
 
@@ -103,9 +130,15 @@ class RulesBrain(Backend):
         if speeches:
             return Step(text=" ".join(s for s in reversed(speeches) if s))
         user = next((m["text"] for m in reversed(history) if m["role"] == "user"), "")
-        call = route(user, self.role)
+        call = route(user, self.role, history)
         if call:
             return Step(tool_calls=[call])
+        low = user.lower()
+        if re.search(r"^call (mom|maya|leo|grace)", low):
+            who = re.search(r"^call (\w+)", low).group(1).capitalize()
+            return Step(text=f"Calling {who}'s Echo Show now.")
+        if re.search(r"not yet|no thanks|i'?ll handle it|i'?m on it", low):
+            return Step(text="Okay. I'll check back with you soon." if "not yet" in low else "Okay.")
         if re.search(r"^(hi|hello|hey|good (morning|evening|afternoon))", user.lower()):
             return Step(text="Hi! I can help with your medications, how you're feeling, messages from the family and upcoming appointments.")
         return Step(text="I can help with medications, check-ins, messages to the care circle, doctor's notes and appointments.")

@@ -22,12 +22,15 @@ from pydantic import BaseModel
 
 from nova_server.store import now as household_now
 
-from .agent import Agent, Device, new_id, result_json, structured_of
+from .agent import HOUSEHOLD, Agent, Device, new_id, result_json, structured_of
 
 log = logging.getLogger("nova.simulator")
 
 STATIC = Path(__file__).resolve().parent / "static"
 MCP_URL = os.getenv("NOVA_MCP_URL", "http://127.0.0.1:8765/mcp")
+MCP_BASE = MCP_URL.rsplit("/mcp", 1)[0]
+RING_SECRET = os.getenv("NOVA_RING_SECRET", "nova-demo-ring")
+SAMPLES = Path(__file__).resolve().parent.parent / "samples"
 
 DEVICES = {
     "kitchen": Device(
@@ -42,6 +45,7 @@ DEVICES = {
             "Any messages for me?",
             "Can I take ibuprofen for my knee?",
             "Tell Maya I loved Lily's recital video",
+            "Remind me in 10 minutes",
         ],
     ),
     "maya": Device(
@@ -55,6 +59,8 @@ DEVICES = {
             "Did Mom take her evening pills?",
             "Tell Mom I'll call her Sunday",
             "Any open alerts?",
+            "When did Mom last open the front door?",
+            "What are my notifications?",
         ],
     ),
 }
@@ -123,12 +129,55 @@ async def lifespan(_: FastAPI):
     state["agent"] = await asyncio.to_thread(Agent, DEVICES)
     log.info("Brain: %s", state["agent"].brain_info()["label"])
     await connect_all()
+    poller = asyncio.create_task(poll_announcements())
     yield
+    poller.cancel()
     for d in DEVICES.values():
         try:
             await d.close()
         except Exception:
             pass
+
+
+async def fetch_clock() -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=5) as http:
+        r = await http.get(f"{MCP_BASE}/demo/clock")
+        r.raise_for_status()
+        data = r.json()
+    from datetime import datetime
+
+    HOUSEHOLD["now"] = datetime.fromisoformat(data["now"])
+    HOUSEHOLD["speed"] = data.get("speed", 1.0)
+    return data
+
+
+async def poll_announcements() -> None:
+    """Deliver Nova's proactive announcements to each device (reading nova://announcements over MCP)."""
+    tick = 0
+    while True:
+        try:
+            if state["connected"]:
+                for d in DEVICES.values():
+                    if d.client is None:
+                        continue
+                    res = await d.client.read_resource("nova://announcements")
+                    text = next((getattr(c, "text", None) for c in res.contents if getattr(c, "text", None)), "{}")
+                    items = json.loads(text).get("items", [])
+                    for item in items:
+                        await hub.emit({"type": "announcement", "device": d.id, "item": item})
+                        # Keep the conversation aware of what Nova just said, so "I took it" makes sense.
+                        d.history.append({"role": "assistant", "text": f"(Nova announcement) {item['speech']}"})
+                    if items:
+                        await hub.emit({"type": "circle", "item": {"device": d.id}})
+            if tick % 2 == 0:
+                clock = await fetch_clock()
+                await hub.emit({"type": "clock", "now": clock["now"], "speed": clock["speed"]})
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # server restarting etc.
+            log.debug("announcement poll failed: %s", exc)
+        tick += 1
+        await asyncio.sleep(1.0)
 
 
 app = FastAPI(title="Nova · Alexa+ simulator", lifespan=lifespan)
@@ -159,7 +208,8 @@ async def status() -> dict[str, Any]:
         await connect_all()
     agent: Agent = state["agent"]
     return {
-        "household_now": household_now().isoformat(),
+        "household_now": (HOUSEHOLD["now"] or household_now()).isoformat(),
+        "clock_speed": HOUSEHOLD["speed"],
         "brain": agent.brain_info(),
         "mcp": {"url": MCP_URL, "connected": state["connected"], "error": state["error"],
                 "server_name": state["server"].get("title") or state["server"].get("name"), **state["server"]},
@@ -267,6 +317,108 @@ async def events() -> StreamingResponse:
 
 
 # ---------------------------------------------------------------------------
+# v2: household clock, announcements, vision, Ring
+# ---------------------------------------------------------------------------
+class ClockIn(BaseModel):
+    time: str | None = None
+    speed: float | None = None
+
+
+@app.get("/api/clock")
+async def get_clock() -> dict[str, Any]:
+    return await fetch_clock()
+
+
+@app.post("/api/clock")
+async def set_clock(body: ClockIn) -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=10) as http:
+        r = await http.post(f"{MCP_BASE}/demo/clock", json=body.model_dump(exclude_none=True))
+        r.raise_for_status()
+    clock = await fetch_clock()
+    if body.time:
+        for d in DEVICES.values():
+            d.history.clear()
+    await hub.emit({"type": "clock", "now": clock["now"], "speed": clock["speed"]})
+    await hub.emit({"type": "circle", "item": {}})
+    return clock
+
+
+@app.get("/api/announcements")
+async def list_announcements(device: str) -> dict[str, Any]:
+    await ensure_connected()
+    d = device_or_404(device)
+    result = await d.client.call_tool("read_notifications", {})
+    return {"items": structured_of(result).get("items", [])}
+
+
+class AckIn(BaseModel):
+    device: str
+    action: str = "acknowledged"
+
+
+@app.post("/api/announcements/{ann_id}/ack")
+async def ack_announcement(ann_id: int, body: AckIn) -> dict[str, Any]:
+    await ensure_connected()
+    d = device_or_404(body.device)
+    action = body.action if body.action in ("acknowledged", "dismissed") else "acknowledged"
+    await d.client.call_tool("acknowledge_notification", {"notification_id": ann_id, "action": action})
+    return {"ok": True}
+
+
+@app.get("/api/samples")
+async def samples() -> dict[str, Any]:
+    path = SAMPLES / "fixtures.json"
+    fixtures = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    items = [{"id": v["file"].rsplit(".", 1)[0], "kind": v["kind"], "label": v["label"], "url": f"/samples/{v['file']}"}
+             for v in fixtures.values()]
+    return {"samples": sorted(items, key=lambda x: (x["kind"], x["label"]))}
+
+
+class VisionIn(BaseModel):
+    device: str
+    kind: str
+    image: str
+
+
+@app.post("/api/vision")
+async def vision(body: VisionIn) -> dict[str, Any]:
+    await ensure_connected()
+    device = device_or_404(body.device)
+    tool = "check_pill_photo" if body.kind == "pill" else "read_care_document"
+    said = ("(Rose holds a pill bottle up to the camera) Is this the right pill?" if body.kind == "pill"
+            else "(Maya photographs the after-visit summary) Read this and update the plan.")
+    agent: Agent = state["agent"]
+    try:
+        out = await agent.run_direct(device, tool, {"image_base64": body.image}, said, hub.emit)
+    except Exception as exc:
+        log.exception("vision failed")
+        await hub.emit({"type": "trace", "device": device.id, "item": {"kind": "error", "message": str(exc)[:300]}})
+        raise HTTPException(500, str(exc)[:300])
+    await hub.emit({"type": "circle", "item": {"device": device.id}})
+    return out
+
+
+class RingIn(BaseModel):
+    kind: str
+    who: str | None = None
+
+
+@app.post("/api/ring/event")
+async def ring_event(body: RingIn) -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=10) as http:
+        r = await http.post(f"{MCP_BASE}/integrations/ring/events", json=body.model_dump(exclude_none=True),
+                            headers={"x-nova-ring-secret": RING_SECRET})
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, r.text[:200])
+    data = r.json()
+    await hub.emit({"type": "trace", "device": "kitchen", "item": {
+        "kind": "ring", "at": data.get("signal", {}).get("at"), "text": data.get("signal", {}).get("text"),
+        "announced": data.get("announced", [])}})
+    await hub.emit({"type": "circle", "item": {"ring": True}})
+    return data
+
+
+# ---------------------------------------------------------------------------
 # Speech: Amazon Polly when AWS is configured, otherwise the browser speaks.
 # ---------------------------------------------------------------------------
 _polly: dict[str, Any] = {"client": None, "ok": None}
@@ -311,3 +463,5 @@ async def tts(body: TtsIn) -> Response:
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+if SAMPLES.exists():
+    app.mount("/samples", StaticFiles(directory=SAMPLES), name="samples")

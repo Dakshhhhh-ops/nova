@@ -126,14 +126,14 @@ class CareEngine:
 
                 if self._crossed(at, last, t):
                     fired += self._fire(
-                        f"dose_reminder:{slot}", elder["id"], "dose_reminder", f"{ins.time_label(at)} medicines",
+                        f"dose_reminder:{slot}", elder["id"], "dose_reminder", f"{ins.time_label(at)} medicines", due_at=at,
                         f"It's {ins.time_label(at)}, {name}. Time for your {names}{food}. That's {looks}.",
                         expects_reply=True, replies=["I took it", "Remind me in 10 minutes", "I'll skip it tonight"],
                         related=related,
                     )
                 if self._crossed(at + FOLLOW_UP_AFTER, last, t) and not self.store.has_dedupe(f"snoozed:{slot}"):
                     fired += self._fire(
-                        f"dose_followup:{slot}", elder["id"], "dose_followup", "Just checking",
+                        f"dose_followup:{slot}", elder["id"], "dose_followup", "Just checking", due_at=at + FOLLOW_UP_AFTER,
                         f"Just checking, {name}: have you taken your {ins.time_label(at)} {names} yet?",
                         expects_reply=True, replies=["Yes, I took it", "Not yet", "Remind me in 10 minutes"],
                         related=related,
@@ -146,6 +146,7 @@ class CareEngine:
                         mom = (elder.get("relation") or "mom").split("/")[0].capitalize()
                         res = self._fire(
                             f"escalate:{slot}", cg["id"], "caregiver_escalation", f"{name} missed her {ins.time_label(at)} medicines",
+                            due_at=at + ESCALATE_AFTER,
                             f"{mom} hasn't taken her {ins.time_label(at)} {names}. I reminded her at {reminded}.",
                             severity="watch", expects_reply=True,
                             replies=["Remind Mom again", "Tell Mom I'll call her", "I'll handle it"],

@@ -45,7 +45,18 @@ CREATE TABLE IF NOT EXISTS medications (
     instructions TEXT,
     started TEXT,
     changed_on TEXT,
-    change_note TEXT
+    change_note TEXT,
+    supply INTEGER                -- pills on hand
+);
+CREATE TABLE IF NOT EXISTS refills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    med_id TEXT NOT NULL,
+    person_id TEXT NOT NULL,
+    requested_at TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    pharmacy TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'requested',   -- requested | ready | picked_up
+    ready_at TEXT
 );
 CREATE TABLE IF NOT EXISTS dose_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,6 +228,10 @@ class Store:
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
+        cols = {r[1] for r in self._db.execute("PRAGMA table_info(medications)").fetchall()}
+        if "supply" not in cols:  # databases created before refill tracking
+            self._db.execute("ALTER TABLE medications ADD COLUMN supply INTEGER")
+            self._db.commit()
 
     # -- low level -----------------------------------------------------------
     def q(self, sql: str, args: tuple | list = ()) -> list[dict[str, Any]]:
@@ -240,7 +255,7 @@ class Store:
         with self._lock:
             for table in (
                 "people", "sharing", "medications", "dose_events", "checkins",
-                "messages", "appointments", "care_notes", "alerts", "announcements", "signals", "change_sets", "vitals",
+                "messages", "appointments", "care_notes", "alerts", "announcements", "signals", "change_sets", "vitals", "refills",
             ):
                 self._db.execute(f"DELETE FROM {table}")
             self._db.execute("DELETE FROM sqlite_sequence")
@@ -333,6 +348,22 @@ class Store:
             day += timedelta(days=1)
         doses.sort(key=lambda d: (d["scheduled_for"], d["name"]))
         return doses
+
+    def use_supply(self, med_id: str, n: int = 1) -> int | None:
+        """Take pills off the shelf; returns what's left (None if not tracked)."""
+        row = self.one("SELECT supply FROM medications WHERE id = ?", (med_id,))
+        if not row or row["supply"] is None:
+            return None
+        left = max(0, row["supply"] - n)
+        self.x("UPDATE medications SET supply = ? WHERE id = ?", (left, med_id))
+        return left
+
+    def refills(self, person_id: str, statuses: tuple[str, ...] = ("requested", "ready")) -> list[dict[str, Any]]:
+        return self.q(
+            f"SELECT r.*, m.name FROM refills r JOIN medications m ON m.id = r.med_id WHERE r.person_id = ? "
+            f"AND r.status IN ({','.join('?' * len(statuses))}) ORDER BY r.requested_at",
+            (person_id, *statuses),
+        )
 
     def log_dose(self, med_id: str, scheduled_for: datetime, status: str, by: str, at: datetime | None = None) -> None:
         self.x(

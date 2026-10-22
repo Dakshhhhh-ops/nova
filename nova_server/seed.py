@@ -41,6 +41,9 @@ PEOPLE = [
 ]
 
 
+# Pills on hand. Metformin is about to run out: that's the refill story.
+SUPPLY = {"lisinopril": 18, "metformin": 7, "atorvastatin": 24, "vitamin_d": 40}
+
 # Evening doses have started slipping over the last five days (mornings hold).
 EVENING_MISSES = {("metformin", 1), ("metformin", 3), ("metformin", 4), ("atorvastatin", 2), ("atorvastatin", 4)}
 
@@ -81,9 +84,9 @@ def seed(store: Store, *, rng_seed: int = 7) -> None:
     for m in meds:
         store.x(
             "INSERT INTO medications (id, person_id, name, dose, purpose, appearance, times, with_food, "
-            "instructions, started, changed_on, change_note) VALUES (:id, 'rose', :name, :dose, :purpose, "
-            ":appearance, :times, :with_food, :instructions, :started, :changed_on, :change_note)",
-            {**m, "times": json.dumps(m["times"])},
+            "instructions, started, changed_on, change_note, supply) VALUES (:id, 'rose', :name, :dose, :purpose, "
+            ":appearance, :times, :with_food, :instructions, :started, :changed_on, :change_note, :supply)",
+            {**m, "times": json.dumps(m["times"]), "supply": SUPPLY.get(m["id"])},
         )
 
     # Fourteen days of dose history. Mornings are reliable; evenings have
@@ -172,7 +175,7 @@ def seed(store: Store, *, rng_seed: int = 7) -> None:
                         "Limit grapefruit juice while on atorvastatin.", at=today - timedelta(days=60))
     store.add_care_note("rose", "Emergency info",
                         "Allergies: penicillin (rash). Primary care: Dr. James Moore, 614-555-0101. "
-                        "Pharmacy: CVS on High Street, 614-555-0142. Spare key with neighbor Ruth at 41 Elm.",
+                        "Pharmacy: Elm Street Pharmacy, 41 Elm St, 614-555-0142. Spare key with neighbor Ruth at 39 Elm.",
                         at=today - timedelta(days=200))
 
     for cat in ("medications", "wellbeing", "appointments", "messages"):

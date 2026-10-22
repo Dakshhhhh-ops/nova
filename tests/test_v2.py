@@ -196,3 +196,28 @@ def test_bp_prompt_only_after_doctor_asks():
     store_mod.freeze(at(7, 40))
     eng2.tick(at(7, 40))
     assert any(k.startswith("bp:") for k in run(eng2, at(7, 45), at(7, 50)))
+
+
+# -- refills ----------------------------------------------------------------
+async def test_low_supply_nudge_refill_and_pharmacy_ready():
+    eng = freeze_and_seed(at(9, 50))
+    fired = run(eng, at(9, 55), at(10, 5))
+    assert any(k.startswith("low:metformin") for k in fired)
+    out = await call("request_refill", {"medication": "metformin"})
+    assert "Elm Street Pharmacy" in out["speech"] and out["refill"]["status"] == "requested"
+    again = await call("request_refill", {"medication": "metformin"})
+    assert "already" in again["speech"]
+    assert any(a["title"] == "Refill ordered" for a in server.store.announcements("maya"))
+    fired = run(eng, at(10, 10), at(12, 20), step_min=10)
+    assert any(k.startswith("refill-ready:") for k in fired)
+    today = await call("get_today", {})
+    assert any(r["status"] == "ready" for r in today["refills"])
+
+
+async def test_logging_doses_uses_supply():
+    freeze_and_seed(at(18, 20))
+    before = {m["id"]: m["supply"] for m in server.store.medications("rose")}
+    out = await call("log_medication", {"medication": "metformin", "time_of_day": "evening"})
+    after = {m["id"]: m["supply"] for m in server.store.medications("rose")}
+    assert after["metformin"] == before["metformin"] - 1
+    assert out["low_supply"] and "refill" in out["speech"]

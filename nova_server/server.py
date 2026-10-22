@@ -214,6 +214,8 @@ def build_today(me: dict[str, Any], elder: dict[str, Any]) -> dict[str, Any]:
         "appointments": [],
         "unread_messages": len(store.inbox(me["id"])),
         "next_dose": None,
+        "supply": supply_status(elder["id"]) if shared(me, elder, "medications") else [],
+        "refills": [{"name": r["name"], "status": r["status"], "pharmacy": r["pharmacy"]} for r in store.refills(elder["id"])],
     }
     if shared(me, elder, "medications"):
         out["doses"] = ins.doses_for_day(store, elder["id"], t, t)
@@ -353,8 +355,13 @@ async def log_medication(
     already = [d for d in doses if d["status"] == "taken"]
     to_log = [d for d in doses if d["status"] != "taken" and parse(d["scheduled_for"]) <= t + timedelta(hours=3)]
     future = [d for d in doses if d["status"] != "taken" and parse(d["scheduled_for"]) > t + timedelta(hours=3)]
+    low_supply = []
     for d in to_log:
         store.log_dose(d["med_id"], parse(d["scheduled_for"]), status, me["id"])
+        if status == "taken":
+            left = store.use_supply(d["med_id"])
+            if left is not None and left <= 8:
+                low_supply.append((d["name"], left))
     warning = None
     parts = []
     if to_log:
@@ -377,8 +384,13 @@ async def log_medication(
     nxt = next((d for d in ins.doses_for_day(store, elder["id"], t, t) if d["status"] in ("upcoming",)), None)
     if nxt and to_log:
         parts.append(f"Next up is {nxt['name']} at {nxt['time_label']}.")
+    if low_supply and not any(r["name"] == low_supply[0][0] for r in store.refills(elder["id"])):
+        name, left = low_supply[0]
+        parts.append(f"You have {left} {name} left. Say 'order a refill' and I'll send it to the pharmacy."
+                     if me["id"] == elder["id"] else f"{elder['short_name']} has {left} {name} left.")
     return {
         "speech": " ".join(parts),
+        "low_supply": [{"name": n, "left": left} for n, left in low_supply],
         "logged": [{**d, "status": status} for d in to_log],
         "already_taken": already,
         "warning": warning,
@@ -893,6 +905,60 @@ def caregiver_briefing_prompt(period: str = "week") -> list[UserMessage]:
         f"Use care_briefing for the {period}. Tell me the overall picture in one sentence, then the single most "
         "important thing and the suggested next step. Offer to prepare a visit brief if an appointment is coming up."
     )]
+
+
+# ---------------------------------------------------------------------------
+# Refills
+# ---------------------------------------------------------------------------
+PHARMACY = "Elm Street Pharmacy"
+
+
+def supply_status(elder_id: str) -> list[dict[str, Any]]:
+    out = []
+    for m in store.medications(elder_id):
+        if m.get("supply") is None:
+            continue
+        per_day = max(1, len(m["times"]))
+        out.append({"med_id": m["id"], "name": m["name"], "left": m["supply"], "days_left": m["supply"] // per_day})
+    return out
+
+
+@mcp.tool(
+    name="request_refill",
+    title="Order a refill",
+    description=("'Order a refill of my metformin' / 'We're running low'. Sends the refill request to the pharmacy on file "
+                 "and tells the circle who can pick it up. Empty medication means whatever is running lowest."),
+    annotations=NOTIFY,
+)
+def request_refill(medication: Annotated[str, Field(description="Which medication; empty for the one running lowest")] = "") -> dict[str, Any]:
+    me = caller()
+    elder = care_recipient(me)
+    supplies = supply_status(elder["id"])
+    if medication:
+        q = medication.lower()
+        pick = next((s for s in supplies if s["name"].lower() in q or q in s["name"].lower()), None)
+    else:
+        pick = min(supplies, key=lambda s: s["days_left"]) if supplies else None
+    if not pick:
+        return {"speech": "I couldn't tell which medication to refill.", "refill": None}
+    existing = next((r for r in store.refills(elder["id"]) if r["med_id"] == pick["med_id"]), None)
+    if existing:
+        state = "is ready for pickup" if existing["status"] == "ready" else "was already sent"
+        return {"speech": f"The {pick['name']} refill {state} at {PHARMACY}.", "refill": existing}
+    t = now()
+    rid = store.x("INSERT INTO refills (med_id, person_id, requested_at, requested_by, pharmacy, ready_at) VALUES (?, ?, ?, ?, ?, ?)",
+                  (pick["med_id"], elder["id"], iso(t), me["id"], PHARMACY, iso(t + timedelta(hours=2))))
+    aide = next((p for p in store.caregivers() if (p.get("relation") or "").startswith("home aide")), None)
+    nxt = next((a for a in store.appointments(elder["id"], t, t + timedelta(days=4)) if aide and aide["short_name"] in a["title"]), None)
+    pickup = f" {aide['short_name']} can pick it up {ins.mid_sentence(ins.when_label(parse(nxt['at']), t))}." if nxt else ""
+    for p in store.caregivers():
+        if p["id"] != me["id"]:
+            store.announce(p["id"], "info", "Refill ordered",
+                           f"{me['short_name']} ordered a {pick['name']} refill for {elder['short_name']} at {PHARMACY}.{pickup}",
+                           dedupe=f"refill:{rid}:{p['id']}")
+    return {"speech": f"Done. I sent a refill request for {pick['name']} to {PHARMACY}. They usually have it ready in "
+                      f"about two hours.{pickup}",
+            "refill": {"id": rid, "name": pick["name"], "pharmacy": PHARMACY, "status": "requested"}, "supply": pick}
 
 
 # ---------------------------------------------------------------------------

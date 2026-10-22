@@ -84,6 +84,7 @@ class CareEngine:
             fired += self._bp_prompt(elder, last, t)
             fired += self._appointments(elder, last, t)
             fired += self._wellness(elder, last, t)
+            fired += self._refills(elder, last, t)
         self.fired += fired
         return fired
 
@@ -258,6 +259,31 @@ class CareEngine:
                 )
             self.store.add_alert(elder["id"], "urgent", f"quiet-{t.date()}",
                                  f"No activity at {elder['short_name']}'s home this morning and no answer to Nova's check-in.")
+        return fired
+
+    # -- refills --------------------------------------------------------------
+    def _refills(self, elder: dict[str, Any], last: datetime, t: datetime) -> list[str]:
+        fired: list[str] = []
+        ten = t.replace(hour=10, minute=0, second=0)
+        if self._crossed(ten, last, t):
+            open_ids = {r["med_id"] for r in self.store.refills(elder["id"])}
+            for m in self.store.medications(elder["id"]):
+                if m.get("supply") is None or m["id"] in open_ids:
+                    continue
+                days = m["supply"] // max(1, len(m["times"]))
+                if days <= 5:
+                    fired += self._fire(
+                        f"low:{m['id']}:{t.date()}", elder["id"], "info", "Running low",
+                        f"{elder['short_name']}, you have about {days} days of {m['name']} left. "
+                        "Want me to order a refill from Elm Street Pharmacy?",
+                        due_at=ten, expects_reply=True, replies=["Yes, order a refill", "Not now"],
+                    )
+        for r in self.store.refills(elder["id"], ("requested",)):
+            if r["ready_at"] and self._crossed(parse(r["ready_at"]), last, t):
+                self.store.x("UPDATE refills SET status = 'ready' WHERE id = ?", (r["id"],))
+                for to in [elder["id"]] + [p["id"] for p in self.store.caregivers()]:
+                    fired += self._fire(f"refill-ready:{r['id']}:{to}", to, "info", "Refill ready",
+                                        f"The {r['name']} refill is ready at {r['pharmacy']}.")
         return fired
 
     # -- Ring (front door) ----------------------------------------------------

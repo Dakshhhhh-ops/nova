@@ -6,25 +6,28 @@
 <title>Care briefing</title>
 <style>
   :root {
-    --bg: #0A1322;
-    --surface: #101B2E;
-    --surface-2: #15233A;
-    --line: rgba(255, 255, 255, .08);
-    --text: #F3F6FB;
-    --text-2: #B9C5D8;
-    --muted: #8291A8;
-    --accent: #00CAFF;
-    --accent-soft: rgba(0, 202, 255, .13);
-    --green: #3DDC97;
-    --green-soft: rgba(61, 220, 151, .13);
+    --bg: #0A0B10;
+    --surface: #11131A;
+    --surface-2: #191C26;
+    --line: rgba(244, 238, 230, .10);
+    --text: #F4EEE6;
+    --text-2: rgba(244, 238, 230, .74);
+    --muted: rgba(244, 238, 230, .46);
+    --accent: #3BD1FF;
+    --accent-soft: rgba(59, 209, 255, .12);
+    --green: #9ED9B0;
+    --green-soft: rgba(158, 217, 176, .13);
     --amber: #FFB547;
-    --amber-soft: rgba(255, 181, 71, .14);
-    --red: #FF7A7A;
-    --red-soft: rgba(255, 122, 122, .14);
-    --mood: #0B9FCF;
-    --pain: #9575EE;
-    --radius: 18px;
+    --amber-soft: rgba(255, 181, 71, .13);
+    --red: #FF6B57;
+    --red-soft: rgba(255, 107, 87, .14);
+    --mood: #3BD1FF;
+    --pain: #B9A7FF;
+    --radius: 16px;
     color-scheme: dark;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", "Segoe UI Mono", Consolas, Menlo, monospace;
   }
   * { box-sizing: border-box; }
   html { background: var(--bg); color: var(--text); }
@@ -114,6 +117,21 @@
   .sym { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--text-2); }
   .sym b { color: var(--text); font-weight: 600; }
 
+  /* Blood pressure: one range bar per day (diastolic to systolic), same mmHg scale */
+  .bp-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .bp-now { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .bp-now small { font-size: 12.5px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .bp-cmp { font-size: 13px; color: var(--text-2); }
+  .bp-cmp b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bp-plot { position: relative; height: 78px; display: flex; gap: 3px; align-items: stretch; padding-top: 14px; }
+  .bp-day { position: relative; flex: 1; min-width: 4px; }
+  .bp-bar { position: absolute; left: 50%; width: 7px; transform: translateX(-50%); border-radius: 4px; background: rgba(90, 169, 255, .55); }
+  .bp-day.after .bp-bar { background: #5AA9FF; }
+  .bp-day.last .bp-bar { background: #9CCBFF; box-shadow: 0 0 0 2px var(--surface), 0 0 10px rgba(90,169,255,.6); }
+  .bp-mark { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1.5px dashed var(--amber); }
+  .bp-mark span { position: absolute; top: -2px; left: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--amber); white-space: nowrap; }
+  .bp-axis { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
   /* Alerts */
   .alert { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 8px; transition: opacity .4s; }
   .alert .sev-dot { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--soft); color: var(--tone); }
@@ -165,6 +183,56 @@
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
   .toast.error { border-color: rgba(255,122,122,.5); }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  /* ---- Nova studio type system: serif headlines and numerals, mono labels, ivory on ink ---- */
+  body { font-family: var(--sans); }
+  html { background: var(--bg); }
+  .mono-l { font-family: var(--mono); font-weight: 500; letter-spacing: .12em; text-transform: uppercase; }
+  .btn { background: var(--text); color: var(--bg); box-shadow: 0 6px 20px -8px rgba(0,0,0,.6); }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid rgba(244,238,230,.22); }
+  .btn.ghost:hover { background: rgba(244,238,230,.06); }
+  .toast { font-family: var(--sans); background: rgba(17,19,26,.95); border-color: rgba(244,238,230,.16); }
+  .sk { background: linear-gradient(90deg, rgba(244,238,230,.05) 25%, rgba(244,238,230,.1) 50%, rgba(244,238,230,.05) 75%); background-size: 200% 100%; }
+  .state h2 { font-family: var(--serif); font-weight: 400; font-size: 30px; }
+  footer { font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; font-size: 11px; }
+
+  .status-pill, .section-title, .sev, .bar-row .lbl, .spark .name, .axis, .trend, .alert-meta, .row-when, .adh-note, .ring-val small, .bp-cmp, .sym, .count { font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  .banner { border-radius: 24px; padding: 20px 24px 22px; }
+  .status-pill { background: transparent; border: 1px solid currentColor; font-size: 11px; }
+  .headline { font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1.12; letter-spacing: -.015em; max-width: 38ch; }
+  .section-title { font-size: 11px; }
+  .insight { background: transparent; border: 1px solid var(--line); border-radius: 18px; }
+  .insight h3 { font-family: var(--serif); font-weight: 400; font-size: 26px; line-height: 1.12; letter-spacing: -.01em; }
+  .sev { font-size: 11px; }
+  .evidence li { font-size: 13px; }
+  .suggest { background: transparent; border: 1px solid rgba(59,209,255,.25); border-radius: 14px; }
+  .tile { background: transparent; border: 1px solid var(--line); border-radius: 18px; }
+  .ring-val b { font-family: var(--serif); font-weight: 400; font-size: 34px; }
+  .ring-val small { font-size: 9.5px; }
+  .bar-row .lbl { font-size: 11px; }
+  .bar-row .val { font-family: var(--serif); font-weight: 400; font-size: 18px; }
+  .spark .name { font-size: 11px; }
+  .spark .now { font-family: var(--serif); font-weight: 400; font-size: 20px; }
+  .spark .now small { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; }
+  .axis { font-size: 10px; }
+  .trend { font-size: 10.5px; background: transparent !important; border: 1px solid currentColor; }
+  .bp-now { font-family: var(--serif); font-weight: 400; font-size: 34px; }
+  .bp-now small { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .bp-cmp { font-size: 10.5px; }
+  .bp-cmp b { font-family: var(--serif); font-weight: 400; font-size: 16px; letter-spacing: 0; text-transform: none; }
+  .bp-bar { background: rgba(59,209,255,.4); }
+  .bp-day.after .bp-bar { background: var(--accent); }
+  .bp-day.last .bp-bar { background: #BFF2FF; box-shadow: 0 0 0 2px var(--bg), 0 0 12px rgba(59,209,255,.7); }
+  .sym { font-size: 10.5px; background: transparent; border: 1px solid rgba(244,238,230,.16); }
+  .sym b { font-family: var(--sans); letter-spacing: 0; text-transform: none; }
+  .alert { background: transparent; border: 1px solid var(--line); border-radius: 16px; }
+  .alert-msg { font-size: 16px; }
+  .alert-meta { font-size: 10px; }
+  .row-title { font-family: var(--serif); font-weight: 400; font-size: 20px; }
+  .row-when { font-size: 10.5px; }
+  .avatar { font-family: var(--serif); font-weight: 400; font-size: 17px; }
+  .ico { background: transparent; border: 1px solid rgba(244,238,230,.16); }
+  .count { font-family: var(--mono); background: transparent; border: 1px solid rgba(244,238,230,.2); }
 </style>
 </head>
 <body>
@@ -306,6 +374,56 @@ function sparkRow(days, key, label, color, lo, hi, unit) {
   </div>`;
 }
 
+// "2026-10-15" or "Oct 15" -> "Oct 15" (so bp dates and insight dates compare as labels)
+function dayKey(v) {
+  const s = String(v == null ? "" : v).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const [y, m, dd] = s.slice(0, 10).split("-").map(Number);
+    return new Date(y, m - 1, dd).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  return s;
+}
+
+/* Blood pressure range bars, with a dashed marker at the dose change (two days before the
+   top insight's `related.since`, when present). */
+function bpChart(rows, topInsight) {
+  const pts = rows.filter((r) => r && num(r.systolic) !== null && num(r.diastolic) !== null)
+    .map((r) => ({ label: dayKey(r.date), sys: num(r.systolic), dia: num(r.diastolic) }));
+  if (pts.length < 2) return "";
+  let markAt = -1;
+  const since = topInsight && topInsight.related && topInsight.related.since;
+  if (since) {
+    const s = String(since);
+    let target = "";
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const [y, m, dd] = s.slice(0, 10).split("-").map(Number);
+      target = new Date(y, m - 1, dd - 2).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    } else {
+      const d = new Date(`${s} ${new Date().getFullYear()}`);
+      if (!isNaN(d)) { d.setDate(d.getDate() - 2); target = d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+    }
+    markAt = target ? pts.findIndex((p) => p.label === target) : -1;
+  }
+  const lo = Math.min(...pts.map((p) => p.dia)) - 6, hi = Math.max(...pts.map((p) => p.sys)) + 6;
+  const y = (v) => ((v - lo) / (hi - lo || 1)) * 100;
+  const avg = (list, k) => Math.round(list.reduce((a, p) => a + p[k], 0) / list.length);
+  const before = markAt > 0 ? pts.slice(0, markAt) : [];
+  const after = markAt >= 0 ? pts.slice(markAt) : [];
+  const last = pts[pts.length - 1];
+  const cmp = before.length && after.length
+    ? `<span class="bp-cmp">Before <b>${avg(before, "sys")}/${avg(before, "dia")}</b> · since <b>${avg(after, "sys")}/${avg(after, "dia")}</b></span>`
+    : `<span class="bp-cmp">was <b>${pts[0].sys}/${pts[0].dia}</b></span>`;
+  const bars = pts.map((p, i) => `<div class="bp-day${markAt >= 0 && i >= markAt ? " after" : ""}${i === pts.length - 1 ? " last" : ""}" title="${esc(p.label)}: ${p.sys}/${p.dia} mmHg">
+      <span class="bp-bar" style="bottom:${y(p.dia).toFixed(1)}%;height:${Math.max(3, y(p.sys) - y(p.dia)).toFixed(1)}%"></span></div>`).join("");
+  const mark = markAt > 0 ? `<span class="bp-mark" style="left:calc(${(markAt / pts.length * 100).toFixed(2)}% - 1px)"><span>Dose change</span></span>` : "";
+  return `<div class="tile">
+      <div class="section-title" style="margin-bottom:8px">Blood pressure</div>
+      <div class="bp-top"><span class="bp-now">${last.sys}/${last.dia}<small>mmHg</small></span>${cmp}</div>
+      <div class="bp-plot" role="img" aria-label="Blood pressure from ${pts[0].sys}/${pts[0].dia} to ${last.sys}/${last.dia}">${bars}${mark}</div>
+      <div class="bp-axis"><span>${esc(pts[0].label)}</span><span>${esc(last.label)}</span></div>
+    </div>`;
+}
+
 /* ---------- state + rendering ---------- */
 let model = null;
 const alertBusy = new Set();
@@ -373,6 +491,8 @@ function render() {
       ${topSym.length ? `<div class="symptoms">${topSym.map(([s, n]) => `<span class="sym"><b>${esc(s)}</b> · ${n} day${n === 1 ? "" : "s"}</span>`).join("")}</div>` : ""}
     </div>` : "";
 
+  const bpTile = bpChart(arr(w.bp), insights[0]);
+
   // Alerts
   const alerts = arr(d.alerts);
   const alertHtml = alerts.length ? `<div class="section-title">Open alerts <span class="count">${alerts.filter((x) => !alertDone.has(String(x.id))).length}</span></div>
@@ -410,9 +530,9 @@ function render() {
 
   $app.innerHTML = `
     ${banner}
-    <div class="grid"${adherence || wellbeing ? "" : ' style="grid-template-columns:1fr"'}>
+    <div class="grid"${adherence || wellbeing || bpTile ? "" : ' style="grid-template-columns:1fr"'}>
       <section aria-label="Insights"><div class="section-title">What Nova noticed${insights.length ? ` <span class="count">${insights.length}</span>` : ""}</div>${insightHtml}</section>
-      ${adherence || wellbeing ? `<aside>${adherence}${wellbeing}</aside>` : ""}
+      ${adherence || wellbeing || bpTile ? `<aside>${bpTile}${adherence}${wellbeing}</aside>` : ""}
     </div>
     ${alertHtml ? `<section style="margin-top:2px;margin-bottom:12px" aria-label="Alerts">${alertHtml}</section>` : ""}
     <div class="grid2">

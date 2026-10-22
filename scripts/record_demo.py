@@ -35,20 +35,22 @@ NARRATOR = ("Matthew", "generative")
 # (narration, action, settle_seconds). The action runs after the narration line finishes.
 SCENES: list[tuple[str, str, float]] = [
     ("Rose is eighty-one and lives alone in Columbus, Ohio. Her daughter Maya lives in Seattle. "
-     "This is Nova, a care circle for Alexa plus.", "landing", 2.0),
+     "Nova links Rose's Echo, her Ring doorbell and Maya's Echo, to catch medication mistakes before they happen.",
+     "landing", 2.0),
     ("Nova doesn't wait to be asked. At eight, Rose's Echo reminds her about her morning pills.", "morning", 6.0),
     ("Rose shows Alexa a bottle. Amazon Nova reads the label, and Nova checks it against her plan.", "pill_wrong", 7.0),
     ("Her knee hurts, so she reaches for ibuprofen. Nova stops her, using her doctor's own instructions.", "pill_avoid", 6.0),
     ("At nine, Nova checks in. Before her family hears about a symptom, Nova asks Rose.", "checkin", 8.0),
-    ("In Seattle, Maya asks how Mom is doing. Nova connects the dots: the dizziness began two days after her "
-     "blood pressure dose was doubled, and her home readings dropped.", "briefing", 9.0),
-    ("At the front door, Ring tells Nova that Grace, the home aide, has arrived.", "ring", 5.0),
+    ("In Seattle, Maya asks how Mom is doing. Nova connects the dots in one sentence, and gives the evidence "
+     "only when she asks.", "briefing", 7.0),
+    ("At the front door, a Ring doorbell press arrives as a signed Ring webhook. Ring doesn't say who it is, "
+     "so Nova checks the calendar: it's Grace, the home aide, and she gets today's checklist.", "ring", 5.0),
     ("After the cardiology visit, Maya photographs the summary. Nova reconciles the medication list, "
      "and nothing changes until she approves.", "reconcile", 9.0),
     ("Later, Rose picks up her old bottle. Nova catches it.", "pill_old", 7.0),
     ("In the evening, the six o'clock pill is missed. Nova reminds Rose, follows up, and only then tells Maya.", "evening", 4.0),
     ("Under the hood: twenty-five MCP tools over Streamable HTTP, a token for each person, MCP Apps on the Echo Show "
-     "screen, consent by elicitation, and Amazon Nova on Bedrock for language and vision.", "hood", 5.0),
+     "screen, consent by elicitation, Ring webhooks, and Amazon Nova on Bedrock for language and vision.", "hood", 5.0),
     ("Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge.", "end", 3.0),
 ]
 
@@ -156,6 +158,8 @@ class Recorder:
                 await self.demo("window.NovaDemo.answer('kitchen', true)")
             elif action == "briefing":
                 await self.demo("window.NovaDemo.say('maya', \"How's Mom doing?\")")
+                await page.wait_for_timeout(7000)  # let the short answer play, then ask for the evidence
+                await self.demo("window.NovaDemo.say('maya', \"Tell me more\")")
             elif action == "ring":
                 await self.demo("window.NovaDemo.ring('ding', 'grace')")
             elif action == "reconcile":

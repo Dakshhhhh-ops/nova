@@ -7,6 +7,12 @@ Nova is a self-hosted **MCP server** (Streamable HTTP, MCP spec 2025-11-25 and 2
 
 > Track: **Alexa+** (self-hosted MCP server + simulated Alexa+ experience) · Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova, Amazon Polly)
 
+![Maya asks "How's Mom doing?" and Nova connects Rose's dizziness to her recent dose change](docs/img/briefing.png)
+
+| Rose is asked before her family is told | A doctor-visit brief, one voice command away |
+|---|---|
+| ![Consent prompt on Rose's Echo Show](docs/img/consent.png) | ![Visit brief on Maya's Echo Show](docs/img/visit.png) |
+
 ---
 
 ## Why

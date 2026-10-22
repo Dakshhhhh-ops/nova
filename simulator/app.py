@@ -199,7 +199,15 @@ def device_or_404(device_id: str) -> Device:
 
 
 @app.get("/")
-async def index() -> FileResponse:
+async def landing() -> FileResponse:
+    """The story page; falls back to the live demo if it isn't there."""
+    site = STATIC / "site" / "index.html"
+    return FileResponse(site if site.exists() else STATIC / "index.html")
+
+
+@app.get("/live")
+async def live() -> FileResponse:
+    """The live demo (the 'Studio'): two Echo Shows, a Ring doorbell and the inspector."""
     return FileResponse(STATIC / "index.html")
 
 

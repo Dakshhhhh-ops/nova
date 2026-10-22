@@ -1327,8 +1327,8 @@ async function build() {
     const textBottom = Math.max(...textEls.map((b) => b.bottom));
     const labelLeft = Math.min(...labels.map((l) => l.getBoundingClientRect().left - (+gsap.getProperty(l, 'x') || 0)));
     labelRel = labels.map((l) => { const b = l.getBoundingClientRect(); return { x: b.left - r.left - (+gsap.getProperty(l, 'x') || 0), y: b.top - r.top }; });
-    // two places the 3D can live, 48px clear of the text and the labels: beside the text column, or under it.
-    // Take whichever lets it be bigger: a bigger stack is a readable stack.
+    // The 3D is big and sits partly behind the text (which keeps a soft dark fade, see site.css): it spans from
+    // a third of the way into the text column to the labels. Narrow layouts fall back to beside or under.
     const beside = { x0: textRight + 32, x1: labelLeft - 32, y0: r.top + 96, y1: r.bottom - 40 - 40 };
     const under = { x0: textLeft, x1: labelLeft - 32, y0: textBottom + 40, y1: r.bottom - 40 - 40 };
     function fit(reg) {
@@ -1346,9 +1346,14 @@ async function build() {
       }
       return SC;
     }
+    const behind = { x0: textLeft + (textRight - textLeft) * 0.32, x1: labelLeft - 32, y0: r.top + 80, y1: r.bottom - 40 - 32 };
     const ok = (g) => g.x1 - g.x0 > 200 && g.y1 - g.y0 > 200;
-    const sBeside = ok(beside) ? fit(beside) : 0, sUnder = ok(under) ? fit(under) : 0;
-    const reg = sUnder > sBeside * 1.15 ? under : beside;
+    let reg;
+    if (ok(behind) && innerWidth >= 1180) reg = behind;
+    else {
+      const sBeside = ok(beside) ? fit(beside) : 0, sUnder = ok(under) ? fit(under) : 0;
+      reg = sUnder > sBeside * 1.15 ? under : beside;
+    }
     fit(reg);
     echo.group.scale.setScalar(SC);
     pose(1);

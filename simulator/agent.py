@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 import uuid
@@ -171,6 +172,9 @@ class Device:
         return None
 
 
+SPEECH_FIRST = os.getenv("NOVA_SPEECH_FIRST", "1") not in ("0", "false", "no")
+OFFER = "Want the details?"
+
 HOUSEHOLD: dict[str, Any] = {"now": None, "speed": 1.0}  # kept fresh by the simulator's clock poller
 
 
@@ -280,6 +284,8 @@ class Agent:
                 device.history.append({"role": "assistant", "text": reply})
                 break
             device.history.append({"role": "assistant", "text": step.text, "tool_calls": step.tool_calls})
+            spoken: list[str] = []  # TTS-ready lines from this step's tools
+            all_spoken = True
             for call in step.tool_calls:
                 await push({"kind": "tool_call", "name": call["name"], "args": call["args"]})
                 t0 = time.perf_counter()
@@ -294,6 +300,10 @@ class Agent:
                 uri = device.ui_uri(call["name"]) if ok else None
                 if data.get("speech"):
                     last_speech = data["speech"]
+                if ok and data.get("speech"):
+                    spoken.append(data["speech"])
+                else:
+                    all_spoken = False
                 if data.get("more"):
                     device.pending_more = data["more"]
                 await push({"kind": "tool_result", "name": call["name"], "ok": ok, "speech": data.get("speech"),
@@ -305,6 +315,13 @@ class Agent:
                 device.history.append({"role": "tool", "id": call["id"], "name": call["name"],
                                        "result": for_model(data, bool(uri)) if ok else {"error": data.get("error", "tool failed")},
                                        "error": not ok})
+            if SPEECH_FIRST and brain.name != "rules" and spoken and all_spoken:
+                # Speech-first: every tool returned a line written for the ear, so Alexa speaks it without a
+                # second model round trip (half the tokens, half the wait). Errors still go back to the model.
+                lines = [ln.removesuffix(OFFER).rstrip() for ln in spoken[:-1]] + spoken[-1:]
+                reply = " ".join(lines)
+                device.history.append({"role": "assistant", "text": reply})
+                break
         if not reply:
             reply = last_speech or "Sorry, I couldn't finish that."
             device.history.append({"role": "assistant", "text": reply})

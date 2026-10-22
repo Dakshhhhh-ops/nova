@@ -133,5 +133,5 @@ sequenceDiagram
 ## Design choices
 - **Deterministic signals, model language.** Patterns (a symptom after a dose change, evening doses slipping, a quiet home) come from rules that are testable and cite evidence. Amazon Nova writes the spoken briefing, extracts check-ins, answers from the notes and reads images. Every model call has a template or fixture fallback.
 - **Identity from the token, never from speech.** The same tool answers differently for Rose and Maya; only Rose can change what's shared.
-- **Voice first, screen second.** `speech` for the ear, `structuredContent` + `ui://` views for the Echo Show.
+- **Voice first, screen second.** `speech` for the ear (one or two sentences, then "Want the details?" with the rest in `more`), `structuredContent` + `ui://` views for the Echo Show. When a tool returns `speech`, the agent speaks it without a second model call: one Converse round trip per turn instead of two.
 - **Fail fast, degrade gracefully.** A throttled Bedrock call falls back for that turn; a dropped MCP connection reconnects and retries; without WebGL the demo renders in 2D.

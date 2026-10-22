@@ -111,3 +111,27 @@ def test_short_reply_then_tell_me_more(sim):
     assert more["brain"] == "more" and "blood pressure" in more["reply"]
     visit = sim.post("/api/chat", json={"device": "maya", "text": "Yes please"}).json()
     assert any(c["resource_uri"] == "ui://nova/visit.html" for c in visit["cards"])
+
+
+def test_model_turn_speaks_tool_speech_without_a_second_call(sim, monkeypatch):
+    """Speech-first: when the tool returns a line written for the ear, the model is called once, not twice."""
+    from nova_server import llm
+
+    calls = []
+
+    class FakeNova(llm.Backend):
+        name, label = "bedrock", "Amazon Nova 2 Lite · Amazon Bedrock"
+
+        def step(self, system, history, tools):
+            calls.append(len(history))
+            if len(calls) > 1:
+                raise AssertionError("second model call should be skipped")
+            return llm.Step(tool_calls=[{"id": "t1", "name": "care_briefing", "args": {}}])
+
+    monkeypatch.setattr(llm, "_BACKEND", FakeNova())
+    out = sim.post("/api/chat", json={"device": "maya", "text": "How's Mom doing?"}).json()
+    assert len(calls) == 1
+    assert out["reply"].endswith("Want the details?") and "lisinopril" in out["reply"].lower()
+    assert out["brain"] == "Amazon Nova 2 Lite · Amazon Bedrock"
+    more = sim.post("/api/chat", json={"device": "maya", "text": "Tell me more"}).json()
+    assert more["brain"] == "more" and "110 over 66" in more["reply"]

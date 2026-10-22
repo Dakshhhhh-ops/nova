@@ -333,3 +333,50 @@ def get_backend(force: str | None = None) -> Backend:
             break
     _BACKEND = chosen
     return chosen
+
+
+# ---------------------------------------------------------------------------
+# Vision: Amazon Nova (multimodal) on Bedrock, local VL model as fallback
+# ---------------------------------------------------------------------------
+_FORMATS = {"image/png": "png", "image/jpeg": "jpeg", "image/jpg": "jpeg", "image/webp": "webp", "image/gif": "gif"}
+
+
+def vision_json(system: str, prompt: str, image: bytes, mime: str = "image/png") -> tuple[dict[str, Any] | None, str]:
+    """Ask a multimodal model about an image; returns (parsed JSON or None, label of who answered)."""
+    fmt = _FORMATS.get(mime.lower(), "png")
+    backend = get_backend()
+    if isinstance(backend, Bedrock) and backend.available() and backend._client is not None:
+        model_id = backend.model_id or ""
+        if "micro" in model_id:  # Nova Micro is text-only
+            model_id = model_id.replace("nova-micro", "nova-lite")
+        try:
+            resp = backend._client.converse(
+                modelId=model_id,
+                system=[{"text": system}],
+                messages=[{"role": "user", "content": [
+                    {"image": {"format": fmt, "source": {"bytes": image}}},
+                    {"text": prompt + "\n\nRespond with a single JSON object and nothing else."},
+                ]}],
+                inferenceConfig={"maxTokens": 800, "temperature": 0},
+            )
+            text = "".join(c.get("text", "") for c in resp["output"]["message"]["content"])
+            return parse_json(_strip_thinking(text)), f"{_nova_label(model_id)} vision · Amazon Bedrock"
+        except Exception as exc:
+            log.warning("Bedrock vision failed: %s", exc)
+    model = os.getenv("OLLAMA_VISION_MODEL", "qwen3-vl:2b-instruct")
+    url = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+    try:
+        names = [m["name"] for m in httpx.get(f"{url}/api/tags", timeout=2).json().get("models", [])]
+        if model in names:
+            import base64
+
+            r = httpx.post(f"{url}/api/chat", timeout=180, json={
+                "model": model, "stream": False, "format": "json", "options": {"temperature": 0},
+                "messages": [{"role": "system", "content": system},
+                             {"role": "user", "content": prompt, "images": [base64.b64encode(image).decode()]}],
+            })
+            r.raise_for_status()
+            return parse_json(_strip_thinking(r.json()["message"].get("content", ""))), f"{model} · Ollama (local fallback)"
+    except Exception as exc:
+        log.warning("local vision failed: %s", exc)
+    return None, "none"

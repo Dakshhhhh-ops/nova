@@ -93,6 +93,39 @@ CREATE TABLE IF NOT EXISTS care_notes (
     at TEXT NOT NULL,
     text TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    due_at TEXT NOT NULL,          -- household time it should be delivered
+    to_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'info',
+    title TEXT NOT NULL,
+    speech TEXT NOT NULL,
+    expects_reply INTEGER DEFAULT 0,
+    replies TEXT DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'new',   -- new | delivered | acknowledged | dismissed
+    related TEXT DEFAULT '{}',
+    dedupe TEXT UNIQUE
+);
+CREATE TABLE IF NOT EXISTS signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id TEXT NOT NULL,
+    at TEXT NOT NULL,
+    source TEXT NOT NULL,          -- ring | echo
+    kind TEXT NOT NULL,            -- ding | motion | door_open
+    who TEXT,
+    text TEXT
+);
+CREATE TABLE IF NOT EXISTS change_sets (
+    id TEXT PRIMARY KEY,
+    person_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    source TEXT NOT NULL,          -- JSON
+    changes TEXT NOT NULL,         -- JSON
+    instructions TEXT NOT NULL,    -- JSON
+    status TEXT NOT NULL DEFAULT 'pending'
+);
 CREATE TABLE IF NOT EXISTS alerts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     person_id TEXT NOT NULL,
@@ -112,18 +145,32 @@ SHARING_CATEGORIES = ("medications", "wellbeing", "appointments", "messages")
 # The household clock. Real time by default; NOVA_CLOCK=HH:MM shifts it so a demo
 # can be recorded "at 8:20 in the morning" at any hour, and tests can freeze it.
 _FROZEN: datetime | None = None
-_OFFSET = timedelta(0)
+_ANCHOR_REAL = datetime.now()
+_ANCHOR_HOUSE = _ANCHOR_REAL
+_SPEED = 1.0
 
 
-def set_clock(hhmm: str | None) -> None:
-    """Make 'now' start at HH:MM today (and keep ticking)."""
-    global _OFFSET
-    if not hhmm:
-        _OFFSET = timedelta(0)
-        return
-    hh, mm = (int(v) for v in hhmm.split(":"))
+def set_clock(hhmm: str | None = None, speed: float | None = None, *, at: datetime | None = None) -> None:
+    """Re-anchor the household clock.
+
+    `hhmm` jumps to that time today, `at` jumps to an exact moment, `speed` sets the
+    time-lapse factor (1 = real time, 60 = a minute per second). It keeps ticking.
+    """
+    global _ANCHOR_REAL, _ANCHOR_HOUSE, _SPEED
+    current = now()
     real = datetime.now()
-    _OFFSET = real.replace(hour=hh, minute=mm, second=0, microsecond=0) - real
+    if at is not None:
+        current = at
+    elif hhmm:
+        hh, mm = (int(v) for v in hhmm.split(":"))
+        current = current.replace(hour=hh, minute=mm, second=0)
+    _ANCHOR_REAL, _ANCHOR_HOUSE = real, current
+    if speed is not None:
+        _SPEED = max(0.0, float(speed))
+
+
+def clock_speed() -> float:
+    return _SPEED
 
 
 def freeze(at: datetime | None) -> None:
@@ -134,10 +181,11 @@ def freeze(at: datetime | None) -> None:
 def now() -> datetime:
     if _FROZEN is not None:
         return _FROZEN
-    return (datetime.now() + _OFFSET).replace(microsecond=0)
+    elapsed = (datetime.now() - _ANCHOR_REAL) * _SPEED
+    return (_ANCHOR_HOUSE + elapsed).replace(microsecond=0)
 
 
-set_clock(os.getenv("NOVA_CLOCK"))
+set_clock(os.getenv("NOVA_CLOCK") or None)
 
 
 def iso(dt: datetime) -> str:
@@ -182,7 +230,7 @@ class Store:
         with self._lock:
             for table in (
                 "people", "sharing", "medications", "dose_events", "checkins",
-                "messages", "appointments", "care_notes", "alerts",
+                "messages", "appointments", "care_notes", "alerts", "announcements", "signals", "change_sets",
             ):
                 self._db.execute(f"DELETE FROM {table}")
             self._db.execute("DELETE FROM sqlite_sequence")
@@ -400,3 +448,82 @@ class Store:
             (by, iso(now()), alert_id),
         )
         return self.one("SELECT * FROM alerts WHERE id = ?", (alert_id,))
+
+
+    # -- announcements (Nova speaks first) -------------------------------------
+    def announce(self, to_id: str, kind: str, title: str, speech: str, *, due_at: datetime | None = None,
+                 severity: str = "info", expects_reply: bool = False, replies: list[str] | None = None,
+                 related: dict[str, Any] | None = None, dedupe: str | None = None) -> int | None:
+        """Queue an announcement. Returns None if one with the same dedupe key exists."""
+        with self._lock:
+            try:
+                cur = self._db.execute(
+                    "INSERT INTO announcements (due_at, to_id, kind, severity, title, speech, expects_reply, replies, related, dedupe) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (iso(due_at or now()), to_id, kind, severity, title, speech, int(expects_reply),
+                     json.dumps(replies or []), json.dumps(related or {}), dedupe),
+                )
+                self._db.commit()
+                return cur.lastrowid
+            except sqlite3.IntegrityError:
+                return None
+
+    def has_dedupe(self, key: str) -> bool:
+        return self.one("SELECT 1 AS x FROM announcements WHERE dedupe = ?", (key,)) is not None
+
+    def announcements(self, to_id: str, *, due_by: datetime | None = None, statuses: tuple[str, ...] | None = None,
+                      limit: int = 30) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM announcements WHERE to_id = ?"
+        args: list[Any] = [to_id]
+        if due_by is not None:
+            sql += " AND due_at <= ?"
+            args.append(iso(due_by))
+        if statuses:
+            sql += f" AND status IN ({','.join('?' * len(statuses))})"
+            args.extend(statuses)
+        sql += " ORDER BY due_at DESC, id DESC LIMIT ?"
+        args.append(limit)
+        rows = self.q(sql, args)
+        for r in rows:
+            r["replies"] = json.loads(r["replies"] or "[]")
+            r["related"] = json.loads(r["related"] or "{}")
+            r["expects_reply"] = bool(r["expects_reply"])
+        return rows
+
+    def set_announcement_status(self, ann_id: int, status: str, to_id: str | None = None) -> None:
+        if to_id:
+            self.x("UPDATE announcements SET status = ? WHERE id = ? AND to_id = ?", (status, ann_id, to_id))
+        else:
+            self.x("UPDATE announcements SET status = ? WHERE id = ?", (status, ann_id))
+
+    def cancel_pending(self, to_id: str, kinds: tuple[str, ...]) -> None:
+        """Drop scheduled announcements that haven't been delivered (e.g. a snoozed reminder)."""
+        self.x(
+            f"UPDATE announcements SET status = 'dismissed' WHERE to_id = ? AND status = 'new' AND due_at > ? "
+            f"AND kind IN ({','.join('?' * len(kinds))})",
+            (to_id, iso(now()), *kinds),
+        )
+
+    # -- signals (Ring and other ambient sensors) ------------------------------
+    def add_signal(self, person_id: str, source: str, kind: str, who: str | None, text: str, at: datetime | None = None) -> int:
+        return self.x(
+            "INSERT INTO signals (person_id, at, source, kind, who, text) VALUES (?, ?, ?, ?, ?, ?)",
+            (person_id, iso(at or now()), source, kind, who, text),
+        )
+
+    def signals(self, person_id: str, since: datetime) -> list[dict[str, Any]]:
+        return self.q("SELECT * FROM signals WHERE person_id = ? AND at >= ? ORDER BY at", (person_id, iso(since)))
+
+    # -- change sets (medication reconciliation) -------------------------------
+    def add_change_set(self, cs_id: str, person_id: str, by: str, source: dict, changes: list, instructions: list) -> None:
+        self.x(
+            "INSERT INTO change_sets (id, person_id, created_at, created_by, source, changes, instructions) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (cs_id, person_id, iso(now()), by, json.dumps(source), json.dumps(changes), json.dumps(instructions)),
+        )
+
+    def change_set(self, cs_id: str) -> dict[str, Any] | None:
+        r = self.one("SELECT * FROM change_sets WHERE id = ?", (cs_id,))
+        if r:
+            for k in ("source", "changes", "instructions"):
+                r[k] = json.loads(r[k])
+        return r

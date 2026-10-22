@@ -1,0 +1,93 @@
+{
+  "a0cfff98f766bbeb7496058e3e050acaaa0bed8eda43b89e5fc4fbf886661b32": {
+    "file": "pill-atorvastatin.png",
+    "kind": "pill",
+    "label": "Atorvastatin bottle",
+    "data": {
+      "name": "Atorvastatin",
+      "strength": "40 mg",
+      "directions": "Take 1 tablet by mouth at bedtime",
+      "patient": "Rose Alvarez",
+      "pharmacy": "Elm Street Pharmacy",
+      "prescriber": "Dr. James Moore",
+      "label_text": "ATORVASTATIN 40 MG TABLET. TAKE 1 TABLET BY MOUTH AT BEDTIME",
+      "confidence": 0.97
+    }
+  },
+  "861a17a0a2de3f53c3dc8b217966122344ea8d184928e5f0523e89fcd1a7419e": {
+    "file": "pill-lisinopril.png",
+    "kind": "pill",
+    "label": "Lisinopril 20 mg bottle",
+    "data": {
+      "name": "Lisinopril",
+      "strength": "20 mg",
+      "directions": "Take 1 tablet by mouth every morning",
+      "patient": "Rose Alvarez",
+      "pharmacy": "Elm Street Pharmacy",
+      "prescriber": "Dr. Anika Patel",
+      "label_text": "LISINOPRIL 20 MG TABLET. TAKE 1 TABLET BY MOUTH EVERY MORNING",
+      "confidence": 0.97
+    }
+  },
+  "0217e70e85f225b68205f6d5d1a64e75495ddc24d0d5b6c4dbc10ef57e6b12c2": {
+    "file": "pill-metformin.png",
+    "kind": "pill",
+    "label": "Metformin bottle",
+    "data": {
+      "name": "Metformin",
+      "strength": "500 mg",
+      "directions": "Take 1 tablet by mouth twice daily with meals",
+      "patient": "Rose Alvarez",
+      "pharmacy": "Elm Street Pharmacy",
+      "prescriber": "Dr. James Moore",
+      "label_text": "METFORMIN HCL 500 MG TABLET. TAKE 1 TABLET BY MOUTH TWICE DAILY WITH MEALS",
+      "confidence": 0.96
+    }
+  },
+  "e180bdc4c7d06df194fd731258b69c8cf3b033e871d525c5053bfd0183c3f338": {
+    "file": "after-visit-summary.png",
+    "kind": "document",
+    "label": "After-visit summary (cardiology)",
+    "data": {
+      "title": "After Visit Summary",
+      "provider": "Dr. Anika Patel",
+      "facility": "Ohio Heart Center",
+      "date": "10/24/2026",
+      "medications": [
+        {
+          "name": "Lisinopril",
+          "dose": "10 mg",
+          "frequency": "once daily in the morning",
+          "action": "change",
+          "previous_dose": "20 mg",
+          "reason": "dizziness when standing and low blood pressure"
+        },
+        {
+          "name": "Metformin",
+          "dose": "500 mg",
+          "frequency": "twice daily with breakfast and dinner",
+          "action": "continue"
+        },
+        {
+          "name": "Atorvastatin",
+          "dose": "40 mg",
+          "frequency": "once daily at bedtime",
+          "action": "continue"
+        },
+        {
+          "name": "Vitamin D3",
+          "dose": "2,000 IU",
+          "frequency": "once daily with breakfast",
+          "action": "continue"
+        }
+      ],
+      "instructions": [
+        "Check blood pressure every morning before pills and write it down.",
+        "Stand up slowly; sit on the edge of the bed for a minute first.",
+        "Stop using the old 20 mg lisinopril tablets.",
+        "Call (614) 555-0190 if BP is above 160/100 or below 100/60, or if dizziness doesn't improve within a week.",
+        "Follow-up visit in 4 weeks."
+      ]
+    }
+  }
+}

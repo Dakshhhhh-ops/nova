@@ -42,6 +42,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     host = args.host or server.HOST
     port = args.port or server.PORT
+    server.engine.start()  # the proactive care engine runs on the household clock
     app = server.mcp.streamable_http_app(host=host)
     print(f"Nova MCP server · Streamable HTTP · http://{host}:{port}/mcp")
     uvicorn.run(app, host=host, port=port, log_level="info")

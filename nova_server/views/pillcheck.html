@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pill check</title>
+<style>
+  :root {
+    --bg: #0A1322;
+    --surface: #101B2E;
+    --surface-2: #15233A;
+    --line: rgba(255, 255, 255, .08);
+    --text: #F3F6FB;
+    --text-2: #B9C5D8;
+    --muted: #8291A8;
+    --accent: #00CAFF;
+    --accent-soft: rgba(0, 202, 255, .13);
+    --green: #3DDC97;
+    --amber: #FFB547;
+    --red: #FF7A7A;
+    --grey: #A8B3C4;
+    --radius: 18px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--text); }
+  body {
+    margin: 0;
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 18px; line-height: 1.38; -webkit-font-smoothing: antialiased;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 8px; }
+  #app { padding: 20px 22px 20px; }
+
+  /* Verdict banner */
+  .verdict { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 18px; align-items: center; padding: 18px 22px; border-radius: 22px;
+    border: 1px solid var(--tone-line); background: linear-gradient(110deg, var(--tone-bg), rgba(255,255,255,.02) 75%); margin-bottom: 16px; }
+  .verdict.ok_now { --tone: var(--green); --tone-bg: rgba(61,220,151,.20); --tone-line: rgba(61,220,151,.42); }
+  .verdict.wrong_time, .verdict.already_taken { --tone: var(--amber); --tone-bg: rgba(255,181,71,.20); --tone-line: rgba(255,181,71,.42); }
+  .verdict.not_on_list { --tone: var(--red); --tone-bg: rgba(255,122,122,.22); --tone-line: rgba(255,122,122,.46); }
+  .verdict.unclear { --tone: var(--grey); --tone-bg: rgba(168,179,196,.14); --tone-line: rgba(168,179,196,.3); }
+  .v-ico { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: var(--tone); color: #0A1322; box-shadow: 0 0 0 8px color-mix(in srgb, var(--tone) 18%, transparent); }
+  .v-ico svg { width: 38px; height: 38px; }
+  .v-kicker { font-size: 13.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--tone); }
+  .v-title { font-size: 30px; font-weight: 650; line-height: 1.15; margin-top: 4px; letter-spacing: -.01em; }
+  .v-sub { font-size: 18px; color: var(--text-2); margin-top: 4px; }
+
+  .advice { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); margin-bottom: 16px; }
+  .advice svg { width: 26px; height: 26px; color: var(--accent); flex: none; margin-top: 2px; }
+  .advice p { margin: 0; font-size: 21px; line-height: 1.38; }
+
+  .section-title { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 10px 2px; }
+  .due { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .due-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 10px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(0,202,255,.3); }
+  .pill-tile { width: 48px; height: 48px; border-radius: 13px; background: rgba(255,255,255,.06); display: grid; place-items: center; flex: none; }
+  .pill-tile svg { width: 38px; height: 38px; }
+  .due-name { font-size: 19px; font-weight: 600; }
+  .due-sub { font-size: 14.5px; color: var(--muted); }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  @media (max-width: 600px) { .compare { grid-template-columns: 1fr; } .verdict { grid-template-columns: 56px 1fr; } .v-ico { width: 56px; height: 56px; } }
+  .card { padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+  .card-k { font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card-k svg { width: 16px; height: 16px; }
+  .card-name { font-size: 22px; font-weight: 600; margin-top: 8px; line-height: 1.2; }
+  .card-name span { font-weight: 400; color: var(--text-2); font-size: 18px; margin-left: 6px; }
+  .card-line { font-size: 15.5px; color: var(--text-2); margin-top: 6px; }
+  .label-text { margin-top: 10px; padding: 9px 11px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.14);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+  .conf { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13.5px; color: var(--muted); }
+  .conf .track { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .conf .fill { height: 100%; border-radius: 3px; background: var(--accent); }
+  .times { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .time { font-size: 14px; font-weight: 600; padding: 3px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .matched-row { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+  .nomatch { margin-top: 10px; font-size: 17px; color: var(--red); font-weight: 600; }
+
+  footer { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 12.5px; padding: 6px 0 0; }
+  footer svg { width: 14px; height: 14px; color: var(--accent); }
+
+  .sk { background: linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.05) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .state { min-height: 220px; display: grid; place-items: center; text-align: center; padding: 30px; }
+  .state h2 { margin: 10px 0 6px; font-size: 22px; font-weight: 600; }
+  .state p { margin: 0; font-size: 16px; color: var(--muted); max-width: 440px; }
+  .state svg { color: var(--text-2); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26), postMessage JSON-RPC ---------- */
+const bridge = (() => {
+  const handlers = {};
+  const pending = new Map();
+  let seq = 0;
+  const post = (msg) => { try { window.parent.postMessage(msg, "*"); } catch (_) { /* detached */ } };
+  window.addEventListener("message", (ev) => {
+    if (ev.source !== window.parent) return;
+    const m = ev.data;
+    if (!m || typeof m !== "object" || m.jsonrpc !== "2.0") return;
+    if (m.method === undefined && m.id !== undefined) {
+      const p = pending.get(m.id);
+      if (!p) return;
+      pending.delete(m.id);
+      if (m.error) p.reject(new Error(m.error.message || "Request failed"));
+      else p.resolve(m.result);
+      return;
+    }
+    if (m.id !== undefined && m.id !== null) {
+      if (m.method === "ping" || m.method === "ui/resource-teardown") post({ jsonrpc: "2.0", id: m.id, result: {} });
+      else post({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Method not found: " + m.method } });
+      return;
+    }
+    const h = handlers[m.method];
+    if (h) { try { h(m.params || {}); } catch (err) { showState("Something went wrong", String(err && err.message || err)); } }
+  });
+  return {
+    on(method, fn) { handlers[method] = fn; },
+    notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); },
+    request(method, params, timeoutMs = 30000) {
+      const id = ++seq;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { pending.delete(id); reject(new Error("The request timed out")); }, timeoutMs);
+        pending.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v); }, reject: (e) => { clearTimeout(timer); reject(e); } });
+        post({ jsonrpc: "2.0", id, method, params: params || {} });
+      });
+    },
+  };
+})();
+
+/* ---------- helpers ---------- */
+const $app = document.getElementById("app");
+const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const arr = (v) => (Array.isArray(v) ? v : []);
+const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+const num = (v) => (typeof v === "number" && isFinite(v) ? v : (typeof v === "string" && v.trim() !== "" && isFinite(+v) ? +v : null));
+const cap = (s) => { s = String(s || ""); return s ? s[0].toUpperCase() + s.slice(1) : s; };
+function structuredFrom(r) {
+  if (!r || typeof r !== "object") return null;
+  if (r.structuredContent && typeof r.structuredContent === "object") return r.structuredContent;
+  for (const b of arr(r.content)) {
+    if (b && b.type === "text" && typeof b.text === "string") { try { const v = JSON.parse(b.text); if (v && typeof v === "object") return v; } catch (_) { /* not JSON */ } }
+  }
+  return null;
+}
+function textFrom(r) { const b = arr(r && r.content).find((c) => c && c.type === "text"); return b ? String(b.text || "") : ""; }
+function joinWords(list) {
+  const a = list.filter(Boolean).map(String);
+  return a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+}
+
+const ICON = {
+  ok_now: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  wrong_time: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+  already_taken: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.5l4 4L15 9M10.5 15.5l1 1L20 8"/></svg>',
+  not_on_list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+  unclear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 9a3 3 0 1 1 4.3 2.7c-.9.5-1.5 1.2-1.5 2.3M12 17.5v.3"/></svg>',
+  bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>',
+  bottle: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5.5" y="2.5" width="9" height="3" rx="1"/><path d="M6 5.5h8v11a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 6 16.5z"/><path d="M6 9h8v4.5H6z"/></svg>',
+  list: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9"/><circle cx="4" cy="5.5" r=".9" fill="currentColor"/><circle cx="4" cy="10" r=".9" fill="currentColor"/><circle cx="4" cy="14.5" r=".9" fill="currentColor"/></svg>',
+  spark: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z"/></svg>',
+  big: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>',
+};
+
+/* Pill glyph drawn from the plain-language appearance ("small pink oval pill"). */
+const PILL_COLORS = [["pink", "#F7A8C4"], ["yellow", "#F6CF52"], ["orange", "#F6A04D"], ["blue", "#7DB4FF"], ["red", "#F27C7C"],
+  ["green", "#8EDBA9"], ["purple", "#B9A2F5"], ["brown", "#C49A6C"], ["peach", "#F8C3A0"], ["gray", "#C2C8D2"], ["grey", "#C2C8D2"], ["white", "#ECEFF4"]];
+function pillSVG(appearance) {
+  const a = String(appearance || "").toLowerCase();
+  const hit = PILL_COLORS.find(([k]) => a.includes(k));
+  const c = hit ? hit[1] : "#DDE3EC";
+  const shadow = '<ellipse cx="22" cy="35" rx="13" ry="2.6" fill="rgba(0,0,0,.35)"/>';
+  let body;
+  if (/softgel|gel cap|gelcap/.test(a)) body = `<ellipse cx="22" cy="21" rx="15" ry="9.5" fill="${c}" opacity=".92"/><ellipse cx="17" cy="17.5" rx="6" ry="2.4" fill="#fff" opacity=".55"/>`;
+  else if (/capsule/.test(a)) body = `<rect x="6" y="14" width="32" height="14" rx="7" fill="#ECEFF4"/><path d="M13 14h9v14h-9a7 7 0 0 1 0-14z" fill="${c}"/>`;
+  else if (/oblong|long|caplet/.test(a)) body = `<rect x="5" y="14" width="34" height="14" rx="7" fill="${c}"/><path d="M22 15.5v11" stroke="rgba(0,0,0,.18)" stroke-width="1.4"/><rect x="9" y="16.5" width="10" height="2.4" rx="1.2" fill="#fff" opacity=".5"/>`;
+  else if (/round|circle/.test(a)) body = `<circle cx="22" cy="21" r="11" fill="${c}"/><path d="M13.5 21h17" stroke="rgba(0,0,0,.16)" stroke-width="1.4"/><ellipse cx="18" cy="16.5" rx="4" ry="2" fill="#fff" opacity=".5"/>`;
+  else body = `<ellipse cx="22" cy="21" rx="14" ry="9.5" fill="${c}"/><ellipse cx="17.5" cy="17" rx="5" ry="2.2" fill="#fff" opacity=".5"/>`;
+  return `<svg viewBox="0 0 44 44" aria-hidden="true">${shadow}<g transform="rotate(-18 22 21)">${body}</g></svg>`;
+}
+
+/* ---------- rendering ---------- */
+const KICKER = { ok_now: "Good to take", wrong_time: "Not right now", already_taken: "Already taken", not_on_list: "Not on your list", unclear: "Can't read it" };
+
+function render(d) {
+  const verdict = Object.prototype.hasOwnProperty.call(KICKER, d.verdict) ? d.verdict : "unclear";
+  const idf = obj(d.identified) || {};
+  const med = obj(d.matched_med);
+  const times = arr(med && med.times).filter(Boolean);
+  const idName = [idf.name, idf.strength].filter(Boolean).join(" ");
+
+  const title = {
+    ok_now: `Yes, take your ${med && med.name ? med.name : idf.name || "medicine"} now`,
+    wrong_time: times.length ? `Not now. This one is for ${joinWords(times)}` : "Not now. It's for a different time",
+    already_taken: `You already took your ${med && med.name ? med.name : "medicine"} today`,
+    not_on_list: "This isn't on your medicine list",
+    unclear: "I couldn't read the label",
+  }[verdict];
+  const sub = verdict === "unclear" ? "Try again with the label facing the camera, in good light." : (idName ? `I see ${idName}` : "");
+
+  const due = arr(d.due_now).filter((x) => obj(x));
+  const dueHtml = due.length ? `<div class="section-title">${verdict === "ok_now" ? "Due now" : "Take these instead"}</div>
+    <div class="due">${due.map((x) => `<div class="due-item"><div class="pill-tile">${pillSVG(x.appearance)}</div>
+      <div><div class="due-name">${esc(x.name || "")}</div><div class="due-sub">${esc([cap(x.appearance), x.time_label].filter(Boolean).join(" · "))}</div></div></div>`).join("")}</div>` : "";
+
+  const conf = num(idf.confidence);
+  const confPct = conf === null ? null : Math.round(Math.max(0, Math.min(1, conf > 1 ? conf / 100 : conf)) * 100);
+  const bottleCard = `<div class="card"><div class="card-k">${ICON.bottle}On the bottle</div>
+    <div class="card-name">${esc(idf.name || "Unknown")}${idf.strength ? `<span>${esc(idf.strength)}</span>` : ""}</div>
+    ${idf.directions ? `<div class="card-line">${esc(idf.directions)}</div>` : ""}
+    ${idf.label_text ? `<div class="label-text">${esc(idf.label_text)}</div>` : ""}
+    ${confPct !== null ? `<div class="conf"><span>Read with</span><div class="track"><div class="fill" style="width:${confPct}%"></div></div><span>${confPct}%</span></div>` : ""}
+  </div>`;
+  const listCard = med
+    ? `<div class="card"><div class="card-k">${ICON.list}Your medicine list</div>
+        <div class="matched-row"><div class="pill-tile">${pillSVG(med.appearance)}</div>
+        <div style="min-width:0"><div class="card-name" style="margin-top:0">${esc(med.name || "")}${med.dose ? `<span>${esc(med.dose)}</span>` : ""}</div>
+        <div class="card-line" style="margin-top:2px">${esc([cap(med.purpose), cap(med.appearance)].filter(Boolean).join(" · "))}</div></div></div>
+        ${times.length ? `<div class="times">${times.map((t) => `<span class="time">${esc(t)}</span>`).join("")}</div>` : ""}
+      </div>`
+    : `<div class="card"><div class="card-k">${ICON.list}Your medicine list</div>
+        <div class="nomatch">${verdict === "unclear" ? "Nothing to compare yet" : "No match on your list"}</div>
+        <div class="card-line">${verdict === "unclear" ? "Hold the label up to the camera and ask again." : "Check with your pharmacist or Dr. Moore before taking it."}</div></div>`;
+
+  $app.innerHTML = `
+    <section class="verdict ${verdict}">
+      <div class="v-ico">${ICON[verdict]}</div>
+      <div style="min-width:0"><div class="v-kicker">${KICKER[verdict]}</div><div class="v-title">${esc(title)}</div>${sub ? `<div class="v-sub">${esc(sub)}</div>` : ""}</div>
+    </section>
+    ${d.advice ? `<div class="advice">${ICON.bulb}<p>${esc(d.advice)}</p></div>` : ""}
+    ${dueHtml}
+    <div class="compare">${bottleCard}${listCard}</div>
+    ${d.generated_by ? `<footer>${ICON.spark}Read by ${esc(d.generated_by)}</footer>` : ""}`;
+}
+
+function renderSkeleton() {
+  $app.innerHTML = `
+    <section class="verdict unclear" style="--tone-line:rgba(255,255,255,.08)"><div class="sk" style="width:72px;height:72px;border-radius:50%"></div>
+      <div><div class="sk" style="height:13px;width:140px"></div><div class="sk" style="height:28px;width:80%;margin-top:10px"></div></div></section>
+    <div class="advice"><div style="flex:1"><div class="sk" style="height:18px"></div><div class="sk" style="height:18px;width:70%;margin-top:10px"></div></div></div>
+    <div class="compare"><div class="card"><div class="sk" style="height:60px"></div></div><div class="card"><div class="sk" style="height:60px"></div></div></div>`;
+}
+
+function showState(title, detail) {
+  $app.innerHTML = `<div class="state"><div>${ICON.big}<h2>${esc(title)}</h2><p>${esc(detail || "")}</p></div></div>`;
+}
+
+/* ---------- size reporting ---------- */
+let lastH = 0, lastW = 0, rafId = 0;
+function reportSize() {
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(() => {
+    const rect = $app.getBoundingClientRect();
+    const h = Math.ceil(rect.height), w = Math.ceil(rect.width);
+    if (h === lastH && w === lastW) return;
+    lastH = h; lastW = w;
+    bridge.notify("ui/notifications/size-changed", { width: w, height: h });
+  });
+}
+if ("ResizeObserver" in window) new ResizeObserver(reportSize).observe($app);
+
+/* ---------- lifecycle ---------- */
+bridge.on("ui/notifications/tool-input", () => {});
+bridge.on("ui/notifications/tool-result", (params) => {
+  if (params && params.isError) { showState("I couldn't check that photo", textFrom(params) || "Please try again in a moment."); return; }
+  const data = structuredFrom(params);
+  if (!data) { showState("I couldn't check that photo", "Nova didn't send any details this time."); return; }
+  render(data);
+});
+bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
+bridge.on("ui/notifications/host-context-changed", () => {});
+
+renderSkeleton();
+reportSize();
+if (window.parent === window) {
+  showState("Open this from Alexa", "Show Alexa a pill bottle and Nova will check it against your medicine list.");
+} else {
+  bridge.request("ui/initialize", {
+    appCapabilities: { availableDisplayModes: ["inline"] },
+    clientInfo: { name: "nova-pillcheck", version: "0.2.0" },
+    protocolVersion: "2026-01-26",
+  }, 10000).then(() => bridge.notify("ui/notifications/initialized", {}))
+    .catch(() => showState("Couldn't connect", "This view needs an MCP Apps host."));
+}
+</script>
+</body>
+</html>

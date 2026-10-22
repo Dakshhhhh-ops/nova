@@ -36,8 +36,10 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from . import insights as ins
+from . import vision
+from .engine import CareEngine
 from .seed import DEMO_TOKENS, ensure_seeded, seed
-from .store import SHARING_CATEGORIES, Store, iso, now, parse
+from .store import SHARING_CATEGORIES, Store, clock_speed, iso, now, parse, set_clock
 
 log = logging.getLogger("nova.server")
 
@@ -49,6 +51,8 @@ PUBLIC_URL = os.getenv("NOVA_PUBLIC_URL", f"http://{HOST}:{PORT}")
 
 store = Store(DB_PATH)
 ensure_seeded(store)
+engine = CareEngine(store)
+RING_SECRET = os.getenv("NOVA_RING_SECRET", "nova-demo-ring")
 
 NOVA_ICON = Icon(
     src=(
@@ -160,7 +164,8 @@ class LiveHtml(Resource):
 
 
 apps = Apps()
-for view, title in (("today", "Today"), ("briefing", "Care briefing"), ("visit", "Visit brief")):
+for view, title in (("today", "Today"), ("briefing", "Care briefing"), ("visit", "Visit brief"),
+                    ("pillcheck", "Pill check"), ("reconcile", "Medication changes")):
     apps.add_resource(LiveHtml(
         uri=f"ui://nova/{view}.html", name=f"nova-{view}", title=title,
         description=f"Nova {title} view for Echo Show style screens",
@@ -185,9 +190,9 @@ mcp = MCPServer(
     extensions=[apps],
 )
 
-def ui_tool(resource_uri: str, **kwargs: Any):
+def ui_tool(resource_uri: str, visibility: tuple[str, ...] = ("model", "app"), **kwargs: Any):
     """Register a tool bound to an MCP Apps view (`_meta.ui.resourceUri`)."""
-    return mcp.tool(meta={"ui": {"resourceUri": resource_uri, "visibility": ["model", "app"]}}, **kwargs)
+    return mcp.tool(meta={"ui": {"resourceUri": resource_uri, "visibility": list(visibility)}}, **kwargs)
 
 
 READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
@@ -553,6 +558,10 @@ def send_message(
             return {"speech": f"I couldn't find {to} in the circle. I can message {names}, or everyone.", "delivered_to": []}
         recipients = [p]
         store.add_message(me["id"], p["id"], message, urgent)
+    for r in recipients:
+        store.announce(r["id"], "message", f"Message from {me['short_name']}",
+                       f"Message from {me['short_name']}: {message}", severity="urgent" if urgent else "info",
+                       related={"from": me["id"]})
     names = [r["short_name"] for r in recipients]
     return {"speech": f"Sent to {speak_list(names) if len(names) < 4 else 'everyone in the circle'}.", "delivered_to": names}
 
@@ -852,8 +861,16 @@ def timeline(hours: int = 48) -> list[dict[str, Any]]:
     for a in store.q("SELECT * FROM alerts WHERE at >= ? OR status = 'open'", (iso(since),)):
         items.append({"at": a["at"], "kind": "alert", "who": names.get(a["person_id"], ""), "text": a["message"],
                       "severity": a["severity"], "status": a["status"]})
+    for elder in store.elders():
+        for sig in store.signals(elder["id"], since):
+            items.append({"at": sig["at"], "kind": "ring", "who": "Ring · Front door", "text": sig["text"]})
+    for a in store.q("SELECT * FROM announcements WHERE due_at >= ? AND due_at <= ? AND kind IN "
+                     "('caregiver_escalation', 'care_plan_change', 'dose_reminder', 'dose_followup', 'wellness_check')",
+                     (iso(since), iso(t))):
+        items.append({"at": a["due_at"], "kind": "nova", "who": "Nova → " + names.get(a["to_id"], a["to_id"]),
+                      "text": a["speech"], "severity": a["severity"] if a["severity"] != "info" else None})
     items.sort(key=lambda i: i["at"], reverse=True)
-    return items[:60]
+    return items[:80]
 
 
 @mcp.prompt(name="morning_checkin", title="Morning check-in",
@@ -876,6 +893,176 @@ def caregiver_briefing_prompt(period: str = "week") -> list[UserMessage]:
 
 
 # ---------------------------------------------------------------------------
+# Proactive layer: announcements, snooze, activity
+# ---------------------------------------------------------------------------
+def public_announcement(a: dict[str, Any]) -> dict[str, Any]:
+    return {"id": a["id"], "at": a["due_at"], "to": a["to_id"], "kind": a["kind"], "severity": a["severity"],
+            "title": a["title"], "speech": a["speech"], "expects_reply": a["expects_reply"], "replies": a["replies"],
+            "status": a["status"], "related": a["related"]}
+
+
+@mcp.resource("nova://announcements", name="announcements", title="Announcements for this device",
+              mime_type="application/json",
+              description=("Delivery queue of things Nova wants to say to the caller (reminders, follow-ups, escalations, "
+                           "messages). Reading it delivers them: each item is returned once with status 'new'. "
+                           "On Alexa+ these map to proactive notifications."))
+def announcements_resource() -> dict[str, Any]:
+    me = caller()
+    due = store.announcements(me["id"], due_by=now(), statuses=("new",))
+    for a in due:
+        store.set_announcement_status(a["id"], "delivered", me["id"])
+    return {"now": iso(now()), "items": [public_announcement(a) for a in reversed(due) if a["speech"]]}
+
+
+@mcp.tool(
+    name="read_notifications",
+    title="Read notifications",
+    description="'What are my notifications?' Recent things Nova told the caller: reminders, escalations, messages, visitors.",
+    annotations=READ,
+)
+def read_notifications() -> dict[str, Any]:
+    me = caller()
+    items = [a for a in store.announcements(me["id"], due_by=now(), limit=10)
+             if a["status"] != "dismissed" and a["speech"]]
+    if not items:
+        return {"speech": "You have no notifications.", "items": []}
+    spoken = " ".join(a["speech"] for a in items[:3])
+    return {"speech": f"You have {len(items)} notification{'s' if len(items) > 1 else ''}. {spoken}",
+            "items": [public_announcement(a) for a in items]}
+
+
+@mcp.tool(
+    name="acknowledge_notification",
+    title="Acknowledge a notification",
+    description="Mark a notification as acknowledged or dismissed (used by device screens).",
+    annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False),
+    meta={"ui": {"visibility": ["app"]}},
+)
+def acknowledge_notification(
+    notification_id: Annotated[int, Field(description="The notification id")],
+    action: Annotated[Literal["acknowledged", "dismissed"], Field(description="acknowledged or dismissed")] = "acknowledged",
+) -> dict[str, Any]:
+    me = caller()
+    store.set_announcement_status(notification_id, action, me["id"])
+    return {"speech": "Okay.", "id": notification_id, "status": action}
+
+
+@mcp.tool(
+    name="snooze_reminder",
+    title="Snooze a reminder",
+    description="'Remind me in 10 minutes.' Re-schedules the latest medication reminder for the caller.",
+    annotations=WRITE,
+)
+def snooze_reminder(minutes: Annotated[int, Field(description="Minutes from now", ge=1, le=240)] = 10) -> dict[str, Any]:
+    me = caller()
+    recent = [a for a in store.announcements(me["id"], due_by=now(), limit=10)
+              if a["kind"] in ("dose_reminder", "dose_followup", "caregiver_escalation") and a["speech"]]
+    at = now() + timedelta(minutes=minutes)
+    if not recent:
+        store.announce(me["id"], "info", "Reminder", "Here's the reminder you asked for.", due_at=at)
+        return {"speech": f"Okay, I'll remind you in {minutes} minutes.", "at": iso(at)}
+    last = recent[0]
+    slot = (last["related"] or {}).get("scheduled_for")
+    if slot:
+        st = parse(slot)
+        # Marker so the engine skips the 30-minute follow-up for this dose (the snooze replaces it).
+        marker = store.announce(me["id"], "info", "", "", dedupe=f"snoozed:{st.date()}:{st.strftime('%H%M')}")
+        if marker:
+            store.set_announcement_status(marker, "dismissed", me["id"])
+    store.announce(me["id"], "dose_reminder" if last["kind"] == "dose_followup" else last["kind"], last["title"],
+                   last["speech"].replace("Just checking", "Here's your reminder"), due_at=at,
+                   expects_reply=last["expects_reply"], replies=last["replies"], related=last["related"],
+                   dedupe=f"snooze:{last['id']}:{iso(at)}")
+    return {"speech": f"Okay, I'll remind you again in {minutes} minutes.", "at": iso(at)}
+
+
+@mcp.tool(
+    name="recent_activity",
+    title="Recent activity at home",
+    description=("Caregivers: 'When did Mom last open the door?', 'Has Grace been by?'. Front-door events (Ring), "
+                 "doses she logged and check-ins over the last hours."),
+    annotations=READ,
+)
+def recent_activity(hours: Annotated[int, Field(description="How far back", ge=1, le=168)] = 24) -> dict[str, Any]:
+    me = caller()
+    elder = care_recipient(me)
+    t = now()
+    items = [i for i in timeline(hours) if i["kind"] in ("ring", "dose", "checkin")]
+    if not items:
+        return {"speech": f"I haven't seen any activity at {elder['short_name']}'s in the last {hours} hours.", "items": []}
+    parts = []
+    ring = [i for i in items if i["kind"] == "ring"]
+    if ring:
+        r = ring[0]
+        parts.append(f"Last front-door activity: {r['text'][:1].lower() + r['text'][1:]}, "
+                     f"{ins.mid_sentence(ins.when_label(parse(r['at']), t))}.")
+    doses = [i for i in items if i["kind"] == "dose"]
+    if doses:
+        parts.append(f"Last dose logged: {doses[0]['text']}, {ins.mid_sentence(ins.when_label(parse(doses[0]['at']), t))}.")
+    return {"speech": " ".join(parts) or f"{len(items)} events in the last {hours} hours.", "items": items[:20]}
+
+
+# ---------------------------------------------------------------------------
+# Vision (Amazon Nova multimodal): pill check and medication reconciliation
+# ---------------------------------------------------------------------------
+@ui_tool(
+    "ui://nova/pillcheck.html",
+    visibility=("app",),
+    name="check_pill_photo",
+    title="Is this the right pill?",
+    description=("Rose shows a pill bottle to the Echo Show camera. Nova reads the label (Amazon Nova multimodal) and "
+                 "checks it against her plan: on the list? due now? already taken? does the strength still match?"),
+    annotations=READ,
+    icons=[NOVA_ICON],
+)
+async def check_pill_photo(
+    image_base64: Annotated[str, Field(description="The photo as base64 or a data URL")],
+    mime_type: Annotated[str, Field(description="Image MIME type")] = "image/png",
+) -> dict[str, Any]:
+    me = caller()
+    elder = care_recipient(me)
+    data, mime = vision.decode_image(image_base64)
+    return await in_thread(vision.check_pill, store, elder, data, mime if image_base64.startswith("data:") else mime_type)
+
+
+@ui_tool(
+    "ui://nova/reconcile.html",
+    visibility=("app",),
+    name="read_care_document",
+    title="Read discharge or visit papers",
+    description=("A photo of an after-visit summary or discharge papers. Nova extracts the medication list (Amazon Nova "
+                 "multimodal) and reconciles it with the current plan as change / start / stop / continue. Nothing "
+                 "changes until someone approves it with apply_care_changes."),
+    annotations=READ,
+    icons=[NOVA_ICON],
+)
+async def read_care_document(
+    image_base64: Annotated[str, Field(description="The photo as base64 or a data URL")],
+    mime_type: Annotated[str, Field(description="Image MIME type")] = "image/png",
+) -> dict[str, Any]:
+    me = caller()
+    elder = care_recipient(me)
+    data, mime = vision.decode_image(image_base64)
+    return await in_thread(vision.read_document, store, elder, me, data,
+                           mime if image_base64.startswith("data:") else mime_type)
+
+
+@mcp.tool(
+    name="apply_care_changes",
+    title="Approve medication changes",
+    description=("Approve (or discard) a reconciled set of medication changes from read_care_document. Approving "
+                 "updates the plan, saves the instructions as a care note and tells Rose in plain words."),
+    annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False),
+)
+def apply_care_changes(
+    change_set_id: Annotated[str, Field(description="The change_set_id from read_care_document")],
+    approve: Annotated[bool, Field(description="True to apply, False to discard")] = True,
+) -> dict[str, Any]:
+    me = caller()
+    return vision.apply_change_set(store, change_set_id, me, approve)
+
+
+# ---------------------------------------------------------------------------
 # Plain HTTP routes for operators (not part of MCP)
 # ---------------------------------------------------------------------------
 @mcp.custom_route("/healthz", methods=["GET"])
@@ -884,9 +1071,49 @@ async def healthz(_: Request) -> JSONResponse:
 
 
 @mcp.custom_route("/demo/reset", methods=["POST"])
-async def demo_reset(_: Request) -> JSONResponse:
+async def demo_reset(request: Request) -> JSONResponse:
+    body = await _json(request)
+    if body.get("time"):
+        set_clock(body["time"])
     seed(store)
-    return JSONResponse({"ok": True, "seeded_at": iso(now())})
+    engine.reset()
+    return JSONResponse({"ok": True, "seeded_at": iso(now()), "now": iso(now()), "speed": clock_speed()})
+
+
+@mcp.custom_route("/demo/clock", methods=["GET", "POST"])
+async def demo_clock(request: Request) -> JSONResponse:
+    """The household clock. Jumping back in time re-seeds the demo so the history stays consistent."""
+    if request.method == "POST":
+        body = await _json(request)
+        before = now()
+        if body.get("time"):
+            set_clock(body["time"], body.get("speed"))
+            if now() < before:
+                seed(store)
+            engine.reset()
+        elif body.get("speed") is not None:
+            set_clock(speed=body["speed"])
+    return JSONResponse({"now": iso(now()), "speed": clock_speed()})
+
+
+@mcp.custom_route("/integrations/ring/events", methods=["POST"])
+async def ring_events(request: Request) -> JSONResponse:
+    """Webhook for front-door events (Ring). Shared-secret protected; the demo simulates the events."""
+    if request.headers.get("x-nova-ring-secret") != RING_SECRET:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    body = await _json(request)
+    kind = str(body.get("kind") or "motion")
+    if kind not in ("ding", "motion", "door_open"):
+        return JSONResponse({"error": f"unknown kind {kind}"}, status_code=400)
+    return JSONResponse(engine.on_ring_event(kind, body.get("who")))
+
+
+async def _json(request: Request) -> dict[str, Any]:
+    try:
+        data = await request.json()
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 def set_stdio_user(person_id: str) -> None:
@@ -894,4 +1121,4 @@ def set_stdio_user(person_id: str) -> None:
     _STDIO_USER = person_id
 
 
-__all__ = ["mcp", "store", "timeline", "set_stdio_user", "SHARING_CATEGORIES", "DB_PATH"]
+__all__ = ["mcp", "store", "engine", "timeline", "set_stdio_user", "SHARING_CATEGORIES", "DB_PATH"]

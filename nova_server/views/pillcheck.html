@@ -154,6 +154,59 @@
   .compare { gap: 10px; }
   .card { padding: 12px 14px; }
   .card-name { font-size: 24px; }
+
+  /* ---- glance: one screen, readable from across the room; the rest is a tap away ---- */
+  body.fit { overflow: hidden; }
+  body.fit #app { height: var(--vh); padding: 0; overflow: hidden; }
+  body.fit #app > .state { height: var(--vh); min-height: 0; }
+  .g { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px 14px; box-sizing: border-box; min-height: 0; }
+  body.fit .g { height: var(--vh); overflow: hidden; }
+  .g-kick { flex: none; display: flex; align-items: center; gap: 9px; min-width: 0; font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--tone, var(--muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-kick svg { width: 16px; height: 16px; flex: none; }
+  .g-kick .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--tone, var(--accent)); box-shadow: 0 0 10px var(--tone, var(--accent)); }
+  .g-kick .soft { color: var(--muted); }
+  .g-head { flex: none; margin: 0; font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1.08; letter-spacing: -.012em; color: var(--text); text-wrap: balance; overflow-wrap: anywhere; }
+  .g-sub { flex: none; margin: -3px 0 0; font-size: 19px; line-height: 1.3; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+  .g-items { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .g-row { display: flex; align-items: center; gap: 12px; padding: 8px 14px; min-height: 48px; box-sizing: border-box; border-radius: 14px; border: 1px solid rgba(244,238,230,.12); min-width: 0; }
+  .g-ico { width: 32px; height: 32px; flex: none; display: grid; place-items: center; color: var(--tone, var(--accent)); }
+  .g-ico svg { width: 26px; height: 26px; }
+  .g-txt { flex: 1; min-width: 0; font-size: 19px; line-height: 1.28; color: var(--text); }
+  .g-txt b { font-weight: 600; }
+  .g-txt small { display: block; margin-top: 1px; font-size: 16px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-txt .clip2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .g-side { flex: none; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+  .g-num { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-family: var(--serif); font-size: 18px; color: var(--bg); background: var(--text); }
+  .g-tag { padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(244,238,230,.22); font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+  .g-tag.ok { color: var(--green); border-color: rgba(158,217,176,.45); }
+  .g-tag.warn { color: var(--amber); border-color: rgba(255,181,71,.5); }
+  .g-tag.bad { color: var(--red); border-color: rgba(255,107,87,.5); }
+  .g-foot { flex: none; display: flex; align-items: center; gap: 10px; min-height: 46px; }
+  .g-acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .g-pager { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
+  .g-nav { height: 42px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(244,238,230,.24); background: transparent; color: var(--text);
+    font: 500 16.5px/1 var(--sans); cursor: pointer; white-space: nowrap; }
+  .g-nav.more { background: rgba(244,238,230,.09); }
+  .g-nav:hover { background: rgba(244,238,230,.14); }
+  .g .btn { min-height: 44px; font-size: 17px; padding: 0 22px; display: inline-flex; align-items: center; gap: 8px; }
+  .g .btn svg { width: 18px; height: 18px; }
+  .g-row .btn { min-height: 38px; font-size: 15.5px; padding: 0 15px; flex: none; }
+  .g.steady, .g.ok_now, .g.applied, .g.done { --tone: var(--green); }
+  .g.watch, .g.wrong_time, .g.already_taken, .g.pending, .g.missed { --tone: var(--amber); }
+  .g.urgent, .g.not_on_list, .g.avoid { --tone: var(--red); }
+  .g.dose_mismatch { --tone: #FF8A5B; }
+  .g.discarded, .g.unclear { --tone: var(--muted); }
+  @media (max-width: 560px) { .g-head { font-size: 32px; } .g-pager .g-nav { padding: 0 12px; } }
+
+  .g .advice { margin: 0; padding: 10px 14px; flex: none; }
+  .g .advice p { font-size: 20px; }
+  .g .advice p.clip2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .g .source { margin: 0; flex: none; }
+  .g .source q { font-size: 19px; }
+  .g-ico .pill-tile.sm { width: 32px; height: 32px; border-radius: 9px; }
+  .g-ico .pill-tile svg { width: 26px; height: 26px; }
 </style>
 </head>
 <body>
@@ -258,13 +311,68 @@ function pillSVG(appearance) {
 const KICKER = { ok_now: "Good to take", wrong_time: "Not right now", already_taken: "Already taken", not_on_list: "Not on your list",
   dose_mismatch: "Different strength", avoid: "Don't take this", unclear: "Can't read it" };
 
+
+const gCap = (s) => { s = String(s || ""); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; };
+const gObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+
+/* ---------- glance kit: one screen, readable from across the room ---------- */
+// The card fills exactly the space the host gives it (hostContext.containerDimensions.maxHeight). Page one
+// is the glance; anything that doesn't fit waits behind "N more on screen ›" (tap to page), never a scroll.
+let viewH = 0, pageNo = 0, lastSpec = null, lastKey = null, lastSteps = null;
+function setViewport(hc) {
+  const h = Number(hc && hc.containerDimensions && hc.containerDimensions.maxHeight);
+  if (!(h > 0)) return false;
+  const changed = Math.floor(h) !== viewH;
+  viewH = Math.floor(h);
+  document.documentElement.style.setProperty("--vh", viewH + "px");
+  document.body.classList.add("fit");
+  return changed;
+}
+function chunkList(a, n) { const out = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out; }
+function cardFits() {
+  if (!viewH) return true;
+  const g = $app.querySelector(".g"), b = $app.querySelector(".g-body");
+  if (!g || !b) return true;
+  return b.scrollHeight <= b.clientHeight + 1 && g.scrollHeight <= g.clientHeight + 1;
+}
+function gRow(ico, txt, side, cls) {
+  return `<div class="g-row${cls ? " " + cls : ""}">${ico ? `<div class="g-ico">${ico}</div>` : ""}<div class="g-txt">${txt}</div>${side ? `<div class="g-side">${side}</div>` : ""}</div>`;
+}
+// spec(per, level) -> { tone, kicker, head, sub, lead, items, take, actions }. Tries 3 items, then fewer,
+// then a more compact lead, until the card fits its screen.
+const FIT_STEPS = [[3, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]];
+function paintCard(spec, key, steps) {
+  if (key !== lastKey) { pageNo = 0; lastKey = key; }
+  lastSpec = spec; lastSteps = steps;
+  for (const [per, level] of steps || FIT_STEPS) {
+    const c = spec(per, level) || {};
+    const items = (c.items || []).filter(Boolean);
+    const take = Math.min(c.take === undefined ? per : c.take, per);
+    const pages = [items.slice(0, take)].concat(chunkList(items.slice(take), Math.max(1, per)));
+    if (pageNo >= pages.length) pageNo = 0;
+    const shown = pages[pageNo];
+    const after = pages.slice(pageNo + 1).reduce((n, p) => n + p.length, 0);
+    const pager = pages.length > 1
+      ? `<div class="g-pager">${pageNo > 0 ? '<button class="g-nav" type="button" data-page="0">‹ Back</button>' : ""}${after > 0 ? `<button class="g-nav more" type="button" data-page="${pageNo + 1}">${after} more on screen ›</button>` : ""}</div>`
+      : "";
+    $app.innerHTML = `<div class="g ${c.tone || ""}">${c.kicker ? `<div class="g-kick">${c.kicker}</div>` : ""}
+      <h1 class="g-head">${c.head || ""}</h1>${c.sub && pageNo === 0 ? `<p class="g-sub">${c.sub}</p>` : ""}
+      <div class="g-body">${pageNo === 0 ? c.lead || "" : ""}${shown.length ? `<div class="g-items">${shown.join("")}</div>` : ""}</div>
+      ${c.actions || pager ? `<div class="g-foot"><div class="g-acts">${c.actions || ""}</div>${pager}</div>` : ""}</div>`;
+    if (cardFits()) break;
+  }
+}
+function repaint() { if (lastSpec) paintCard(lastSpec, lastKey, lastSteps); }
+$app.addEventListener("click", (e) => {
+  const p = e.target.closest("[data-page]");
+  if (p) { pageNo = Number(p.getAttribute("data-page")) || 0; repaint(); }
+});
 function render(d) {
   const verdict = Object.prototype.hasOwnProperty.call(KICKER, d.verdict) ? d.verdict : "unclear";
   const idf = obj(d.identified) || {};
   const med = obj(d.matched_med);
   const times = arr(med && med.times).filter(Boolean);
   const idName = [idf.name, idf.strength].filter(Boolean).join(" ");
-
   const title = {
     ok_now: `Yes, take your ${med && med.name ? med.name : idf.name || "medicine"} now`,
     wrong_time: times.length ? `Not now. This one is for ${joinWords(times)}` : "Not now. It's for a different time",
@@ -274,50 +382,36 @@ function render(d) {
     avoid: `Please don't take ${idf.name ? idf.name.toLowerCase() : "this"}`,
     unclear: "I couldn't read the label",
   }[verdict];
-  let sub = verdict === "unclear" ? "Try again with the label facing the camera, in good light." : (idName ? `I see ${idName}` : "");
+  let sub = verdict === "unclear" ? "Hold the label up to the camera, in good light." : (idName ? `I see ${idName}` : "");
   if (verdict === "dose_mismatch") {
-    sub = idf.strength && med && med.dose
-      ? `This bottle is ${idf.name || ""} ${idf.strength}, but your plan is now ${med.dose}.`
-      : "The strength on this bottle doesn't match your current plan.";
+    sub = idf.strength && med && med.dose ? `This bottle is ${idf.strength}, but your plan is now ${med.dose}.` : "The strength doesn't match your current plan.";
   }
-
   const due = arr(d.due_now).filter((x) => obj(x));
-  const shown = due.slice(0, 2), more = due.length - shown.length;
-  const dueHtml = due.length ? `<div class="section-title">${verdict === "wrong_time" || verdict === "not_on_list" ? "Take these instead" : "Due now"}</div>
-    <div class="due">${shown.map((x) => `<div class="due-item" title="${esc([x.name, cap(x.appearance), x.time_label].filter(Boolean).join(" · "))}"><div class="pill-tile">${pillSVG(x.appearance)}</div>
-      <div class="due-line"><span class="due-name">${esc(x.name || "")}</span><span class="due-sub">${esc(x.time_label || cap(x.appearance) || "")}</span></div></div>`).join("")}${more > 0 ? `<span class="due-more">+${more} more</span>` : ""}</div>` : "";
-
   const conf = num(idf.confidence);
   const confPct = conf === null ? null : Math.round(Math.max(0, Math.min(1, conf > 1 ? conf / 100 : conf)) * 100);
-  const bottleCard = `<div class="card"><div class="card-k">${ICON.bottle}On the bottle</div>
-    <div class="card-name">${esc(idf.name || "Unknown")}${idf.strength ? `<span>${esc(idf.strength)}</span>` : ""}</div>
-    ${idf.directions ? `<div class="card-line">${esc(idf.directions)}</div>` : ""}
-    ${idf.label_text ? `<div class="label-text">${esc(idf.label_text)}</div>` : ""}
-    ${confPct !== null ? `<div class="conf"><span>Read with</span><div class="track"><div class="fill" style="width:${confPct}%"></div></div><span>${confPct}%</span></div>` : ""}
-  </div>`;
-  const listCard = med
-    ? `<div class="card"><div class="card-k">${ICON.list}Your medicine list</div>
-        <div class="matched-row"><div class="pill-tile">${pillSVG(med.appearance)}</div>
-        <div style="min-width:0"><div class="card-name" style="margin-top:0">${esc(med.name || "")}${med.dose ? `<span>${esc(med.dose)}</span>` : ""}</div>
-        <div class="card-line" style="margin-top:2px">${esc([cap(med.purpose), cap(med.appearance)].filter(Boolean).join(" · "))}</div></div></div>
-        ${times.length ? `<div class="times">${times.map((t) => `<span class="time">${esc(t)}</span>`).join("")}</div>` : ""}
-      </div>`
-    : `<div class="card"><div class="card-k">${ICON.list}Your medicine list</div>
-        <div class="nomatch">${verdict === "unclear" ? "Nothing to compare yet" : verdict === "avoid" ? "Flagged in your care notes" : "No match on your list"}</div>
-        <div class="card-line">${verdict === "unclear" ? "Hold the label up to the camera and ask again." : verdict === "avoid" ? "Your doctors asked you to avoid this one." : "Check with your pharmacist or doctor before taking it."}</div></div>`;
-
-  $app.innerHTML = `
-    <section class="verdict ${verdict}">
-      <div class="v-ico">${ICON[verdict]}</div>
-      <div style="min-width:0"><div class="v-kicker">${KICKER[verdict]}</div><div class="v-title">${esc(title)}</div>${sub ? `<div class="v-sub">${esc(sub)}</div>` : ""}</div>
-    </section>
-    ${verdict === "avoid" && (d.source || d.quote)
-      ? `<blockquote class="source"><q>${esc(d.quote || d.advice || "")}</q>${d.source ? `<cite>From ${esc(d.source)}</cite>` : ""}</blockquote>
-         ${d.quote && d.advice ? `<div class="advice">${ICON.bulb}<p>${esc(d.advice)}</p></div>` : ""}`
-      : d.advice ? `<div class="advice">${ICON.bulb}<p>${esc(d.advice)}</p></div>` : ""}
-    ${dueHtml}
-    <div class="compare">${bottleCard}${listCard}</div>
-    ${d.generated_by ? `<footer>${ICON.spark}Read by ${esc(d.generated_by)}</footer>` : ""}`;
+  paintCard((per, level) => {
+    let lead = "";
+    if (level < 2) {
+      if (verdict === "avoid" && (d.quote || d.source)) lead = `<blockquote class="source"><q>${esc(d.quote || d.advice || "")}</q>${d.source ? `<cite>From ${esc(d.source)}</cite>` : ""}</blockquote>`;
+      else if (d.advice) lead = `<div class="advice">${ICON.bulb}<p class="clip2">${esc(d.advice)}</p></div>`;
+    }
+    const label = verdict === "wrong_time" || verdict === "not_on_list" ? "Take instead" : "Due now";
+    const dueRows = due.map((x) => gRow(`<span class="pill-tile sm">${pillSVG(x.appearance)}</span>`,
+      `<b>${esc(x.name || "")}</b><small>${esc([x.time_label, gCap(x.appearance)].filter(Boolean).join(" · "))}</small>`, `<span class="g-tag">${label}</span>`));
+    const items = dueRows.slice(0, 2);
+    items.push(gRow(ICON.bottle, `On the bottle: <b>${esc(idf.name || "Unknown")}${idf.strength ? " " + esc(idf.strength) : ""}</b>${idf.directions ? `<small>${esc(idf.directions)}</small>` : ""}`,
+      confPct !== null ? `${confPct}% sure` : ""));
+    items.push(med
+      ? gRow(`<span class="pill-tile sm">${pillSVG(med.appearance)}</span>`, `Your list: <b>${esc(med.name || "")}${med.dose ? " " + esc(med.dose) : ""}</b><small>${esc([times.join(", "), gCap(med.purpose)].filter(Boolean).join(" · "))}</small>`)
+      : gRow(ICON.list, `<b>${verdict === "unclear" ? "Nothing to compare yet" : verdict === "avoid" ? "Flagged in your care notes" : "No match on your list"}</b><small>${verdict === "avoid" ? "Your doctors asked you to avoid this one." : "Check with your pharmacist or doctor."}</small>`));
+    items.push(...dueRows.slice(2));
+    if (verdict === "avoid" && d.quote && d.advice) items.push(gRow(ICON.bulb, `<span class="clip2">${esc(d.advice)}</span>`));
+    return {
+      tone: verdict,
+      kicker: `${ICON[verdict]}${esc(KICKER[verdict])}`,
+      head: esc(title), sub: esc(sub), lead, items,
+    };
+  }, d);
 }
 
 function renderSkeleton() {
@@ -355,7 +449,7 @@ bridge.on("ui/notifications/tool-result", (params) => {
   render(data);
 });
 bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
-bridge.on("ui/notifications/host-context-changed", () => {});
+bridge.on("ui/notifications/host-context-changed", (p) => { if (setViewport(p)) repaint(); });
 
 renderSkeleton();
 reportSize();
@@ -366,7 +460,7 @@ if (window.parent === window) {
     appCapabilities: { availableDisplayModes: ["inline"] },
     clientInfo: { name: "nova-pillcheck", version: "0.2.0" },
     protocolVersion: "2026-01-26",
-  }, 10000).then(() => bridge.notify("ui/notifications/initialized", {}))
+  }, 10000).then((res) => { setViewport(res && res.hostContext); return res; }).then(() => bridge.notify("ui/notifications/initialized", {}))
     .catch(() => showState("Couldn't connect", "This view needs an MCP Apps host."));
 }
 </script>

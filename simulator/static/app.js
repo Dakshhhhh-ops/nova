@@ -332,21 +332,23 @@ const sky = {
     }
     stars.innerHTML = html.join("");
   },
+  vars: {},
   render(now) {
     const h = hourOf(now);
     const key = h.toFixed(2);
     if (key === this.last) return;
     this.last = key;
     const s = skyAt(h);
-    const root = document.documentElement.style;
-    root.setProperty("--sky-top", s.top);
-    root.setProperty("--sky-mid", s.mid);
-    root.setProperty("--sky-hor", s.hor);
-    const day = sunElevation(h);
-    root.setProperty("--day", day.toFixed(3));
-    const night = h < 5.5 || h > 20.5 ? 1 : h < 6.8 ? (6.8 - h) / 1.3 : h > 19.2 ? (h - 19.2) / 1.3 : 0;
-    root.setProperty("--night", clamp(night, 0, 1).toFixed(3));
     document.body.classList.toggle("day-bright", s.lum > 0.62);
+    // The CSS sky only shows in 2D (WebGL draws its own). Custom properties set high up in the tree
+    // restyle everything below them, so set them on the scene, and only when a value changes.
+    if (!stage3d) {
+      const day = sunElevation(h);
+      const night = h < 5.5 || h > 20.5 ? 1 : h < 6.8 ? (6.8 - h) / 1.3 : h > 19.2 ? (h - 19.2) / 1.3 : 0;
+      const want = { "--sky-top": s.top, "--sky-mid": s.mid, "--sky-hor": s.hor, "--day": day.toFixed(2), "--night": clamp(night, 0, 1).toFixed(2) };
+      const st = $("#scene").style;
+      for (const [k, v] of Object.entries(want)) if (this.vars[k] !== v) { this.vars[k] = v; st.setProperty(k, v); }
+    }
     arc.place(h);
   },
 };
@@ -441,10 +443,13 @@ const arc = {
     orb.style.setProperty("--ox", `${p.x}px`);
     orb.style.setProperty("--oy", `${p.y}px`);
     orb.classList.toggle("night", mode === "night");
-    orb.classList.toggle("tucked", !this.dragging && this.overScreen(p));
-    const scene = $("#scene");
-    scene.style.setProperty("--sun-x", `${(p.x / scene.clientWidth * 100).toFixed(1)}%`);
-    scene.style.setProperty("--sun-y", `${(p.y / scene.clientHeight * 100).toFixed(1)}%`);
+    if (window.scrollY < 40) orb.classList.toggle("tucked", !this.dragging && this.overScreen(p)); // no layout reads while scrolling
+    if (!stage3d) {
+      const scene = $("#scene");
+      const sx = `${(p.x / scene.clientWidth * 100).toFixed(1)}%`, sy = `${(p.y / scene.clientHeight * 100).toFixed(1)}%`;
+      if (sx !== this.sunX) { this.sunX = sx; scene.style.setProperty("--sun-x", sx); }
+      if (sy !== this.sunY) { this.sunY = sy; scene.style.setProperty("--sun-y", sy); }
+    }
     const label = fmtTime(clock.now());
     orb.setAttribute("aria-valuenow", String(Math.round(hour * 60)));
     orb.setAttribute("aria-valuetext", label);
@@ -510,55 +515,71 @@ const arc = {
 /* ===================================================================== chime */
 
 // A short, soft two-note chime (WebAudio, no files). Tone follows the light ring color.
+// A soft two-note chime for announcements. It is synthesized once per tone into a small WAV and played
+// with an <audio> element: no Web Audio graph (an AudioContext alongside the voice crashed Chrome in testing).
 const chime = {
-  ctx: null,
-  unlock() {
-    try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      this.ctx = this.ctx || new AC();
-      if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
-    } catch { /* audio unavailable */ }
+  urls: new Map(),
+  wav(tone) {
+    const notes = tone === "red"
+      ? [[880, 0, 0.22], [880, 0.24, 0.22], [1046.5, 0.48, 0.5]]
+      : tone === "yellow"
+        ? [[1318.5, 0, 1.1], [987.8, 0.17, 1.3]]
+        : [[783.99, 0, 1.0], [1174.66, 0.15, 1.3]];
+    const rate = 22050;
+    const len = Math.ceil(rate * (Math.max(...notes.map(([, dt, dur]) => dt + dur)) + 0.1));
+    const data = new Float32Array(len);
+    for (const [f, dt, dur] of notes) {
+      const s0 = Math.floor(dt * rate), n = Math.floor(dur * rate);
+      for (let i = 0; i < n && s0 + i < len; i++) {
+        const t = i / rate;
+        const env = t < 0.012 ? 0.14 * (t / 0.012) : 0.14 * Math.pow(0.0001 / 0.14, (t - 0.012) / Math.max(0.05, dur - 0.012));
+        const w = 2 * Math.PI * f * t;
+        data[s0 + i] += env * (Math.sin(w) + 0.22 * Math.sin(2 * w) + 0.06 * Math.sin(3.01 * w));
+      }
+    }
+    const buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf);
+    const tag = (o, txt) => { for (let i = 0; i < txt.length; i++) v.setUint8(o + i, txt.charCodeAt(i)); };
+    tag(0, "RIFF"); v.setUint32(4, 36 + len * 2, true); tag(8, "WAVE"); tag(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true);
+    v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); tag(36, "data"); v.setUint32(40, len * 2, true);
+    for (let i = 0; i < len; i++) v.setInt16(44 + i * 2, Math.round(clamp(data[i], -1, 1) * 30000), true);
+    return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   },
   play(tone = "cyan") {
     if (speech.muted) return;
     try {
-      this.unlock();
-      if (!this.ctx) return;
-      const t0 = this.ctx.currentTime + 0.03;
-      const notes = tone === "red"
-        ? [[880, 0, 0.22], [880, 0.24, 0.22], [1046.5, 0.48, 0.5]]
-        : tone === "yellow"
-          ? [[1318.5, 0, 1.1], [987.8, 0.17, 1.3]]
-          : [[783.99, 0, 1.0], [1174.66, 0.15, 1.3]];
-      for (const [f, dt, dur] of notes) this.note(f, t0 + dt, dur);
+      const key = tone === "red" || tone === "yellow" ? tone : "cyan";
+      if (!this.urls.has(key)) this.urls.set(key, this.wav(key));
+      new Audio(this.urls.get(key)).play().catch(() => { /* autoplay blocked: silent */ });
     } catch { /* audio unavailable */ }
-  },
-  note(freq, at, dur) {
-    const ctx = this.ctx;
-    const g = ctx.createGain();
-    g.connect(ctx.destination);
-    g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(0.14, at + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    for (const [mult, lvl] of [[1, 1], [2, 0.22], [3.01, 0.06]]) {
-      const o = ctx.createOscillator();
-      const og = ctx.createGain();
-      o.type = "sine";
-      o.frequency.value = freq * mult;
-      og.gain.value = lvl;
-      o.connect(og).connect(g);
-      o.start(at);
-      o.stop(at + dur + 0.05);
-    }
   },
 };
 
 /* ===================================================================== speech */
 
+// Shorten to about `n` characters at a word boundary (CSS clamps the lines as well).
+function wordClip(text, n) {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (t.length <= n) return t;
+  const cut = t.slice(0, n + 1).replace(/\s+\S*$/, "").replace(/[\s,;:(\-–—]+$/, "");
+  return `${cut || t.slice(0, n)}…`;
+}
+
+// Speak and settle: on the audio's (or browser voice's) end event, or at most 3 s past the expected
+// length once the voice has started (8 s grace for it to start: queue and TTS fetch). Never hangs.
+function sayCapped(text, device, opts = {}) {
+  const est = estimateMs(text);
+  let onStart = null;
+  const cap = new Promise((r) => {
+    const pre = setTimeout(r, 8_000 + est + 3_000);
+    onStart = (ms) => { clearTimeout(pre); setTimeout(r, Math.max(est, ms || 0) + 3_000); };
+  });
+  return Promise.race([speech.say(text, device, { ...opts, onStart }), cap]);
+}
+
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 const synth = "speechSynthesis" in window ? window.speechSynthesis : null;
-const estimateMs = (text) => Math.min(12_000, Math.max(1_200, (String(text).split(/\s+/).length / 2.6) * 1000));
+const estimateMs = (text) => Math.min(45_000, Math.max(1_200, (String(text).split(/\s+/).length / 2.6) * 1000));
 
 // One voice at a time across both devices. Polly via /api/tts first, browser voice as fallback.
 // While speaking, the light ring's bloom follows the voice (audio level or word boundaries).
@@ -570,11 +591,11 @@ const speech = {
   _voice: null,
   _utterance: null,
 
-  say(text, device, { tone = "cyan" } = {}) {
+  say(text, device, { tone = "cyan", onStart = null } = {}) {
     text = String(text ?? "").trim();
     if (!text || !device) return Promise.resolve();
     return new Promise((resolve) => {
-      this.queue.push({ text, device, tone, resolve, stopped: false, cancel: null });
+      this.queue.push({ text, device, tone, resolve, onStart, stopped: false, cancel: null });
       this.pump();
     });
   },
@@ -583,7 +604,7 @@ const speech = {
     if (this.current || !this.queue.length) return;
     const job = (this.current = this.queue.shift());
     // Hard cap: the queue never stalls on a stuck player (TTS fetch, blocked or stalled audio).
-    const cap = new Promise((r) => { job.capTimer = setTimeout(() => { this.halt(job); r(); }, 8_000 + estimateMs(job.text) * 2.5); });
+    const cap = new Promise((r) => { job.capTimer = setTimeout(() => { this.halt(job); r(); }, 12_000 + estimateMs(job.text) * 1.5); });
     try { await Promise.race([this.play(job), cap]); } catch { /* never let speech break the page */ }
     clearTimeout(job.capTimer);
     if (this.current === job) this.current = null;
@@ -638,11 +659,13 @@ const speech = {
 
   async play(job) {
     const { text, device } = job;
-    if (this.muted) {
-      device.setLight("speaking", job.tone);
-      await this.pulse(job, estimateMs(text));
-      return;
-    }
+    let voiced = false;
+    const started = (ms) => {
+      if (!voiced && !job.stopped && ms > 0) { voiced = true; device.setLight("speaking", job.tone); }
+      try { job.onStart?.(ms); } catch { /* caller's problem */ }
+      job.onStart = null;
+    };
+    if (this.muted) { started(0); return; } // muted: nothing to wait for, the status stays Ready
     let blob = null;
     if (Date.now() >= this.pollyOffUntil) {
       try {
@@ -655,9 +678,10 @@ const speech = {
       }
     }
     if (job.stopped) return;
-    device.setLight("speaking", job.tone);
+    job.started = started;
     if (blob && blob.size) await this.playBlob(blob, job);
     else await this.speakBrowser(text, job);
+    started(0);
   },
 
   playBlob(blob, job) {
@@ -667,29 +691,17 @@ const speech = {
       let done = false, raf = 0, safety = 0, pulse = null;
       const arm = (ms) => { clearTimeout(safety); safety = setTimeout(() => finish(), ms); };
       arm(estimateMs(job.text) + 3_000);
-      audio.onloadedmetadata = () => { if (Number.isFinite(audio.duration) && audio.duration > 0) arm(audio.duration * 1000 + 3_000); };
-      // Drive the bloom from the actual audio level, but only through a running AudioContext:
-      // a suspended one would silence (and can stall) the element.
+      const dur = () => (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration * 1000 : 0);
+      audio.onloadedmetadata = () => { if (dur()) arm(dur() + 3_000); };
+      audio.onplaying = () => job.started?.(dur() || estimateMs(job.text));
+      // The bloom follows a speech-like envelope. (Routing the element through Web Audio for a real
+      // level meter crashed Chrome on repeated playback in testing, so the audio plays straight out.)
       try {
-        chime.unlock();
-        if (chime.ctx && chime.ctx.state === "running") {
-          const src = chime.ctx.createMediaElementSource(audio);
-          const an = chime.ctx.createAnalyser();
-          an.fftSize = 512;
-          src.connect(an);
-          an.connect(chime.ctx.destination);
-          const buf = new Uint8Array(an.fftSize);
-          const loop = () => {
-            an.getByteTimeDomainData(buf);
-            let sum = 0;
-            for (const v of buf) { const x = (v - 128) / 128; sum += x * x; }
-            job.device.setLevel(clamp(Math.sqrt(sum / buf.length) * 4, 0, 1));
-            if (!done) raf = requestAnimationFrame(loop);
-          };
-          raf = requestAnimationFrame(loop);
-        } else {
-          pulse = setInterval(() => job.device.setLevel(Math.max(0, .45 + .35 * Math.sin(performance.now() / 90))), 50);
-        }
+        pulse = setInterval(() => {
+          if (audio.paused) return;
+          const t = performance.now() / 1000;
+          job.device.setLevel(clamp(.42 + .3 * Math.sin(t * 11) * Math.sin(t * 3.1) + .12 * Math.sin(t * 23), 0, 1));
+        }, 50);
       } catch { /* plays without the level meter */ }
       function finish() {
         if (done) return;
@@ -724,6 +736,7 @@ const speech = {
       u.onboundary = () => { level = 1; };
       const decay = () => { level *= 0.9; job.device.setLevel(.25 + level * .75); if (!done) raf = requestAnimationFrame(decay); };
       raf = requestAnimationFrame(decay);
+      u.onstart = () => job.started?.(estimateMs(text));
       this._utterance = u; // keep a reference: Chrome can drop onend for collected utterances
       const safety = setTimeout(finish, estimateMs(text) * 1.25 + 3_000);
       job.cancel = () => { try { synth.cancel(); } catch { /* ignore */ } finish(); };
@@ -936,7 +949,7 @@ class AppHost {
 
       case "ui/notifications/size-changed": {
         const h = Number(p.height);
-        if (Number.isFinite(h) && h > 0) this.iframe.style.height = `${Math.min(Math.ceil(h), this.device.cardMaxHeight())}px`;
+        if (Number.isFinite(h) && h > 0) { this.reportedH = Math.ceil(h); this.device.fitCard(); }
         return;
       }
 
@@ -1117,6 +1130,21 @@ class Device {
     if (!this.ui.hintText.textContent) this.rotateHint(true);
   }
 
+  // A follow-up pill ("Tell me more") leads the row after a reply that offers details.
+  setFollowUp(text) {
+    this.ui.chips.querySelector(".chip.follow")?.remove();
+    if (text) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip follow";
+      b.dataset.text = text;
+      b.textContent = text;
+      b.title = text;
+      this.ui.chips.prepend(b);
+    }
+    requestAnimationFrame(() => this.fitChips());
+  }
+
   // One row: at most three whole pills, then "More" (a popover with the rest).
   fitChips() {
     const box = this.ui.chips;
@@ -1196,6 +1224,7 @@ class Device {
     magnetic(chips, ".chip");
     this.ui.mic.addEventListener("click", () => mic.toggle(this));
     cardClose.addEventListener("click", () => this.closeCard());
+    this.ui.caption.addEventListener("click", () => this.toggleCaption());
     focusBtn.addEventListener("click", () => toggleFocus(this.id));
     flipBtn.addEventListener("click", () => this.flip());
     this.ui.visionBtn.addEventListener("click", (e) => { e.stopPropagation(); shelf.toggle(this); });
@@ -1490,6 +1519,7 @@ class Device {
     this.setBusy(true);
     this.wake();
     this.closeCard();
+    this.setFollowUp(null);
     const turn = this.newTurn(text);
     this.pendingTurn = turn;
     this.setThinking(turn);
@@ -1505,7 +1535,7 @@ class Device {
       const res = (await request()) || {};
       reply = String(res.reply ?? "").trim() || "Sorry, I didn't catch that.";
       cards = arr(res.cards).filter((c) => isObj(c) && typeof c.html === "string" && c.html.trim());
-      if (res.brain && source !== "vision") status.noteBrain(res.brain);
+      if (res.brain && source !== "vision" && res.brain !== "more") status.noteBrain(res.brain); // "more" replays the details
       inspector.endTurn(rec, res, Math.round(performance.now() - t0));
     } catch (err) {
       failed = true;
@@ -1520,10 +1550,13 @@ class Device {
     if (gen !== this.gen) { this.settleLight(); return; } // the demo was reset mid-turn
     this.hideElicit(); // the turn is over, so any open prompt is moot
     this.fillReply(turn, reply, failed);
+    this.replySeq = (this.replySeq || 0) + 1;
     if (cards.length) this.showCard(cards[cards.length - 1], reply);
     this.lastReply = reply;
-    this.setLight("thinking"); // until the voice starts
-    await Promise.race([speech.say(reply, this), sleep(8_000 + estimateMs(reply) * 1.25 + 3_000)]);
+    this.setLight(this.elicit ? "listening" : this.announcement ? "notify" : "idle", this.announcement ? toneFor(this.announcement, this) : "cyan");
+    // A short answer that offers more gets a one-tap follow-up.
+    this.setFollowUp(/want (the|more) details\??["”']?\s*$/i.test(reply) ? "Tell me more" : null);
+    await sayCapped(reply, this);
     this.settleLight();
     this.scheduleIdle();
     if (!this.announcement && !this.busy) this.showNextAnnouncement();
@@ -1559,11 +1592,41 @@ class Device {
     return Math.max(160, this.ui.cardFrame.clientHeight || this.size.h - 84);
   }
 
+  // Fit the card's iframe to the space under the caption; if the view is taller, it scrolls inside
+  // and the bottom edge fades with a hint instead of cutting text in half.
+  fitCard() {
+    const host = this.card;
+    if (!host?.reportedH) return;
+    const cap = this.cardMaxHeight();
+    if (host.lastCap !== cap) {
+      host.lastCap = cap;
+      host.notify("ui/notifications/host-context-changed", { containerDimensions: { width: this.ui.cardFrame.clientWidth, maxHeight: cap } });
+    }
+    host.iframe.style.height = `${Math.min(host.reportedH, cap)}px`;
+    this.ui.cardFrame.classList.toggle("overflowing", host.reportedH > cap + 4);
+  }
+
+  toggleCaption(force) {
+    const cap = this.ui.caption, row = cap.closest(".card-caption");
+    const open = force === undefined ? !row.classList.contains("expanded") : !!force;
+    if (open && cap.scrollHeight <= cap.clientHeight + 1 && !row.classList.contains("expanded")) return; // nothing hidden
+    row.classList.toggle("expanded", open);
+    cap.setAttribute("aria-expanded", String(open));
+    requestAnimationFrame(() => this.fitCard());
+  }
+
   showCard(card, caption) {
     this.closeCard();
     const host = new AppHost(this, card);
     this.card = host;
     this.ui.caption.textContent = caption || "";
+    this.ui.caption.closest(".card-caption")?.classList.remove("expanded");
+    this.ui.cardFrame.classList.remove("overflowing");
+    requestAnimationFrame(() => {
+      const c = this.ui.caption;
+      c.classList.toggle("clamped", c.scrollHeight > c.clientHeight + 1);
+      c.title = c.classList.contains("clamped") ? "Tap to read it all" : "";
+    });
     this.ui.cardFrame.replaceChildren(host.iframe);
     this.wake();
     this.ui.screen.classList.add("has-card");
@@ -2113,11 +2176,18 @@ class CaptureSheet {
 
 /* ================================================================= Ring panel */
 
+function ringHookLine(res) {
+  if (!isObj(res) || !res.ring_type) return "";
+  const verified = res.signature_verified ?? res.verified ?? !!res.signal;
+  return ["Ring Webhook v1.1", str(res.ring_type), verified ? "signature verified" : "unverified"].join(" · ");
+}
+
 class RingPanel {
   constructor(device) {
     this.device = device;
     this.el = $("#ringTpl").content.firstElementChild.cloneNode(true);
     this.lastV = $(".rl-v", this.el);
+    this.hookV = $(".rp-hook", this.el);
     this.time = $(".rv-time", this.el);
     this.banner = $(".rv-banner", this.el);
     this.timers = [];
@@ -2186,6 +2256,14 @@ class RingPanel {
     this.later(() => this.el.classList.remove("banner-on"), 3600);
   }
 
+  // "Ring Webhook v1.1 · button_press · signature verified" when the event came in the partner format.
+  setHook(res) {
+    if (!this.hookV) return;
+    const line = ringHookLine(res);
+    this.hookV.textContent = line;
+    this.hookV.hidden = !line;
+  }
+
   setLast(text, at) {
     this.lastV.innerHTML = `${esc(text)}${at ? `<time>${esc(fmtTime(at))}</time>` : ""}`;
     this.lastV.title = text;
@@ -2208,6 +2286,7 @@ class RingPanel {
       const sig = res?.signal;
       const text = typeof sig === "string" ? sig : isObj(sig) ? str(sig.text || sig.summary || sig.label) : "";
       this.setLast(text || fallback, (isObj(sig) && parseTime(sig.at)) || clock.now());
+      this.setHook(res);
       inspector.endRing(rec, res, Math.round(performance.now() - t0));
     } catch (err) {
       this.setLast(fallback, clock.now());
@@ -2221,6 +2300,7 @@ class RingPanel {
     this.clearAnim();
     this.el.classList.remove("has-box");
     this.lastV.textContent = "Quiet so far";
+    this.setHook(null);
   }
 }
 
@@ -2592,7 +2672,7 @@ function compactArgs(a) {
 }
 
 const TRACE_KINDS = ["user", "llm", "tool_call", "tool_result", "elicit", "elicit_answer", "reply", "error", "app_call",
-  "announcement", "ann_ack", "ring", "ring_event", "ring_result"];
+  "announcement", "ann_ack", "ring", "ring_event", "ring_result", "ring_webhook"];
 
 function renderTraceItem(item, start) {
   const kind = TRACE_KINDS.includes(item.kind) ? item.kind : "other";
@@ -2655,6 +2735,10 @@ function renderTraceItem(item, start) {
     case "ring_event":
       head = traceTag("Ring → Nova webhook") + traceName("POST /integrations/ring/events") + relHTML;
       body = argsHTML(item.args);
+      break;
+    case "ring_webhook":
+      head = traceTag("Ring Webhook v1.1") + traceName(`${str(item.ring_type)} · ${item.verified ? "signature verified" : "unverified"}`, true);
+      body = `<div class="ti-replies">${[item.device, item.request_id].filter(Boolean).map((k) => `<span>${esc(str(k))}</span>`).join("")}</div>`;
       break;
     case "ring_result": {
       const sig = item.signal;
@@ -2880,6 +2964,10 @@ const inspector = {
       rec.group.add({ kind: "ring_event", args: { kind: rec.kind, who: rec.who } });
       if (res) rec.group.add({ kind: "ring_result", signal: res.signal, announced: res.announced, ms });
     }
+    if (isObj(res) && res.ring_type) {
+      rec.group.add({ kind: "ring_webhook", ring_type: res.ring_type, device: res.device, request_id: res.request_id,
+        verified: res.signature_verified ?? res.verified ?? !!res.signal });
+    }
     if (err) rec.group.add({ kind: "error", message: err.message || String(err) });
     rec.group.setLatency(ms);
     if (this.rings.get(rec.device) === rec) this.rings.delete(rec.device);
@@ -2980,11 +3068,14 @@ const circleFeed = {
         <div class="m-top"><span class="m-dot"></span>${esc(label)}</div>
         <div class="m-time">${esc(t[0])}<small>${esc((t[1] || "").toLowerCase())}</small></div>
         <div class="m-who">${esc(str(it.who) || KIND[kind] || "")}</div>
-        <div class="m-text">${esc(str(it.text))}</div>
+        <div class="m-text">${esc(wordClip(str(it.text), 112))}</div>
       </article>`);
     }
     if (!html.length) html.push('<div class="rail-empty">Nothing in the care circle yet.</div>');
-    this.list.innerHTML = html.join("");
+    const markup = html.join("");
+    if (markup === this.lastMarkup) { this.loaded = true; return; }
+    this.lastMarkup = markup;
+    this.list.innerHTML = markup;
     this.seen = new Set(items.filter(isObj).map(key));
     this.loaded = true;
     scrollFx.refreshRail();
@@ -3174,7 +3265,15 @@ const scrollFx = {
   railST: null,
   async init() {
     document.documentElement.classList.add("no-gsap");
-    window.addEventListener("scroll", () => document.body.classList.toggle("scrolled", window.scrollY > 30), { passive: true });
+    // The bar steps aside while you read further down, and comes back as soon as you scroll up.
+    let lastY = window.scrollY;
+    window.addEventListener("scroll", () => {
+      const y = window.scrollY, deep = y > window.innerHeight * 0.7;
+      document.body.classList.toggle("scrolled", y > 30);
+      if (!deep || y < lastY - 6) document.body.classList.remove("bar-away");
+      else if (y > lastY + 2 && !hoodDrawer.open) document.body.classList.add("bar-away");
+      lastY = y;
+    }, { passive: true });
     this.nativeRail();
     try {
       await loadScript(CDN.gsap);
@@ -3195,8 +3294,10 @@ const scrollFx = {
     }
     if (!REDUCED) {
       // As you leave the scene the devices recede in 3D; they come back when you scroll up.
-      g.to("#stage, #scene3d, #backLayer", { scale: 0.84, rotateX: 16, yPercent: -4, opacity: 0.35, transformPerspective: 1600, ease: "none",
+      // (A shade fades it rather than opacity on the 3D layers, which would flatten them every frame.)
+      g.to("#stage, #scene3d, #backLayer", { scale: 0.9, yPercent: -5, force3D: true, ease: "none",
         scrollTrigger: { trigger: "#scene", start: "top top", end: "bottom top", scrub: 0.6 } });
+      g.fromTo("#sceneShade", { autoAlpha: 0 }, { autoAlpha: 0.72, ease: "none", immediateRender: false, scrollTrigger: { trigger: "#scene", start: "top top", end: "bottom top", scrub: 0.6 } });
       g.to("#arc", { yPercent: -18, opacity: 0, ease: "none", scrollTrigger: { trigger: "#scene", start: "top top", end: "60% top", scrub: 0.6 } });
       g.to(".flow", { "--fp": 1, ease: "none", scrollTrigger: { trigger: ".flow", start: "top 75%", end: "bottom 60%", scrub: 0.6 } });
     }
@@ -3229,20 +3330,21 @@ const scrollFx = {
     const track = $("#circleList");
     if (this.railST) { ST.refresh(); return; } // built once; later renders only re-measure
     const dist = () => Math.max(0, track.scrollWidth - window.innerWidth);
-    this.railTween = g.to(track, {
-      x: () => -dist(), ease: "none",
+    const progress = $("#railProgress");
+    let lastTilt = "";
+    // A short hold first, so the cards start aligned with the heading before they move.
+    this.railTween = g.timeline({
       scrollTrigger: {
-        trigger: "#circlePin", start: "top top", end: () => `+=${Math.max(dist(), 1)}`, pin: true, scrub: 0.8, invalidateOnRefresh: true,
+        trigger: "#circlePin", start: "top top", end: () => `+=${Math.max(dist() * 1.18, 1)}`, pin: true, scrub: 0.8, invalidateOnRefresh: true,
         onUpdate: (self) => {
-          $("#railProgress").style.setProperty("--p", self.progress.toFixed(3));
-          const v = clamp(self.getVelocity() / -260, -8, 8);
-          track.style.setProperty("--tilt", `${v.toFixed(2)}deg`);
-          for (const m of track.children) m.style.setProperty("--tilt", `${v.toFixed(2)}deg`);
+          progress.style.setProperty("--p", self.progress.toFixed(3));
+          const v = `${clamp(self.getVelocity() / -260, -8, 8).toFixed(1)}deg`;
+          if (v !== lastTilt) { lastTilt = v; track.style.setProperty("--tilt", v); }
           clearTimeout(this.tiltT);
-          this.tiltT = setTimeout(() => { for (const m of track.children) m.style.setProperty("--tilt", "0deg"); }, 160);
+          this.tiltT = setTimeout(() => { lastTilt = "0.0deg"; track.style.setProperty("--tilt", "0deg"); }, 160);
         },
       },
-    });
+    }).to({}, { duration: 0.18 }).to(track, { x: () => -dist(), ease: "none", duration: 1 });
     this.railST = this.railTween.scrollTrigger;
     if (first && window.Draggable) {
       const proxy = document.createElement("div");
@@ -3282,14 +3384,19 @@ const hoodDrawer = {
     if (want === this.open) return;
     this.open = want;
     const panel = $("#tracePanel"), drawer = $("#hoodDrawer");
+    const drawerW = Math.min(460, window.innerWidth - 28) + 14;
+    const k = clamp((window.innerWidth - drawerW - 40) / Math.max(1, $("#scene").clientWidth), 0.5, 1);
+    document.body.style.setProperty("--hood-k", k.toFixed(4));
     if (want) {
       panel.classList.add("in");
       $("#hoodSlot").append(panel);
       drawer.classList.add("open");
       drawer.setAttribute("aria-hidden", "false");
       document.body.classList.add("hood-open");
+      document.body.classList.remove("bar-away");
       $("#hoodClose").focus({ preventScroll: true });
     } else {
+      if (drawer.contains(document.activeElement)) $("#hoodBtn").focus({ preventScroll: true });
       drawer.classList.remove("open");
       drawer.setAttribute("aria-hidden", "true");
       document.body.classList.remove("hood-open");
@@ -3328,9 +3435,9 @@ const overlapDebug = {
       if (d.chipMenu) add(`${d.id} more-menu`, d.chipMenu);
     }
     add("ring label", $(".ring-mini"));
-    if (stage3d) addRect("ring doorbell", stage3d.ringRect());
+    if (stage3d) addRect("ring doorbell", stage3d.ringRect(), "ring");
     const ringPop = $(".ring-pop");
-    if (ringPop && !ringPop.hidden) add("ring popover", ringPop);
+    if (ringPop && !ringPop.hidden && shown(ringPop)) out.push({ name: "ring popover", el: ringPop, r: ringPop.getBoundingClientRect(), owner: "ring" });
     add("ring live view", $(".ring.live-on .ring-view"));
     add("hud timecode", $(".hud-l.bl-txt"));
     add("hud coords", $(".hud-l.br-txt"));
@@ -3346,7 +3453,7 @@ const overlapDebug = {
       for (let j = i + 1; j < bs.length; j++) {
         const a = bs[i], b = bs[j];
         if (a.el && b.el && (a.el.contains(b.el) || b.el.contains(a.el))) continue;
-        if (a.owner && a.owner === b.owner) continue; // a device and its own screen
+        if (a.owner && a.owner === b.owner) continue; // a device and its own screen; the doorbell and its own menu
         if (meets(a.r, b.r)) hits.push([a, b]);
       }
     }
@@ -3401,10 +3508,17 @@ async function waitFor(test, timeout = 60_000, every = 150) {
 
 window.NovaDemo = {
   ready: demoReady,
-  async say(device, text) {
+  // Resolves with the reply once it is on screen and the voice has finished (or at most 3 s past the
+  // expected speech length). say(device, text, { waitForSpeech: false }) resolves when the reply shows.
+  async say(device, text, { waitForSpeech = true } = {}) {
     const d = deviceFor(device);
-    await waitFor(() => !d.busy);
-    return d.send(text);
+    await waitFor(() => !d.busy, 60_000);
+    const seq = d.replySeq || 0;
+    const turn = d.send(text);
+    if (waitForSpeech) return turn;
+    turn.catch(() => {});
+    await Promise.race([waitFor(() => (d.replySeq || 0) > seq, 200_000, 60), turn]);
+    return d.lastReply;
   },
   async showSample(device, sampleId) {
     const d = deviceFor(device);
@@ -3415,7 +3529,14 @@ window.NovaDemo = {
   },
   async answer(device, yes) {
     const d = deviceFor(device);
-    await waitFor(() => !!d.elicit, 30_000);
+    const t0 = Date.now();
+    let sawBusy = d.busy;
+    while (!d.elicit) {
+      if (d.busy) sawBusy = true;
+      else if (sawBusy || Date.now() - t0 > 6_000) throw new Error(`No question on ${d.shortName}'s screen`);
+      if (Date.now() - t0 > 30_000) throw new Error("Timed out waiting for a question");
+      await sleep(120);
+    }
     return d.answerYesNo(!!yes);
   },
   async tapReply(device, text) {
@@ -3556,8 +3677,6 @@ function wireChrome() {
 
   window.addEventListener("pointermove", trackTilt, { passive: true });
   window.addEventListener("resize", () => { clearTimeout(wireChrome.rt); wireChrome.rt = setTimeout(layout, 120); });
-  // Browsers only allow audio after a user gesture: warm up the chime's AudioContext then.
-  document.addEventListener("pointerdown", () => chime.unlock(), { once: true });
   magnetic($("#speedSeg"), "button");
   if (!SR) document.body.classList.add("no-speech");
 }
@@ -3602,7 +3721,12 @@ async function main() {
   const scrollLayer = scrollFx.init(); // GSAP + Lenis load in the background; nothing waits on them
 
   // Prefer the backend's device list; fall back so the page always renders.
-  const [s] = await Promise.all([status.load(), samples.load()]);
+  const statusP = Promise.all([status.load(), samples.load()]);
+  // Wake the GPU process while those requests are in flight (the first WebGL context can take a second).
+  if (WANT_3D) {
+    try { document.createElement("canvas").getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* 3D falls back later */ }
+  }
+  const [s] = await statusP;
   performance.mark("nova:status");
   shelf.init();
   mountDevices(arr(s?.devices).length ? s.devices : FALLBACK_DEVICES);

@@ -152,6 +152,58 @@
   .changed { font-size: 9.5px; }
   .bring li { font-size: 16px; }
   .box { border-radius: 50%; border-width: 1.5px; }
+
+  /* ---- glance: one screen, readable from across the room; the rest is a tap away ---- */
+  body.fit { overflow: hidden; }
+  body.fit #app { height: var(--vh); padding: 0; overflow: hidden; }
+  body.fit #app > .state { height: var(--vh); min-height: 0; }
+  .g { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px 14px; box-sizing: border-box; min-height: 0; }
+  body.fit .g { height: var(--vh); overflow: hidden; }
+  .g-kick { flex: none; display: flex; align-items: center; gap: 9px; min-width: 0; font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--tone, var(--muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-kick svg { width: 16px; height: 16px; flex: none; }
+  .g-kick .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--tone, var(--accent)); box-shadow: 0 0 10px var(--tone, var(--accent)); }
+  .g-kick .soft { color: var(--muted); }
+  .g-head { flex: none; margin: 0; font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1.08; letter-spacing: -.012em; color: var(--text); text-wrap: balance; overflow-wrap: anywhere; }
+  .g-sub { flex: none; margin: -3px 0 0; font-size: 19px; line-height: 1.3; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+  .g-items { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .g-row { display: flex; align-items: center; gap: 12px; padding: 8px 14px; min-height: 48px; box-sizing: border-box; border-radius: 14px; border: 1px solid rgba(244,238,230,.12); min-width: 0; }
+  .g-ico { width: 32px; height: 32px; flex: none; display: grid; place-items: center; color: var(--tone, var(--accent)); }
+  .g-ico svg { width: 26px; height: 26px; }
+  .g-txt { flex: 1; min-width: 0; font-size: 19px; line-height: 1.28; color: var(--text); }
+  .g-txt b { font-weight: 600; }
+  .g-txt small { display: block; margin-top: 1px; font-size: 16px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-txt .clip2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .g-side { flex: none; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+  .g-num { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-family: var(--serif); font-size: 18px; color: var(--bg); background: var(--text); }
+  .g-tag { padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(244,238,230,.22); font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+  .g-tag.ok { color: var(--green); border-color: rgba(158,217,176,.45); }
+  .g-tag.warn { color: var(--amber); border-color: rgba(255,181,71,.5); }
+  .g-tag.bad { color: var(--red); border-color: rgba(255,107,87,.5); }
+  .g-foot { flex: none; display: flex; align-items: center; gap: 10px; min-height: 46px; }
+  .g-acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .g-pager { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
+  .g-nav { height: 42px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(244,238,230,.24); background: transparent; color: var(--text);
+    font: 500 16.5px/1 var(--sans); cursor: pointer; white-space: nowrap; }
+  .g-nav.more { background: rgba(244,238,230,.09); }
+  .g-nav:hover { background: rgba(244,238,230,.14); }
+  .g .btn { min-height: 44px; font-size: 17px; padding: 0 22px; display: inline-flex; align-items: center; gap: 8px; }
+  .g .btn svg { width: 18px; height: 18px; }
+  .g-row .btn { min-height: 38px; font-size: 15.5px; padding: 0 15px; flex: none; }
+  .g.steady, .g.ok_now, .g.applied, .g.done { --tone: var(--green); }
+  .g.watch, .g.wrong_time, .g.already_taken, .g.pending, .g.missed { --tone: var(--amber); }
+  .g.urgent, .g.not_on_list, .g.avoid { --tone: var(--red); }
+  .g.dose_mismatch { --tone: #FF8A5B; }
+  .g.discarded, .g.unclear { --tone: var(--muted); }
+  @media (max-width: 560px) { .g-head { font-size: 32px; } .g-pager .g-nav { padding: 0 12px; } }
+
+  .gv-sum.one { -webkit-line-clamp: 1; }
+  .gv-sum { margin: 0; font-family: var(--serif); font-size: 20px; line-height: 1.32; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: none; }
+  .g-row.q { border: 0; padding: 2px 0; min-height: 0; }
+  .g-row.q .g-txt { font-size: 19px; }
+  .g-txt .clip1 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-row.q .g-num { width: 28px; height: 28px; font-size: 16px; }
 </style>
 </head>
 <body>
@@ -248,72 +300,92 @@ function shareButton() {
   return `<button class="btn" data-share>${ICON.share}Share with circle</button>`;
 }
 
+
+const gCap = (s) => { s = String(s || ""); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; };
+const gObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+
+/* ---------- glance kit: one screen, readable from across the room ---------- */
+// The card fills exactly the space the host gives it (hostContext.containerDimensions.maxHeight). Page one
+// is the glance; anything that doesn't fit waits behind "N more on screen ›" (tap to page), never a scroll.
+let viewH = 0, pageNo = 0, lastSpec = null, lastKey = null, lastSteps = null;
+function setViewport(hc) {
+  const h = Number(hc && hc.containerDimensions && hc.containerDimensions.maxHeight);
+  if (!(h > 0)) return false;
+  const changed = Math.floor(h) !== viewH;
+  viewH = Math.floor(h);
+  document.documentElement.style.setProperty("--vh", viewH + "px");
+  document.body.classList.add("fit");
+  return changed;
+}
+function chunkList(a, n) { const out = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out; }
+function cardFits() {
+  if (!viewH) return true;
+  const g = $app.querySelector(".g"), b = $app.querySelector(".g-body");
+  if (!g || !b) return true;
+  return b.scrollHeight <= b.clientHeight + 1 && g.scrollHeight <= g.clientHeight + 1;
+}
+function gRow(ico, txt, side, cls) {
+  return `<div class="g-row${cls ? " " + cls : ""}">${ico ? `<div class="g-ico">${ico}</div>` : ""}<div class="g-txt">${txt}</div>${side ? `<div class="g-side">${side}</div>` : ""}</div>`;
+}
+// spec(per, level) -> { tone, kicker, head, sub, lead, items, take, actions }. Tries 3 items, then fewer,
+// then a more compact lead, until the card fits its screen.
+const FIT_STEPS = [[3, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]];
+function paintCard(spec, key, steps) {
+  if (key !== lastKey) { pageNo = 0; lastKey = key; }
+  lastSpec = spec; lastSteps = steps;
+  for (const [per, level] of steps || FIT_STEPS) {
+    const c = spec(per, level) || {};
+    const items = (c.items || []).filter(Boolean);
+    const take = Math.min(c.take === undefined ? per : c.take, per);
+    const pages = [items.slice(0, take)].concat(chunkList(items.slice(take), Math.max(1, per)));
+    if (pageNo >= pages.length) pageNo = 0;
+    const shown = pages[pageNo];
+    const after = pages.slice(pageNo + 1).reduce((n, p) => n + p.length, 0);
+    const pager = pages.length > 1
+      ? `<div class="g-pager">${pageNo > 0 ? '<button class="g-nav" type="button" data-page="0">‹ Back</button>' : ""}${after > 0 ? `<button class="g-nav more" type="button" data-page="${pageNo + 1}">${after} more on screen ›</button>` : ""}</div>`
+      : "";
+    $app.innerHTML = `<div class="g ${c.tone || ""}">${c.kicker ? `<div class="g-kick">${c.kicker}</div>` : ""}
+      <h1 class="g-head">${c.head || ""}</h1>${c.sub && pageNo === 0 ? `<p class="g-sub">${c.sub}</p>` : ""}
+      <div class="g-body">${pageNo === 0 ? c.lead || "" : ""}${shown.length ? `<div class="g-items">${shown.join("")}</div>` : ""}</div>
+      ${c.actions || pager ? `<div class="g-foot"><div class="g-acts">${c.actions || ""}</div>${pager}</div>` : ""}</div>`;
+    if (cardFits()) break;
+  }
+}
+function repaint() { if (lastSpec) paintCard(lastSpec, lastKey, lastSteps); }
+$app.addEventListener("click", (e) => {
+  const p = e.target.closest("[data-page]");
+  if (p) { pageNo = Number(p.getAttribute("data-page")) || 0; repaint(); }
+});
 function render() {
   const d = model || {};
   const ap = d.appointment || {};
-  const metaBits = [
-    ap.provider ? `<span>${ICON.doctor}${esc(ap.provider)}</span>` : "",
-    ap.when_label ? `<span>${ICON.clock}${esc(ap.when_label)}</span>` : "",
-    ap.location ? `<span>${ICON.pin}${esc(ap.location)}</span>` : "",
-  ].join("");
-
   const questions = arr(d.questions).filter(Boolean);
-  const symptoms = arr(d.symptoms).filter((s) => s && typeof s === "object");
-  const meds = arr(d.medications).filter((m) => m && typeof m === "object");
+  const symptoms = arr(d.symptoms).filter(gObj);
+  const meds = arr(d.medications).filter(gObj);
   const bring = arr(d.bring).filter(Boolean);
-
-  const qHtml = questions.length
-    ? `<ol class="qs">${questions.map((q) => `<li><span>${esc(q)}</span></li>`).join("")}</ol>`
-    : '<div class="empty">No questions yet.</div>';
-
-  const sHtml = symptoms.length
-    ? symptoms.map((s) => {
-        const count = num(s.count);
-        const sub = [s.first_label ? `First noted ${s.first_label}` : "", s.note || ""].filter(Boolean).join(" · ");
-        return `<div class="sym"><div class="sym-top"><span class="sym-name">${esc(cap(s.name || "Symptom"))}</span>
-          ${count !== null ? `<span class="sym-count">${count}×</span>` : ""}</div>
-          ${sub ? `<div class="sym-sub">${esc(sub)}</div>` : ""}</div>`;
-      }).join("")
-    : '<div class="empty">No symptoms reported.</div>';
-
-  const mHtml = meds.length
-    ? `<table><thead><tr><th>Medicine</th><th>Taken</th><th>Notes</th></tr></thead><tbody>
-      ${meds.map((m) => {
-        const p = num(m.adherence_pct);
-        const pct = p === null ? null : Math.max(0, Math.min(100, Math.round(p)));
-        const tone = pct === null ? "" : pct >= 90 ? "" : pct >= 75 ? " mid" : " low";
-        const changed = /increas|decreas|chang|new|start|doubl/i.test(String(m.note || ""));
-        return `<tr><td class="name"><b>${esc(m.name || "")}</b><span>${esc(m.dose || "")}</span></td>
-          <td>${pct === null ? '<span class="empty">n/a</span>' : `<div class="adh"><div class="track"><div class="fill${tone}" style="width:${pct}%"></div></div><b>${pct}%</b></div>`}</td>
-          <td class="note">${esc(m.note || "")}${changed ? '<div class="changed">Recent change</div>' : ""}</td></tr>`;
-      }).join("")}</tbody></table>`
-    : '<div class="empty">No medicines listed.</div>';
-
-  const bHtml = bring.length
-    ? `<ul class="bring">${bring.map((b) => `<li><span class="box"></span><span>${esc(b)}</span></li>`).join("")}</ul>`
-    : "";
-
-  $app.innerHTML = `
-    <article class="sheet">
-      <header class="sheet-head">
-        <div class="doc-row">
-          <div style="min-width:0">
-            <div class="eyebrow">${ICON.doc}Visit brief</div>
-            <h1>${esc(ap.title || "Upcoming appointment")}</h1>
-            ${metaBits ? `<div class="meta">${metaBits}</div>` : ""}
-          </div>
-          <div style="flex:none">${shareButton()}</div>
-        </div>
-      </header>
-      ${d.summary ? `<section class="sec"><div class="sec-title">Summary for the doctor</div><p class="summary">${esc(d.summary)}</p></section>` : ""}
-      <div class="cols">
-        <section class="sec"><div class="sec-title">Questions to ask</div>${qHtml}</section>
-        <section class="sec"><div class="sec-title">Symptoms</div>${sHtml}</section>
-      </div>
-      <section class="sec"><div class="sec-title">Medicines</div>${mHtml}</section>
-      ${bHtml ? `<section class="sec"><div class="sec-title">What to bring</div>${bHtml}</section>` : ""}
-    </article>
-    <footer><span>${d.generated_by ? `${ICON.spark}Generated by ${esc(d.generated_by)}` : ""}</span><span>Prepared by Nova for the care circle</span></footer>`;
+  paintCard((per, level) => {
+    // the top questions: two lines each when there is room, one line each when that's what fits three
+    const items = questions.map((q, i) => gRow(`<span class="g-num">${i + 1}</span>`, `<span class="${level ? "clip1" : "clip2"}">${esc(q)}</span>`, "", "q"));
+    for (const s of symptoms) {
+      const count = num(s.count);
+      const sub = [s.first_label ? `First noted ${s.first_label}` : "", s.note || ""].filter(Boolean).join(" · ");
+      items.push(gRow(ICON.clock, `<b>${esc(gCap(s.name || "Symptom"))}</b>${sub ? `<small>${esc(sub)}</small>` : ""}`, count !== null ? `${count}×` : ""));
+    }
+    for (const m of meds) {
+      const p = num(m.adherence_pct);
+      const changed = /increas|decreas|chang|new|start|doubl/i.test(String(m.note || ""));
+      items.push(gRow(ICON.doc, `<b>${esc(m.name || "")}</b> ${esc(m.dose || "")}<small>${esc([p === null ? "" : `Taken ${Math.round(p)}%`, m.note || ""].filter(Boolean).join(" · "))}</small>`,
+        changed ? '<span class="g-tag warn">Changed</span>' : ""));
+    }
+    for (const b of bring) items.push(gRow(ICON.check, esc(b), "", ""));
+    const lead = d.summary && level < 2 ? `<p class="gv-sum">${esc(d.summary)}</p>` : d.summary && level === 2 ? `<p class="gv-sum one">${esc(d.summary)}</p>` : "";
+    return {
+      kicker: `${ICON.doc}Visit brief<span class="soft">${esc([ap.when_label, ap.provider].filter(Boolean).map((x) => " · " + x).join(""))}</span>`,
+      head: esc(ap.title || "Upcoming appointment"),
+      sub: level ? "" : esc(ap.location || ""),
+      lead, items, take: Math.min(3, per), actions: shareButton(),
+    };
+  }, model, [[3, 0], [3, 1], [3, 2], [2, 1], [1, 2]]);
 }
 
 function renderSkeleton() {
@@ -374,7 +446,7 @@ bridge.on("ui/notifications/tool-result", (params) => {
   render();
 });
 bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
-bridge.on("ui/notifications/host-context-changed", () => {});
+bridge.on("ui/notifications/host-context-changed", (p) => { if (setViewport(p)) repaint(); });
 
 renderSkeleton();
 reportSize();
@@ -385,7 +457,7 @@ if (window.parent === window) {
     appCapabilities: { availableDisplayModes: ["inline"] },
     clientInfo: { name: "nova-visit", version: "0.1.0" },
     protocolVersion: "2026-01-26",
-  }, 10000).then(() => bridge.notify("ui/notifications/initialized", {}))
+  }, 10000).then((res) => { setViewport(res && res.hostContext); return res; }).then(() => bridge.notify("ui/notifications/initialized", {}))
     .catch(() => showState("Couldn't connect", "This view needs an MCP Apps host."));
 }
 </script>

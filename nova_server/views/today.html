@@ -234,6 +234,55 @@
   .msgs-sub { font-size: 10.5px; }
   .msgs-ico { background: transparent; border: 1px solid rgba(244,238,230,.18); }
   .done-ico { background: var(--green-soft); }
+
+  /* ---- glance: one screen, readable from across the room; the rest is a tap away ---- */
+  body.fit { overflow: hidden; }
+  body.fit #app { height: var(--vh); padding: 0; overflow: hidden; }
+  body.fit #app > .state { height: var(--vh); min-height: 0; }
+  .g { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px 14px; box-sizing: border-box; min-height: 0; }
+  body.fit .g { height: var(--vh); overflow: hidden; }
+  .g-kick { flex: none; display: flex; align-items: center; gap: 9px; min-width: 0; font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--tone, var(--muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-kick svg { width: 16px; height: 16px; flex: none; }
+  .g-kick .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--tone, var(--accent)); box-shadow: 0 0 10px var(--tone, var(--accent)); }
+  .g-kick .soft { color: var(--muted); }
+  .g-head { flex: none; margin: 0; font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1.08; letter-spacing: -.012em; color: var(--text); text-wrap: balance; overflow-wrap: anywhere; }
+  .g-sub { flex: none; margin: -3px 0 0; font-size: 19px; line-height: 1.3; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+  .g-items { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .g-row { display: flex; align-items: center; gap: 12px; padding: 8px 14px; min-height: 48px; box-sizing: border-box; border-radius: 14px; border: 1px solid rgba(244,238,230,.12); min-width: 0; }
+  .g-ico { width: 32px; height: 32px; flex: none; display: grid; place-items: center; color: var(--tone, var(--accent)); }
+  .g-ico svg { width: 26px; height: 26px; }
+  .g-txt { flex: 1; min-width: 0; font-size: 19px; line-height: 1.28; color: var(--text); }
+  .g-txt b { font-weight: 600; }
+  .g-txt small { display: block; margin-top: 1px; font-size: 16px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-txt .clip2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .g-side { flex: none; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+  .g-num { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-family: var(--serif); font-size: 18px; color: var(--bg); background: var(--text); }
+  .g-tag { padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(244,238,230,.22); font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+  .g-tag.ok { color: var(--green); border-color: rgba(158,217,176,.45); }
+  .g-tag.warn { color: var(--amber); border-color: rgba(255,181,71,.5); }
+  .g-tag.bad { color: var(--red); border-color: rgba(255,107,87,.5); }
+  .g-foot { flex: none; display: flex; align-items: center; gap: 10px; min-height: 46px; }
+  .g-acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .g-pager { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
+  .g-nav { height: 42px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(244,238,230,.24); background: transparent; color: var(--text);
+    font: 500 16.5px/1 var(--sans); cursor: pointer; white-space: nowrap; }
+  .g-nav.more { background: rgba(244,238,230,.09); }
+  .g-nav:hover { background: rgba(244,238,230,.14); }
+  .g .btn { min-height: 44px; font-size: 17px; padding: 0 22px; display: inline-flex; align-items: center; gap: 8px; }
+  .g .btn svg { width: 18px; height: 18px; }
+  .g-row .btn { min-height: 38px; font-size: 15.5px; padding: 0 15px; flex: none; }
+  .g.steady, .g.ok_now, .g.applied, .g.done { --tone: var(--green); }
+  .g.watch, .g.wrong_time, .g.already_taken, .g.pending, .g.missed { --tone: var(--amber); }
+  .g.urgent, .g.not_on_list, .g.avoid { --tone: var(--red); }
+  .g.dose_mismatch { --tone: #FF8A5B; }
+  .g.discarded, .g.unclear { --tone: var(--muted); }
+  @media (max-width: 560px) { .g-head { font-size: 32px; } .g-pager .g-nav { padding: 0 12px; } }
+
+  .g-row .pill-tile.sm, .g-ico .pill-tile.sm { width: 32px; height: 32px; border-radius: 9px; }
+  .g-ico .pill-tile svg { width: 26px; height: 26px; }
+  .g-row.s-taken .g-txt { color: var(--text-2); }
 </style>
 </head>
 <body>
@@ -365,130 +414,121 @@ function chipFor(d, personId) {
   return `<span class="chip upcoming">${esc(d.time_label || "Later")}</span>`;
 }
 
+
+const gCap = (s) => { s = String(s || ""); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; };
+const gObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+
+/* ---------- glance kit: one screen, readable from across the room ---------- */
+// The card fills exactly the space the host gives it (hostContext.containerDimensions.maxHeight). Page one
+// is the glance; anything that doesn't fit waits behind "N more on screen ›" (tap to page), never a scroll.
+let viewH = 0, pageNo = 0, lastSpec = null, lastKey = null, lastSteps = null;
+function setViewport(hc) {
+  const h = Number(hc && hc.containerDimensions && hc.containerDimensions.maxHeight);
+  if (!(h > 0)) return false;
+  const changed = Math.floor(h) !== viewH;
+  viewH = Math.floor(h);
+  document.documentElement.style.setProperty("--vh", viewH + "px");
+  document.body.classList.add("fit");
+  return changed;
+}
+function chunkList(a, n) { const out = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out; }
+function cardFits() {
+  if (!viewH) return true;
+  const g = $app.querySelector(".g"), b = $app.querySelector(".g-body");
+  if (!g || !b) return true;
+  return b.scrollHeight <= b.clientHeight + 1 && g.scrollHeight <= g.clientHeight + 1;
+}
+function gRow(ico, txt, side, cls) {
+  return `<div class="g-row${cls ? " " + cls : ""}">${ico ? `<div class="g-ico">${ico}</div>` : ""}<div class="g-txt">${txt}</div>${side ? `<div class="g-side">${side}</div>` : ""}</div>`;
+}
+// spec(per, level) -> { tone, kicker, head, sub, lead, items, take, actions }. Tries 3 items, then fewer,
+// then a more compact lead, until the card fits its screen.
+const FIT_STEPS = [[3, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]];
+function paintCard(spec, key, steps) {
+  if (key !== lastKey) { pageNo = 0; lastKey = key; }
+  lastSpec = spec; lastSteps = steps;
+  for (const [per, level] of steps || FIT_STEPS) {
+    const c = spec(per, level) || {};
+    const items = (c.items || []).filter(Boolean);
+    const take = Math.min(c.take === undefined ? per : c.take, per);
+    const pages = [items.slice(0, take)].concat(chunkList(items.slice(take), Math.max(1, per)));
+    if (pageNo >= pages.length) pageNo = 0;
+    const shown = pages[pageNo];
+    const after = pages.slice(pageNo + 1).reduce((n, p) => n + p.length, 0);
+    const pager = pages.length > 1
+      ? `<div class="g-pager">${pageNo > 0 ? '<button class="g-nav" type="button" data-page="0">‹ Back</button>' : ""}${after > 0 ? `<button class="g-nav more" type="button" data-page="${pageNo + 1}">${after} more on screen ›</button>` : ""}</div>`
+      : "";
+    $app.innerHTML = `<div class="g ${c.tone || ""}">${c.kicker ? `<div class="g-kick">${c.kicker}</div>` : ""}
+      <h1 class="g-head">${c.head || ""}</h1>${c.sub && pageNo === 0 ? `<p class="g-sub">${c.sub}</p>` : ""}
+      <div class="g-body">${pageNo === 0 ? c.lead || "" : ""}${shown.length ? `<div class="g-items">${shown.join("")}</div>` : ""}</div>
+      ${c.actions || pager ? `<div class="g-foot"><div class="g-acts">${c.actions || ""}</div>${pager}</div>` : ""}</div>`;
+    if (cardFits()) break;
+  }
+}
+function repaint() { if (lastSpec) paintCard(lastSpec, lastKey, lastSteps); }
+$app.addEventListener("click", (e) => {
+  const p = e.target.closest("[data-page]");
+  if (p) { pageNo = Number(p.getAttribute("data-page")) || 0; repaint(); }
+});
 function render() {
   const d = model || {};
   const person = d.person || {};
   const who = person.short_name || person.name || "";
-  const doses = arr(d.doses).map((x, i) => ({ ...x, _i: i, _st: normStatus(x.status) }));
+  const doses = arr(d.doses).map((x, i) => ({ ...x, _i: i, _st: normStatus(x.status) }))
+    .sort((a, b) => String(a.scheduled_for || "").localeCompare(String(b.scheduled_for || "")));
   const taken = doses.filter((x) => x._st === "taken").length;
-
-  // Group doses by time label, keeping schedule order.
-  const slots = [];
-  for (const x of doses.slice().sort((a, b) => String(a.scheduled_for || "").localeCompare(String(b.scheduled_for || "")))) {
-    const key = x.time_label || fmtTime(x.scheduled_for) || "Today";
-    let slot = slots.find((s) => s.key === key);
-    if (!slot) { slot = { key, items: [] }; slots.push(slot); }
-    slot.items.push(x);
-  }
-
-  const segs = doses.map((x) => `<span class="seg ${x._st}"></span>`).join("");
-  const progress = doses.length
-    ? `<div class="progress"><div class="progress-label"><b>${taken}</b> of ${doses.length} doses taken</div><div class="segs" aria-hidden="true">${segs}</div></div>`
-    : "";
-
-  const doseRow = (x) => {
-    const actionable = x._st === "due" || x._st === "missed";
-    const isBusy = busy.has(x._i);
-    const sub = [x.appearance, x.purpose].filter(Boolean).map((s) => `<span>${esc(cap(s))}</span>`).join("");
-    const btn = actionable
-      ? `<button class="btn${x._st === "missed" ? " ghost" : ""}" data-take="${x._i}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Logging' : "Mark taken"}</button>`
-      : "";
-    return `<div class="dose s-${x._st}" data-row="${x._i}">
-      <div class="pill-tile">${pillSVG(x.appearance)}</div>
-      <div><div class="dose-name">${esc(x.name || x.med_id || "Medicine")}<span class="dose-amt">${esc(x.dose || "")}</span></div>
-      ${sub ? `<div class="dose-sub">${sub}</div>` : ""}</div>
-      <div class="dose-side">${chipFor(x, person.id)}${btn}</div>
-    </div>`;
-  };
-
-  const slotHtml = slots.length
-    ? slots.map((s) => {
-        const now = s.items.some((x) => x._st === "due");
-        return `<div class="slot"><div class="slot-head${now ? " now" : ""}">${esc(s.key)}${now ? '<span class="now-tag">Now</span>' : ""}</div>${s.items.map(doseRow).join("")}</div>`;
-      }).join("")
-    : '<div class="tile empty">No medicines scheduled for today.</div>';
-
-  // Hero: a due dose first, then a missed one, then what's next, else "all done".
   const focus = doses.find((x) => x._st === "due") || doses.find((x) => x._st === "missed");
-  let hero = "";
-  if (focus) {
-    const isBusy = busy.has(focus._i);
-    const sub = [focus.appearance, focus.purpose].filter(Boolean).map((s) => esc(cap(s))).join(" · ");
-    hero = `<section class="hero ${focus._st}">
-      <div class="pill-tile">${pillSVG(focus.appearance)}</div>
-      <div style="min-width:0"><div class="hero-label">${focus._st === "due" ? "Due now" : "Missed"}${focus.time_label ? " · " + esc(focus.time_label) : ""}</div>
-        <div class="hero-name">${esc(focus.name || "Medicine")}<span>${esc(focus.dose || "")}</span></div>
-        ${sub ? `<div class="hero-sub">${sub}</div>` : ""}</div>
-      <button class="btn" data-take="${focus._i}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Logging' : ICON.check + "Mark taken"}</button>
-    </section>`;
-  } else if (doses.length && doses.every((x) => x._st === "taken" || x._st === "skipped")) {
-    hero = `<section class="hero done"><div class="done-ico">${ICON.check}</div>
-      <div><div class="hero-label">All done</div><div class="hero-name">Every dose today is taken</div><div class="hero-sub">Nice work${who ? ", " + esc(who) : ""}.</div></div><span></span></section>`;
-  } else {
-    // Prefer the live dose list (it changes when a dose is logged here); next_dose is only a fallback.
-    const up = doses.find((x) => x._st === "upcoming");
-    const nd = up || (d.next_dose && (d.next_dose.name || d.next_dose.time_label) ? d.next_dose : null);
-    if (nd) {
-      hero = `<section class="hero next"><div class="pill-tile">${pillSVG(nd.appearance)}</div>
-        <div><div class="hero-label">Next dose${nd.time_label ? " · " + esc(nd.time_label) : ""}</div>
-        <div class="hero-name">${esc(nd.name || "")}${nd.dose ? `<span>${esc(nd.dose)}</span>` : ""}</div>
-        ${nd.appearance ? `<div class="hero-sub">${esc(cap(nd.appearance))}</div>` : ""}</div><span></span></section>`;
-    }
-  }
-
-  const appts = arr(d.appointments).slice(0, 3);
-  const apptHtml = appts.length
-    ? appts.map((a) => {
-        const dt = parseDate(a.at);
-        const cal = dt
-          ? `<div class="cal"><div class="cal-m">${esc(dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase())}</div><div class="cal-d">${dt.getDate()}</div></div>`
-          : `<div class="cal" style="display:grid;place-items:center">${ICON.cal}</div>`;
-        const sub = [a.provider, a.location].filter(Boolean).map(esc).join(" · ");
-        return `<div class="appt">${cal}<div style="min-width:0">${a.when_label ? `<div class="appt-when">${esc(a.when_label)}</div>` : ""}<div class="appt-title">${esc(a.title || "Appointment")}</div>${sub ? `<div class="appt-sub" title="${sub}">${sub}</div>` : ""}</div></div>`;
-      }).join("")
-    : '<div class="empty">Nothing on the calendar.</div>';
-
-  // Supply: pills left per medicine, with refill status (warning at 5 days or fewer).
-  const refills = arr(d.refills).filter((r) => r && typeof r === "object");
-  const refillFor = (name) => refills.find((r) => String(r.name || "").toLowerCase() === String(name || "").toLowerCase());
-  const supply = arr(d.supply).filter((s) => s && typeof s === "object" && (s.name || s.med_id));
-  const supplyItems = supply.map((s) => {
-    const days = Number(s.days_left), left = Number(s.left);
-    const low = Number.isFinite(days) && days <= 5;
-    const look = doses.find((x) => x.med_id && x.med_id === s.med_id);
-    const r = refillFor(s.name);
-    const rf = r ? `<span class="rf ${r.status === "ready" ? "ready" : "req"}">${r.status === "ready" ? "Ready" : "Requested"}${r.pharmacy ? " · " + esc(r.pharmacy) : ""}</span>` : "";
-    return `<div class="sup${low ? " low" : ""}"><div class="pill-tile sm">${pillSVG(look ? look.appearance : "")}</div>
-      <div class="sup-main"><div class="sup-name">${esc(s.name || s.med_id)}</div>
-      <div class="sup-meta">${Number.isFinite(left) ? `${left} left` : ""}${Number.isFinite(days) ? `${Number.isFinite(left) ? " · " : ""}${days} day${days === 1 ? "" : "s"}` : ""}</div>${rf}</div></div>`;
-  });
-  for (const r of refills) {
-    if (supply.some((s) => String(s.name || "").toLowerCase() === String(r.name || "").toLowerCase())) continue;
-    supplyItems.push(`<div class="sup"><div class="sup-main"><div class="sup-name">${esc(r.name || "Refill")}</div>
-      <span class="rf ${r.status === "ready" ? "ready" : "req"}">${r.status === "ready" ? "Ready" : "Requested"}${r.pharmacy ? " · " + esc(r.pharmacy) : ""}</span></div></div>`);
-  }
-  const supplyHtml = supplyItems.length ? `<section aria-label="Supply" style="margin-top:4px"><div class="section-title">Supply</div><div class="sups">${supplyItems.join("")}</div></section>` : "";
-
+  const allDone = doses.length && doses.every((x) => x._st === "taken" || x._st === "skipped");
+  const next = doses.find((x) => x._st === "upcoming") || (d.next_dose && (d.next_dose.name || d.next_dose.time_label) ? d.next_dose : null);
   const unread = Number(d.unread_messages) || 0;
-  const msgs = `<div class="tile msgs">
-      <div class="msgs-ico">${ICON.mail}${unread ? `<span class="badge">${unread}</span>` : ""}</div>
-      <div class="msgs-text"><div class="msgs-title">${unread ? `${unread} new message${unread === 1 ? "" : "s"}` : "No new messages"}</div>
-      <div class="msgs-sub">${unread ? "From your care circle" : "You're all caught up"}</div></div>
-      ${unread ? '<button class="btn ghost" data-read>Read</button>' : ""}
-    </div>`;
-
-  $app.innerHTML = `
-    <header class="top">
-      <div><div class="eyebrow">Today${who ? " · " + esc(who) : ""}</div><h1>${esc(d.date_label || new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</h1></div>
-      ${progress}
-    </header>
-    ${hero}
-    <section aria-label="Medicines"><div class="section-title">Today's medicines</div>${slotHtml}</section>
-    ${supplyHtml}
-    <div class="bottom">
-      <section><div class="section-title">Coming up</div><div class="tile" style="padding:6px 16px">${apptHtml}</div></section>
-      <section><div class="section-title">Messages</div>${msgs}</section>
-    </div>`;
+  paintCard((per, level) => {
+    let head, sub = "", tone = "";
+    if (focus) {
+      head = focus._st === "due" ? `Time for your ${esc(focus.name || "medicine")}` : `${esc(focus.name || "A dose")} was missed`;
+      sub = esc([focus.dose, gCap(focus.appearance), focus.time_label].filter(Boolean).join(" · "));
+      tone = focus._st === "due" ? "" : "missed";
+    } else if (allDone) { head = "All done for today"; sub = esc(`Every dose is taken${who ? ", " + who : ""}.`); tone = "done"; }
+    else if (next) { head = `Next: ${esc(next.name || "medicine")}${next.time_label ? ` at ${esc(next.time_label)}` : ""}`; sub = esc([next.dose, gCap(next.appearance)].filter(Boolean).join(" · ")); }
+    else head = esc(d.date_label || "Today");
+    const items = [];
+    const order = { due: 0, missed: 1, upcoming: 2, taken: 3, skipped: 4 };
+    for (const x of doses.slice().sort((a, b) => order[a._st] - order[b._st])) {
+      if (x === focus) continue;
+      const actionable = x._st === "due" || x._st === "missed";
+      const isBusy = busy.has(x._i);
+      const side = actionable
+        ? `<button class="btn${x._st === "missed" ? " ghost" : ""}" type="button" data-take="${x._i}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Logging' : "Mark taken"}</button>`
+        : x._st === "taken" ? `<span class="g-tag ok">Taken${x.logged_at ? " " + esc(fmtTime(x.logged_at)) : ""}</span>`
+        : x._st === "skipped" ? '<span class="g-tag">Skipped</span>' : `<span class="g-tag">${esc(x.time_label || "Later")}</span>`;
+      items.push(gRow(`<span class="pill-tile sm">${pillSVG(x.appearance)}</span>`, `<b>${esc(x.name || x.med_id || "Medicine")}</b> ${esc(x.dose || "")}<small>${esc([x.time_label, gCap(x.appearance)].filter(Boolean).join(" · "))}</small>`, side, `s-${x._st}`));
+    }
+    const refills = arr(d.refills).filter(gObj);
+    const refillFor = (name) => refills.find((r) => String(r.name || "").toLowerCase() === String(name || "").toLowerCase());
+    const supply = arr(d.supply).filter((s) => gObj(s) && (s.name || s.med_id))
+      .sort((a, b) => (Number(a.days_left) || 99) - (Number(b.days_left) || 99));
+    for (const s of supply) {
+      const days = Number(s.days_left), left = Number(s.left), low = Number.isFinite(days) && days <= 5;
+      const r = refillFor(s.name);
+      const side = r ? `<span class="g-tag ${r.status === "ready" ? "ok" : ""}">${r.status === "ready" ? "Refill ready" : "Refill requested"}</span>` : low ? '<span class="g-tag warn">Running low</span>' : "";
+      if (!low && !r) continue;
+      items.push(gRow(`<span class="pill-tile sm">${pillSVG((doses.find((x) => x.med_id && x.med_id === s.med_id) || {}).appearance)}</span>`,
+        `<b>${esc(s.name || s.med_id)}</b><small>${esc([Number.isFinite(left) ? `${left} left` : "", Number.isFinite(days) ? `${days} day${days === 1 ? "" : "s"}` : "", r && r.pharmacy ? r.pharmacy : ""].filter(Boolean).join(" · "))}</small>`, side));
+    }
+    for (const a of arr(d.appointments).filter(gObj)) {
+      items.push(gRow(ICON.cal, `<b>${esc(a.title || "Appointment")}</b><small>${esc([a.when_label, a.provider].filter(Boolean).join(" · "))}</small>`));
+    }
+    if (unread && focus) items.push(gRow(ICON.mail, `<b>${unread} new message${unread === 1 ? "" : "s"}</b><small>From your care circle</small>`, '<button class="btn ghost" type="button" data-read>Read</button>'));
+    let actions = "";
+    if (focus) {
+      const isBusy = busy.has(focus._i);
+      actions = `<button class="btn" type="button" data-take="${focus._i}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Logging' : ICON.check + "Mark taken"}</button>`;
+    } else if (unread) actions = `<button class="btn" type="button" data-read>${ICON.mail}Read ${unread} message${unread === 1 ? "" : "s"}</button>`;
+    return {
+      tone,
+      kicker: `<span class="dot"></span>Today${who ? " · " + esc(who) : ""}<span class="soft">${doses.length ? ` · ${taken} of ${doses.length} taken` : ""}</span>`,
+      head, sub, lead: "", items, actions,
+    };
+  }, model);
 }
 
 function renderSkeleton() {
@@ -582,7 +622,7 @@ bridge.on("ui/notifications/tool-result", (params) => {
   render();
 });
 bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
-bridge.on("ui/notifications/host-context-changed", () => {});
+bridge.on("ui/notifications/host-context-changed", (p) => { if (setViewport(p)) repaint(); });
 
 renderSkeleton();
 reportSize();
@@ -593,7 +633,7 @@ if (window.parent === window) {
     appCapabilities: { availableDisplayModes: ["inline"] },
     clientInfo: { name: "nova-today", version: "0.1.0" },
     protocolVersion: "2026-01-26",
-  }, 10000).then(() => {
+  }, 10000).then((res) => { setViewport(res && res.hostContext); return res; }).then(() => {
     bridge.notify("ui/notifications/initialized", {});
   }).catch(() => showState("Couldn't connect", "This view needs an MCP Apps host."));
 }

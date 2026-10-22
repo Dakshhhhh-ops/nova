@@ -683,7 +683,7 @@ body.lapse .amb-top::after { content: " · time-lapse"; color: var(--amber); }
 .circle-sec { position: relative; background: linear-gradient(180deg, #08090D 0%, var(--ink) 30%); }
 .circle-pin { position: relative; height: 100vh; min-height: 640px; display: flex; flex-direction: column; justify-content: center; padding: 96px 0 40px; overflow: hidden; }
 .sec-head { padding: 0 6vw; position: relative; }
-.sec-index { display: flex; align-items: center; gap: 14px; color: var(--faint); }
+.sec-index { display: flex; width: max-content; align-items: center; gap: 14px; color: var(--faint); }
 .sec-index::after { content: ""; width: 80px; height: 1px; background: var(--line-2); }
 .display { margin: 14px 0 0; font-family: var(--serif); font-weight: 400; font-size: clamp(56px, 8.4vw, 150px); line-height: .9; letter-spacing: -.025em; }
 .display em { font-style: italic; color: var(--nova); }
@@ -937,7 +937,7 @@ body.hood-open .hood-btn kbd { color: var(--ink); border-color: rgba(10,11,16,.3
 .ring-mini .ro-grille { display: none; }
 .ring-mini .ro-button { width: 13px; height: 13px; margin-left: -6.5px; bottom: 8px; }
 .is3d .ring-mini .ring-obj { display: none; } /* the real one is in 3D */
-.ring-label { color: var(--faint); white-space: nowrap; font-size: 9px; letter-spacing: .1em; }
+.ring-label { color: rgba(244,238,230,.7); white-space: nowrap; font-size: 9px; letter-spacing: .1em; }
 .ring-more { width: 22px; height: 22px; }
 .ring-pop { position: absolute; z-index: 20; left: -4px; bottom: calc(100% + 10px); width: 164px; padding: 12px 10px 10px; border-radius: 16px;
   background: rgba(14,15,21,.95); border: 1px solid var(--line-2); backdrop-filter: blur(18px); box-shadow: 0 26px 60px rgba(0,0,0,.6);
@@ -945,7 +945,8 @@ body.hood-open .hood-btn kbd { color: var(--ink); border-color: rgba(10,11,16,.3
 .rp-k { color: var(--faint); font-size: 9.5px; }
 .ring-pop .rl-v { font-size: 12.5px; color: var(--mist); }
 .ring-pop .ring-btns { display: grid; grid-template-columns: 1fr; gap: 5px; }
-.ring-pop .ring-btns button { text-align: left; padding: 0 12px; }
+.ring-pop .ring-btns button { text-align: left; padding: 0 11px; font-size: 11.5px; }
+.is3d .ring-pop { width: var(--ring-pop-w, 164px); }
 .ring-pop .rl-v { line-height: 1.35; }
 .ring .ring-view { position: absolute; z-index: 15; left: 0; bottom: calc(100% + 12px); width: 240px; aspect-ratio: 16 / 9;
   opacity: 0; transform: translateY(8px) scale(.97); pointer-events: none; transition: opacity .5s var(--ease), transform .6s var(--ease); }
@@ -986,6 +987,76 @@ body.hood-open .hood-btn kbd { color: var(--ink); border-color: rgba(10,11,16,.3
 .overlap-layer .ob.hit { outline: 2px solid #FF2D55; background: rgba(255,45,85,.08); }
 .overlap-layer .ob span { position: absolute; left: 2px; top: 1px; font: 9px/1.2 var(--mono); color: rgba(59,209,255,.9); white-space: nowrap; }
 .overlap-layer .ob.hit span { color: #FF2D55; }
+
+
+/* ============================================ review: performance */
+/* Blur only on the bar and the small popovers; everything else uses solid or semi-opaque fills.
+   No blend modes, no full-screen overlay layers. */
+.orb-tip, .amb-hint, .elicit-layer, .drop-hint, .drawer, .rv-banner, .hood-drawer, .toast { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.orb-tip, .drop-hint, .rv-banner { background: rgba(10,11,16,.9); }
+.amb-hint { background: rgba(8,9,14,.8); }
+.elicit-layer { background: rgba(4,5,9,.88); }
+.drawer { background: rgba(14,15,21,.985); }
+.hood-drawer { background: rgba(12,13,19,.975); }
+.toast { background: rgba(17,19,26,.97); }
+.glare, .bloom { mix-blend-mode: normal; }
+.glare { opacity: .55; }
+.moment::after { mix-blend-mode: normal; opacity: .45; }
+.grain { display: none; mix-blend-mode: normal; animation: none; }
+#stage, #scene3d, #backLayer { will-change: transform; }
+.scene-shade { position: absolute; inset: 0; z-index: 9; background: #0B0C12; opacity: 0; visibility: hidden; pointer-events: none; }
+/* the bar sits over a live WebGL canvas: a backdrop blur would be recomputed every frame, so it's a tinted glass instead */
+.bar { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: rgba(12,13,19,.84); }
+body.bar-away .bar { transform: translateY(calc(-100% - 16px)); opacity: 0; pointer-events: none; transition: transform .5s var(--ease), opacity .3s; }
+.bar { transition: background .5s var(--ease), transform .5s var(--ease), opacity .3s; }
+body.scrolled .bar, body.day-bright .bar { background: rgba(12,13,19,.9); }
+.ring-pop .rp-hook { font-size: 8.5px; line-height: 1.4; letter-spacing: .08em; color: rgba(59,209,255,.8); white-space: normal; }
+
+/* ============================================ review: story rail */
+/* Cards start on the heading's left edge and slide under soft edges. */
+/* soft edges: two small gradient strips over the rail (cheaper than masking the moving track) */
+.rail { position: relative; }
+.rail::before, .rail::after { content: ""; position: absolute; top: -10px; bottom: -10px; width: 6vw; z-index: 2; pointer-events: none; }
+.rail::before { left: 0; background: linear-gradient(90deg, var(--ink), rgba(10,11,16,0)); }
+.rail::after { right: 0; background: linear-gradient(270deg, var(--ink), rgba(10,11,16,0)); }
+.no-gsap .rail::before, .no-gsap .rail::after { display: none; }
+/* cards: flat at rest (one layer for the whole track), lighter shadows, no overlay pass */
+.moment { transform: none; transition: none; box-shadow: 0 18px 30px -18px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.12); }
+.moment.fresh { box-shadow: 0 0 0 2px var(--nova), 0 18px 30px -18px rgba(0,0,0,.7); }
+.moment::after { display: none; }
+.m-text { -webkit-line-clamp: 3; }
+
+/* ============================================ review: MCP App card */
+.card-frame { overflow: hidden; border-radius: 18px; }
+.card-frame.overflowing::after { content: "Scroll for more"; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; z-index: 2; pointer-events: none;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; border-radius: 0 0 18px 18px;
+  font: 500 10.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: rgba(244,238,230,.75);
+  background: linear-gradient(180deg, rgba(11,12,18,0), rgba(11,12,18,.92) 70%); }
+.caption-text.clamped { cursor: pointer; }
+.card-caption.expanded .caption-text { -webkit-line-clamp: unset; display: block; max-height: 9.2em; overflow: auto; }
+.card-caption { align-items: flex-start; padding-top: 8px; }
+.card-caption .alexa-orb, .card-caption .card-close { margin-top: 1px; }
+
+/* ============================================ review: inspector drawer */
+/* The stage slides left and scales so the drawer never covers Maya's Echo Show. */
+#scene { transform-origin: 0 50%; transition: transform .9s var(--ease), border-radius .9s var(--ease); }
+body.hood-open #scene { transform: translateX(20px) scale(var(--hood-k, .74)); border-radius: 26px; }
+@media (prefers-reduced-motion: reduce) { #scene { transition: none; } }
+
+
+/* ============================================ review: tagline, follow-up pill */
+.brand-sub { font-family: var(--sans); font-size: 12.5px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--mist);
+  max-width: clamp(150px, 15vw, 330px); white-space: normal; line-height: 1.2; }
+.page-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+.page-foot .foot-line { margin: 0; max-width: 62ch; font-size: 14px; line-height: 1.5; color: var(--mist); }
+.chip.follow { border-color: rgba(59,209,255,.55); color: var(--nova); background: rgba(59,209,255,.08); }
+.chip.follow:hover { background: rgba(59,209,255,.16); }
+.bar-brand { align-items: center; }
+.hh-meta, #hhDay { white-space: nowrap; }
+@media (max-width: 1600px) { .bar .stat-k { display: none; } .bar .stat-v { max-width: 170px; } }
+/* the Ring's menu opens from the frame's gutter, inside the Ring's own column */
+.is3d .ring-pop { left: calc(16px - var(--ring-x, 16px)); }
+body:not(.is3d) .ring-pop { width: 128px; } /* 2D: stays inside the Ring's column */
 
 /* =============================================================== responsive */
 @media (max-width: 1340px) {

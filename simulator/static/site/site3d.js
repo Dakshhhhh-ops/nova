@@ -426,9 +426,10 @@ async function hero() {
     if (!introDone) placeLogoStart();
     applyScroll();
   }
+  const LOGO_PEAK = 0.58; // the intro logo peaks at a bit over half the Echo's size, so it never fills the hero
   function placeLogoStart() {
     logo.group.position.set(base.x, base.y + 0.72 * S, 0.4);
-    logo.group.scale.setScalar(S * 0.95);
+    logo.group.scale.setScalar(S * LOGO_PEAK);
     echo.group.position.y = base.y - 1.7 * S;
   }
 
@@ -448,7 +449,7 @@ async function hero() {
     intro.ran = true;
     const tl = gsap.timeline({ delay: 0.15 });
     const ls = logo.group.scale, lp = logo.group.position, ep = echo.group.position;
-    tl.fromTo(ls, { x: S * 0.3, y: S * 0.3, z: S * 0.3 }, { x: S * 1.05, y: S * 1.05, z: S * 1.05, duration: 1.3, ease: 'expo.out' }, 0);
+    tl.fromTo(ls, { x: S * 0.2, y: S * 0.2, z: S * 0.2 }, { x: S * LOGO_PEAK, y: S * LOGO_PEAK, z: S * LOGO_PEAK, duration: 1.3, ease: 'expo.out' }, 0);
     tl.add(() => { if (logo.spin) logo.spin(3.2); }, 1.25);
     tl.to(ep, { y: base.y, duration: 1.5, ease: 'expo.out' }, 1.55);
     tl.to(lp, { z: 0.12, y: base.y + 0.66 * S, duration: 1.1, ease: 'power3.inOut' }, 1.5);

@@ -26,7 +26,7 @@ catch (err) { document.documentElement.classList.add('no-webgl'); /* keep the 2D
 `createStage` throws `Error('Nova3D: WebGL unavailable')` (with `err.code === 'NO_WEBGL'`) when WebGL2/WebGL is not available.
 
 ### World conventions
-- **Units: 1 unit = 10 cm**, Y up. Every object is real size: Echo Show 8 is 2.0 × 1.36 units, Echo Show 15 is 4.02 × 2.52, the Ring doorbell is 0.62 × 1.28, a pill bottle is about 0.44 × 0.95, the paper is 2.16 × 2.79 (US letter).
+- **Units: 1 unit = 10 cm**, Y up. Every object is real size: Echo Show 8 is 2.0 × 1.36 units, Echo Show 15 is 4.02 × 2.52, the Ring doorbell is 0.62 × 1.28, a pill bottle is about 0.46 × 0.94, the paper is 2.16 × 2.79 (US letter).
 - Every factory returns a **handle** `{ group, kind, …, dispose() }`. `group` is a `THREE.Group` whose origin is the **bottom centre** of the object (it rests on y = 0), facing **+Z** (towards the default camera). Move, rotate and scale `handle.group` freely.
 - `stage.add(handle)` / `stage.remove(handle)` accept a handle or any `Object3D`. Handles added to the stage become pickable and get per-frame animation.
 - Colours come from `docs/DESIGN.md` and are exported as `COLORS`.
@@ -163,11 +163,21 @@ ring.flash('ding');
 const pill = N.createPillBottle({
   label: '/samples/pill-atorvastatin.png', // the sample PNG; the label area is cropped automatically
   id: 'atorvastatin',
-  crop: [250, 210, 400, 310],             // optional: label rectangle in the source image's pixels (default fits the samples)
-  pills: true,                            // a few tablets visible through the amber plastic
+  style: 'rx',                            // 'rx' | 'otc' (see below). Default: 'otc' if the label URL contains "ibuprofen" or "otc", else 'rx'
+  crop: [252, 212, 396, 306],             // optional: label rectangle [x, y, w, h] in source pixels (defaults fit the 900×640 samples for each style)
+  pills: true,                            // rx only: a few tablets visible through the amber plastic
 });
+// the four bottles used in the Studio and on the landing:
+const bottles = [
+  N.createPillBottle({ label: '/samples/pill-atorvastatin.png', id: 'atorvastatin' }),
+  N.createPillBottle({ label: '/samples/pill-lisinopril.png',   id: 'lisinopril' }),
+  N.createPillBottle({ label: '/samples/pill-metformin.png',    id: 'metformin' }),
+  N.createPillBottle({ label: '/samples/pill-ibuprofen.png',    id: 'ibuprofen', style: 'otc' }),
+];
 ```
-`{ group, kind: 'pill', id, setHighlight(on: boolean), ready: Promise, dispose() }`. Amber translucent body (physical transmission in high quality, a convincing tinted fake in low), white ridged child-proof cap, paper label wrapped around the front. `ready` resolves once the label texture is loaded.
+`{ group, kind: 'pill', id, style, setHighlight(on: boolean), ready: Promise, dispose() }`. The label is cropped from the sample and wrapped round the front (+Z) of the bottle. `ready` resolves once the label texture is loaded; until then (or if the PNG fails to load) a drawn placeholder label is shown.
+- `style: 'rx'`: amber translucent prescription vial (physical transmission in high quality, a tinted fake in low) with a white ridged child-resistant cap; about 0.46 × 0.94 units.
+- `style: 'otc'`: opaque white HDPE over-the-counter bottle with rounded shoulders and a narrower blue ridged cap; about 0.48 × 0.89 units.
 
 ## createPaper(options) → Paper
 

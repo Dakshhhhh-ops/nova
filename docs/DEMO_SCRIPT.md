@@ -12,7 +12,7 @@ Record at 1440x900 in Chrome with sound on. Start everything (`uv run python run
 | 1:25–1:35 | Ring | **Grace arrives** → Rose: *"Grace is at the front door."* Maya: *"Grace arrived at Mom's at 10:02."* |
 | 1:35–2:05 | Maya | **Scan paperwork** → *After-visit summary* → reconciliation card: Lisinopril 20 → 10 mg, reason, instructions → **Approve**. Rose's Echo: *"Dr. Patel changed your lisinopril from 20 mg to 10 mg…"* Then Rose shows the **Lisinopril 20 mg** bottle → *"Careful… your plan now says 10 mg."* |
 | 2:05–2:35 | Jump to **5:55 PM**, speed **300×** | 6 PM reminder → 6:30 follow-up → 7:30 Maya's Echo glows yellow: *"Mom hasn't taken her 6 PM Metformin. I reminded her at 6 and 6:30."* Maya taps **Remind Mom again** → Rose gets *"Message from Maya…"* |
-| 2:35–2:50 | Show the inspector | "Twenty-two MCP tools over Streamable HTTP, a token per person, MCP Apps on the Echo Show, consent by elicitation, and Amazon Nova on Bedrock for language and vision. Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge." |
+| 2:35–2:50 | Show the inspector | "Twenty-four MCP tools over Streamable HTTP, a token per person, MCP Apps on the Echo Show, consent by elicitation, and Amazon Nova on Bedrock for language and vision. Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge." |
 
 Tips
 - Before recording, make sure the top bar shows **Amazon Nova · Amazon Bedrock** (fix AWS credentials first). Offline mode works but is less impressive for the AWS Builder entry.

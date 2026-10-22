@@ -47,7 +47,7 @@ SCENES: list[tuple[str, str, float]] = [
      "and nothing changes until she approves.", "reconcile", 9.0),
     ("Later, Rose picks up her old bottle. Nova catches it.", "pill_old", 7.0),
     ("In the evening, the six o'clock pill is missed. Nova reminds Rose, follows up, and only then tells Maya.", "evening", 4.0),
-    ("Under the hood: twenty-two MCP tools over Streamable HTTP, a token for each person, MCP Apps on the Echo Show "
+    ("Under the hood: twenty-four MCP tools over Streamable HTTP, a token for each person, MCP Apps on the Echo Show "
      "screen, consent by elicitation, and Amazon Nova on Bedrock for language and vision.", "hood", 5.0),
     ("Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge.", "end", 3.0),
 ]

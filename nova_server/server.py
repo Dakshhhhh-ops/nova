@@ -655,10 +655,15 @@ def list_alerts() -> dict[str, Any]:
     annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False),
 )
 def resolve_alert(
-    alert_id: Annotated[int, Field(description="The alert id")],
+    alert_id: Annotated[int, Field(description="The alert id; 0 means the most important open alert")] = 0,
     note: Annotated[str, Field(description="What was done, e.g. 'Called Dr. Patel's office'")] = "",
 ) -> dict[str, Any]:
     me = caller()
+    if not alert_id:
+        open_alerts = store.alerts(care_recipient(me)["id"])
+        if not open_alerts:
+            return {"speech": "There are no open alerts.", "alert": None}
+        alert_id = open_alerts[0]["id"]
     a = store.handle_alert(alert_id, me["id"])
     if not a:
         return {"speech": "I couldn't find that alert.", "alert": None}
@@ -893,6 +898,70 @@ def caregiver_briefing_prompt(period: str = "week") -> list[UserMessage]:
         f"Use care_briefing for the {period}. Tell me the overall picture in one sentence, then the single most "
         "important thing and the suggested next step. Offer to prepare a visit brief if an appointment is coming up."
     )]
+
+
+# ---------------------------------------------------------------------------
+# Appointments and vitals (read)
+# ---------------------------------------------------------------------------
+@mcp.tool(
+    name="list_appointments",
+    title="Upcoming appointments",
+    description="'When is my doctor appointment?', 'Who's coming this week?' Upcoming visits, who's driving, and where.",
+    annotations=READ,
+)
+def list_appointments(days: Annotated[int, Field(description="How far ahead", ge=1, le=60)] = 14) -> dict[str, Any]:
+    me = caller()
+    elder = care_recipient(me)
+    if not shared(me, elder, "appointments"):
+        return not_shared(elder, "appointments")
+    t = now()
+    appts = store.appointments(elder["id"], t, t + timedelta(days=days))
+    if not appts:
+        return {"speech": f"Nothing is scheduled in the next {days} days.", "appointments": []}
+    driver = engine._driver_for(appts[0]) if hasattr(engine, "_driver_for") else None
+    items, parts = [], []
+    for a in appts[:4]:
+        when = ins.mid_sentence(ins.when_label(parse(a["at"]), t))
+        personal = a["provider"] and a["provider"].split()[0] in a["title"]
+        items.append({"title": a["title"], "provider": a["provider"], "when_label": when, "location": a["location"]})
+        if personal:
+            parts.append(f"{a['provider'].split()[0]} visits {when}.")
+        else:
+            who = "You see" if me["id"] == elder["id"] else f"{elder['short_name']} sees"
+            ride = ""
+            if driver and driver["id"] != me["id"]:
+                ride = f" {driver['short_name']} is driving{' you' if me['id'] == elder['id'] else ''}."
+            parts.append(f"{who} {a['provider']} for the {a['title'].lower()} {when}, at {a['location']}.{ride}")
+    return {"speech": " ".join(parts[:3]), "appointments": items}
+
+
+@mcp.tool(
+    name="get_vitals",
+    title="Blood pressure readings",
+    description="'What's Mom's blood pressure?', 'How has my blood pressure been?' Recent readings, the average and the doctor's limits.",
+    annotations=READ,
+)
+def get_vitals(days: Annotated[int, Field(description="How far back", ge=1, le=60)] = 7) -> dict[str, Any]:
+    me = caller()
+    elder = care_recipient(me)
+    if not shared(me, elder, "wellbeing"):
+        return not_shared(elder, "wellbeing")
+    t = now()
+    rows = store.bp(elder["id"], t - timedelta(days=days))
+    if not rows:
+        return {"speech": f"No blood pressure readings in the last {days} days.", "readings": []}
+    last = rows[-1]
+    avg_s = round(sum(r["systolic"] for r in rows) / len(rows))
+    avg_d = round(sum(r["diastolic"] for r in rows) / len(rows))
+    (hi_s, hi_d), (lo_s, lo_d), _ = ins.bp_limits(store, elder["id"])
+    whose = "Your" if me["id"] == elder["id"] else f"{elder['short_name']}'s"
+    speech = (f"{whose} last reading was {last['systolic']} over {last['diastolic']}, "
+              f"{ins.mid_sentence(ins.when_label(parse(last['at']), t))}. Over the last {days} days it averaged "
+              f"{avg_s} over {avg_d}.")
+    if any(r["systolic"] < lo_s or r["diastolic"] < lo_d or r["systolic"] > hi_s or r["diastolic"] > hi_d for r in rows):
+        speech += " Some readings were outside the doctor's range."
+    return {"speech": speech, "average": f"{avg_s}/{avg_d}", "limits": {"high": f"{hi_s}/{hi_d}", "low": f"{lo_s}/{lo_d}"},
+            "readings": [{"at": r["at"], "bp": f"{r['systolic']}/{r['diastolic']}", "pulse": r["pulse"]} for r in rows]}
 
 
 # ---------------------------------------------------------------------------

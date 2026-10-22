@@ -37,6 +37,15 @@ def _med_phrase(text: str) -> str:
 
 def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     t = text.lower().strip()
+    if re.search(r"what (should|do|can) i take (now|today|tonight)|which pills|what pills (now|today)|what('s| is) due", t):
+        return _call("get_today")
+    if re.search(r"appointment|doctor'?s? visit|see (the )?doctor|who'?s coming|anyone coming|coming (today|tomorrow|this week)", t) \
+            and not re.search(r"brief|prepare|get ready", t):
+        return _call("list_appointments", days=14)
+    if re.search(r"blood pressure|\bbp\b", t) and not re.search(r"\d{2,3}\s*(over|/)\s*\d{2,3}", t):
+        return _call("get_vitals", days=7)
+    if role != "elder" and re.search(r"(mark|resolve|clear).*(alert|handled)|i'?ve? handled it|i called (the )?(doctor|office)", t):
+        return _call("resolve_alert", alert_id=0, note=text if re.search(r"called", t) else "")
     m = re.search(r"(\d{2,3})\s*(?:over|/)\s*(\d{2,3})", t)
     if m:
         p = re.search(r"pulse (?:is |of )?(\d{2,3})", t)
@@ -65,7 +74,8 @@ def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> 
     m = re.search(r"\bask (grace|leo|maya) to (.+)", text, flags=re.I)
     if m:
         return _call("send_message", to=m.group(1), message=f"Could you {m.group(2).rstrip('.')}?")
-    if role != "elder" and re.search(r"last (open|opened)|front door|been by|activity|has grace|visited", t):
+    if role != "elder" and re.search(r"last (open|opened)|front door|been by|come by|came by|activity|has grace|"
+                                     r"did grace|visited|leave the house|left the house|went out|go out|been out", t):
         return _call("recent_activity", hours=24)
     if re.search(r"\bhelp me\b|call for help|i need help|emergency", t):
         return _call("get_help", reason=text)
@@ -95,7 +105,8 @@ def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> 
         return _call("list_alerts")
     if re.search(r"alert", t):
         return _call("list_alerts")
-    if role != "elder" and re.search(r"how('s| is| are)|doing|briefing|update|anything i should know|week", t):
+    if role != "elder" and re.search(r"how('s| is| are| was)|doing|briefing|update|anything i should know|week|"
+                                     r"is (mom|she|rose) (ok|okay|alright|all right|fine)|going on with|what'?s up with", t):
         return _call("care_briefing", period="today" if "today" in t else "week")
     if re.search(r"did (i|she|he|mom|rose) take|have (i|you) taken|has (she|mom|rose) taken|what('s| is) the .*(pill|for)|when do i take|what is .* for", t):
         return _call("check_medication", medication=_med_phrase(t.replace("did i take", "took").replace("did mom take", "took")), time_of_day=_tod(t))
@@ -143,7 +154,19 @@ class RulesBrain(Backend):
         call = route(user, self.role, history)
         if call:
             return Step(tool_calls=[call])
-        low = user.lower()
+        low = user.lower().strip(" .!?")
+        name = "Rose" if self.role == "elder" else ""
+        if re.fullmatch(r"(thank you|thanks|thank you so much|thanks alexa|thank you alexa)( alexa)?", low):
+            return Step(text=f"You're welcome{', ' + name if name else ''}.")
+        if re.fullmatch(r"good night|goodnight|night night", low):
+            return Step(text=f"Good night{', ' + name if name else ''}. Sleep well. I'm here if you need anything.")
+        if re.fullmatch(r"good morning|morning", low):
+            return Step(text=f"Good morning{', ' + name if name else ''}! How did you sleep?" if name
+                        else "Good morning! Ask me how Mom is doing whenever you like.")
+        if re.search(r"what time is it|what'?s the time", low):
+            from .agent import HOUSEHOLD, household_now
+            t = HOUSEHOLD["now"] or household_now()
+            return Step(text=f"It's {t.strftime('%I:%M %p').lstrip('0')}.")
         if re.search(r"^call (mom|maya|leo|grace)", low):
             who = re.search(r"^call (\w+)", low).group(1).capitalize()
             return Step(text=f"Calling {who}'s Echo Show now.")

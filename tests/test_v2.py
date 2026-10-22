@@ -239,3 +239,14 @@ async def test_pill_check_catches_a_drug_the_doctor_said_to_avoid():
     assert out["verdict"] == "avoid"
     assert "don't take ibuprofen" in out["speech"].lower()
     assert "blood pressure" in out["speech"] and "acetaminophen" in out["speech"].lower()
+
+
+async def test_appointments_vitals_and_resolving_the_top_alert():
+    freeze_and_seed(at(12, 0))
+    appts = await call("list_appointments", {}, as_person="rose")
+    assert "Dr. Anika Patel" in appts["speech"] and "Leo is driving you" in appts["speech"]
+    vit = await call("get_vitals", {"days": 7}, as_person="maya")
+    assert vit["speech"].startswith("Rose's last reading was 106 over 64")
+    await call("care_briefing", {}, as_person="maya")  # opens alerts
+    res = await call("resolve_alert", {}, as_person="maya")
+    assert res["alert"] and res["alert"]["status"] == "handled"

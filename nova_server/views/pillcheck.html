@@ -44,6 +44,12 @@
   .verdict.wrong_time, .verdict.already_taken { --tone: var(--amber); --tone-bg: rgba(255,181,71,.20); --tone-line: rgba(255,181,71,.42); }
   .verdict.not_on_list { --tone: var(--red); --tone-bg: rgba(255,122,122,.22); --tone-line: rgba(255,122,122,.46); }
   .verdict.dose_mismatch { --tone: #FF8A5B; --tone-bg: rgba(255,138,91,.22); --tone-line: rgba(255,138,91,.48); }
+  .verdict.avoid { --tone: var(--red); --tone-bg: rgba(255,107,87,.30); --tone-line: rgba(255,107,87,.7); box-shadow: 0 0 0 1px rgba(255,107,87,.25), 0 0 50px -10px rgba(255,107,87,.45); }
+  .verdict.avoid .v-ico { animation: avoidPulse 1.6s ease-out infinite; }
+  @keyframes avoidPulse { 0% { box-shadow: 0 0 0 0 rgba(255,107,87,.55); } 100% { box-shadow: 0 0 0 22px rgba(255,107,87,0); } }
+  .source { margin: -4px 0 16px; padding: 14px 18px 14px 20px; border-left: 2px solid var(--red); border-radius: 0 14px 14px 0; background: rgba(255,107,87,.06); }
+  .source q { display: block; font-family: var(--serif); font-size: 21px; line-height: 1.32; quotes: "\201C" "\201D"; }
+  .source cite { display: block; margin-top: 8px; font-family: var(--mono); font-style: normal; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
   .verdict.unclear { --tone: var(--grey); --tone-bg: rgba(168,179,196,.14); --tone-line: rgba(168,179,196,.3); }
   .v-ico { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: var(--tone); color: #0A1322; box-shadow: 0 0 0 8px color-mix(in srgb, var(--tone) 18%, transparent); }
   .v-ico svg { width: 38px; height: 38px; }
@@ -196,6 +202,7 @@ const ICON = {
   already_taken: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.5l4 4L15 9M10.5 15.5l1 1L20 8"/></svg>',
   not_on_list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>',
   dose_mismatch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 6.5v7M12 17.5v.3"/></svg>',
+  avoid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M6.4 17.6L17.6 6.4"/></svg>',
   unclear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 9a3 3 0 1 1 4.3 2.7c-.9.5-1.5 1.2-1.5 2.3M12 17.5v.3"/></svg>',
   bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>',
   bottle: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5.5" y="2.5" width="9" height="3" rx="1"/><path d="M6 5.5h8v11a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 6 16.5z"/><path d="M6 9h8v4.5H6z"/></svg>',
@@ -223,7 +230,7 @@ function pillSVG(appearance) {
 
 /* ---------- rendering ---------- */
 const KICKER = { ok_now: "Good to take", wrong_time: "Not right now", already_taken: "Already taken", not_on_list: "Not on your list",
-  dose_mismatch: "Different strength", unclear: "Can't read it" };
+  dose_mismatch: "Different strength", avoid: "Don't take this", unclear: "Can't read it" };
 
 function render(d) {
   const verdict = Object.prototype.hasOwnProperty.call(KICKER, d.verdict) ? d.verdict : "unclear";
@@ -238,6 +245,7 @@ function render(d) {
     already_taken: `You already took your ${med && med.name ? med.name : "medicine"} today`,
     not_on_list: "This isn't on your medicine list",
     dose_mismatch: "Set this bottle aside",
+    avoid: `Please don't take ${idf.name ? idf.name.toLowerCase() : "this"}`,
     unclear: "I couldn't read the label",
   }[verdict];
   let sub = verdict === "unclear" ? "Try again with the label facing the camera, in good light." : (idName ? `I see ${idName}` : "");
@@ -268,15 +276,18 @@ function render(d) {
         ${times.length ? `<div class="times">${times.map((t) => `<span class="time">${esc(t)}</span>`).join("")}</div>` : ""}
       </div>`
     : `<div class="card"><div class="card-k">${ICON.list}Your medicine list</div>
-        <div class="nomatch">${verdict === "unclear" ? "Nothing to compare yet" : "No match on your list"}</div>
-        <div class="card-line">${verdict === "unclear" ? "Hold the label up to the camera and ask again." : "Check with your pharmacist or doctor before taking it."}</div></div>`;
+        <div class="nomatch">${verdict === "unclear" ? "Nothing to compare yet" : verdict === "avoid" ? "Flagged in your care notes" : "No match on your list"}</div>
+        <div class="card-line">${verdict === "unclear" ? "Hold the label up to the camera and ask again." : verdict === "avoid" ? "Your doctors asked you to avoid this one." : "Check with your pharmacist or doctor before taking it."}</div></div>`;
 
   $app.innerHTML = `
     <section class="verdict ${verdict}">
       <div class="v-ico">${ICON[verdict]}</div>
       <div style="min-width:0"><div class="v-kicker">${KICKER[verdict]}</div><div class="v-title">${esc(title)}</div>${sub ? `<div class="v-sub">${esc(sub)}</div>` : ""}</div>
     </section>
-    ${d.advice ? `<div class="advice">${ICON.bulb}<p>${esc(d.advice)}</p></div>` : ""}
+    ${verdict === "avoid" && (d.source || d.quote)
+      ? `<blockquote class="source"><q>${esc(d.quote || d.advice || "")}</q>${d.source ? `<cite>From ${esc(d.source)}</cite>` : ""}</blockquote>
+         ${d.quote && d.advice ? `<div class="advice">${ICON.bulb}<p>${esc(d.advice)}</p></div>` : ""}`
+      : d.advice ? `<div class="advice">${ICON.bulb}<p>${esc(d.advice)}</p></div>` : ""}
     ${dueHtml}
     <div class="compare">${bottleCard}${listCard}</div>
     ${d.generated_by ? `<footer>${ICON.spark}Read by ${esc(d.generated_by)}</footer>` : ""}`;

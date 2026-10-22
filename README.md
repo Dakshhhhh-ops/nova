@@ -96,7 +96,7 @@ flowchart LR
     V["Polly voice"]
   end
   subgraph Nova["nova_server/ (MCP server)"]
-    T["22 tools · 8 resources · 2 prompts<br/>5 ui:// views"]
+    T["24 tools · 8 resources · 2 prompts<br/>5 ui:// views"]
     E["Care engine<br/>(household clock)"]
     X["Insight engine"]
     S["Vision: pill check,<br/>reconciliation"]
@@ -181,7 +181,7 @@ It drives the story in real Chrome, captures Alexa's spoken replies, adds an Ama
 ```bash
 uv run pytest -q
 ```
-40 tests cover:
+41 tests cover:
 - the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
 - Ring events, live message delivery;
 - pill checks (wrong time, already taken, outdated strength, a drug the doctor said to avoid), reconciliation and approval;
@@ -200,6 +200,7 @@ uv run pytest -q
 | `check_medication` | both | "Did I take…", "what's the pink pill for?" |
 | `daily_checkin` | Rose | Free-form check-in → structured signals, red flags, consent |
 | `log_vitals` | both | Blood pressure by voice, checked against the doctor's limits |
+| `list_appointments` / `get_vitals` | both | "When is my doctor appointment?" (who's driving, where); "What's Mom's blood pressure?" (last reading, average, doctor's range) |
 | `request_refill` | both | Refill to the pharmacy, with pickup plan; pill supply is tracked automatically |
 | `send_message` / `read_messages` | both | Circle messaging, delivered live as announcements |
 | `read_notifications` / `snooze_reminder` | both | "What are my notifications?", "Remind me in 10 minutes" |

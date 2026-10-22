@@ -208,17 +208,20 @@
       <div class="sky sky-night"></div>
       <div class="stars"><i class="st-a"></i><i class="st-b"></i></div>
       <svg class="sky-arc" viewBox="0 0 1000 400" preserveAspectRatio="none"><path d="M40 360 Q500 -60 960 360"/></svg>
-      <svg class="skyline" viewBox="0 0 1600 220" preserveAspectRatio="xMidYMax slice">
-        <path class="sl-far" d="M0 150 C 140 128 260 140 380 132 S 640 118 760 130 S 1040 140 1180 126 S 1460 120 1600 134 V220 H0Z"/>
-        <g class="sl-near">
-          <path d="M0 190 H90 V150 L130 122 L170 150 V190 H210 V162 H240 V140 L280 112 L320 140 V190 H360 C 380 150 420 150 440 190 H500 V156 L548 120 L596 156 V190 H640 V150 H700 V190 H760 C 778 158 812 158 830 190 H880 V146 L930 108 L980 146 V190 H1040 V160 L1070 140 L1100 160 V190 H1150 C 1170 148 1214 148 1234 190 H1290 V150 L1340 116 L1390 150 V190 H1440 V164 H1480 V140 L1520 112 L1560 140 V190 H1600 V220 H0Z"/>
+      <svg class="skyline" viewBox="0 104 3200 116" preserveAspectRatio="xMidYMax slice">
+        <g id="slRow">
+          <path class="sl-far" d="M0 150 C 140 128 260 140 380 132 S 640 118 760 130 S 1040 140 1180 126 S 1460 120 1600 134 V220 H0Z"/>
+          <g class="sl-near">
+            <path d="M0 190 H90 V150 L130 122 L170 150 V190 H210 V162 H240 V140 L280 112 L320 140 V190 H360 C 380 150 420 150 440 190 H500 V156 L548 120 L596 156 V190 H640 V150 H700 V190 H760 C 778 158 812 158 830 190 H880 V146 L930 108 L980 146 V190 H1040 V160 L1070 140 L1100 160 V190 H1150 C 1170 148 1214 148 1234 190 H1290 V150 L1340 116 L1390 150 V190 H1440 V164 H1480 V140 L1520 112 L1560 140 V190 H1600 V220 H0Z"/>
+          </g>
+          <g class="sl-win">
+            <rect x="140" y="160" width="12" height="12"/><rect x="292" y="152" width="12" height="12"/><rect x="530" y="160" width="12" height="14"/><rect x="566" y="160" width="12" height="14"/><rect x="668" y="164" width="10" height="10"/>
+            <rect x="1065" y="166" width="10" height="10"/><rect x="1306" y="160" width="12" height="12"/><rect x="1500" y="152" width="12" height="12"/>
+          </g>
+          <g class="sl-lamp"><line x1="1210" y1="190" x2="1210" y2="134"/><circle cx="1210" cy="132" r="4"/></g>
         </g>
-        <g class="sl-win">
-          <rect x="140" y="160" width="12" height="12"/><rect x="292" y="152" width="12" height="12"/><rect x="530" y="160" width="12" height="14"/><rect x="566" y="160" width="12" height="14"/><rect x="668" y="164" width="10" height="10"/>
-          <rect x="1065" y="166" width="10" height="10"/><rect x="1306" y="160" width="12" height="12"/><rect x="1500" y="152" width="12" height="12"/>
-        </g>
+        <use href="#slRow" x="1600"/>
         <rect class="sl-rose" x="914" y="152" width="18" height="16"/>
-        <g class="sl-lamp"><line x1="1210" y1="190" x2="1210" y2="134"/><circle cx="1210" cy="132" r="4"/></g>
       </svg>
     </div>
 

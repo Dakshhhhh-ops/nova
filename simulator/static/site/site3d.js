@@ -31,6 +31,7 @@ export async function boot() {
     frameHud();
     await hero(); mark('hero');
     document.dispatchEvent(new CustomEvent('nova:gl-hero'));
+    await heroSettled; mark('hero settled');
     await fontsReady(); mark('fonts');
     for (const [name, build_] of [['day', day], ['dots', dots], ['sees', sees], ['build', build], ['cta', cta]]) {
       await idle(); mark('idle');
@@ -353,9 +354,13 @@ function frameHud() {
 /* =========================================================
    HERO: a chrome logo loop resolves into the Echo Show 8
    ========================================================= */
+// resolves once the hero's intro has finished (or straight away when there is none)
+let heroSettledResolve;
+const heroSettled = new Promise((r) => { heroSettledResolve = r; });
+
 async function hero() {
   const host = $('.gl-hero');
-  if (!host) return;
+  if (!host) { heroSettledResolve(); return; }
   $('.hero').classList.add('is-gl-prep'); // lay the host out (still transparent) so the stage has a real size
   const stage = makeStage(host, {
     background: 'transparent', bloom: true, css3d: true, fov: 30,
@@ -446,6 +451,7 @@ async function hero() {
       if (orbit && orbit.setEnabled) orbit.setEnabled(true);
       const s = NOVA.heroState;
       if (s) echo.setRing(RING[s.state] || 'idle');
+      setTimeout(heroSettledResolve, 400);
     }, 3.6);
   }
   const heroSec = $('.hero');
@@ -455,22 +461,26 @@ async function hero() {
     layout();
     if (orbit && orbit.setEnabled) orbit.setEnabled(true);
     const s0 = NOVA.heroState; echo.setRing(s0 ? RING[s0.state] || 'idle' : 'idle');
+    heroSettledResolve();
   }
   function goLive() {
     heroSec.classList.add('is-gl', 'is-gl-live');
     setTimeout(() => heroSec.classList.add('is-gl-done'), 1000);
   }
-  if (!NOVA.introAt) {
-    // ready before the curtain lifts: the logo loop is the reveal
-    goLive();
-    document.addEventListener('nova:intro', intro, { once: true });
-  } else if (NOVA.scrollNow() < innerHeight * 0.6) {
-    // the CSS Echo is on screen: cross-fade into the logo loop, which resolves into the 3D Echo
-    goLive();
-    intro();
-  } else {
-    goLive();
-    finalState();
+  // which reveal to play is decided now; it starts only once the first frame is ready (see the end)
+  function reveal() {
+    if (!NOVA.introAt) {
+      // ready before the curtain lifts: the logo loop is the reveal
+      goLive();
+      document.addEventListener('nova:intro', intro, { once: true });
+    } else if (NOVA.scrollNow() < innerHeight * 0.6) {
+      // the CSS Echo is on screen: cross-fade into the logo loop, which resolves into the 3D Echo
+      goLive();
+      intro();
+    } else {
+      goLive();
+      finalState();
+    }
   }
 
   // scrolling away: the view sinks and pulls back a little. That is a compositor transform on the
@@ -488,9 +498,19 @@ async function hero() {
 
   stage.on('resize', layout);
   layout();
+  // all the heavy one-off work (shader programs, texture uploads, the first frame) happens while the
+  // CSS Echo is still the one on screen, so the swap itself is a smooth cross-fade
   if (stage.compileAsync) await stage.compileAsync();
+  await idleFrame();
   warmTextures(stage);
+  await idleFrame();
   stage.render();
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  reveal();
+}
+
+function idleFrame() {
+  return new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 120 }) : setTimeout(r, 16)));
 }
 
 // a dark stone counter whose left end dissolves, so it never cuts through the copy
@@ -535,6 +555,24 @@ function windowTexture() {
    ========================================================= */
 async function day() {
   const sec = $('.day');
+  // the DOM skyline in front of the 3D sky: silhouette tint and lit windows follow the scene's hour
+  const SIL = [[7.0, [10, 11, 18]], [8.0, [36, 31, 56]], [10.5, [56, 66, 92]], [16.0, [56, 66, 92]], [18.0, [46, 32, 56]],
+    [19.6, [21, 19, 42]], [21.0, [10, 11, 18]]];
+  let lastSil = '';
+  function skylineAt(hour) {
+    const hh = hour % 24;
+    let c = SIL[SIL.length - 1][1];
+    if (hh <= SIL[0][0]) c = SIL[0][1];
+    else for (let i = 1; i < SIL.length; i++) {
+      if (hh <= SIL[i][0]) { const [h0, a] = SIL[i - 1], [h1, b] = SIL[i], t = (hh - h0) / (h1 - h0); c = a.map((v, k) => Math.round(lerp(v, b[k], t))); break; }
+    }
+    const lights = hh < 9 ? clamp((9 - hh) / 1.2, 0, 0.7) : clamp((hh - 17.4) / 1.8, 0, 1);
+    const key = c.join(',') + '|' + lights.toFixed(2);
+    if (key === lastSil) return;
+    lastSil = key;
+    sec.style.setProperty('--sil', `rgb(${c.join(',')})`);
+    sec.style.setProperty('--lights', lights.toFixed(2));
+  }
   const host = $('.gl-day');
   if (!sec || !host) return;
   sec.classList.add('is-gl');
@@ -590,6 +628,7 @@ async function day() {
     if (i !== car.index) { fromScroll = true; target = i; car.select(i); fromScroll = false; }
     const h = hourAt(p);
     stage.setTimeOfDay(h);
+    skylineAt(h);
     const fi = idxAt(p), ci = Math.round(fi);
     if (clock) clock.textContent = (p >= FIRST && Math.abs(fi - ci) < 0.3 && clocks[ci]) ? clocks[ci] : hourLabel(h, true);
     const hh = h % 24; sec.setAttribute('data-fg', hh > 6.6 && hh < 18.9 ? 'dark' : 'light');
@@ -1171,17 +1210,27 @@ async function build() {
   if (!sec || !host) return;
   sec.classList.add('is-gl', 'is-x');
   const stage = makeStage(host, {
-    quality: 'low', crisp: true, background: 'transparent', bloom: false, css3d: true, fov: 30, pixelRatioCap: 2,
+    quality: 'low', crisp: true, background: 'transparent', bloom: false, css3d: false, fov: 30, pixelRatioCap: 2,
     camera: [0, 1.0, 11], target: [0, 0.75, 0], timeOfDay: 22,
     fx: { grain: 0, vignette: 0, scanlines: 0, aberration: 0 },
   });
   const echo = N.createEchoShow({ size: 8, color: 'charcoal', shadow: true });
   stage.add(echo);
   echo.setRing('speaking');
-  const scrEl = $('.echo3d-xray .e3-screen').cloneNode(true);
-  scrEl.classList.add('gl-screen');
-  scrEl.querySelectorAll('.e3-lightbar, .e3-spec, .xl-mark').forEach((n) => n.remove());
-  echo.attachScreen(scrEl, { pxWidth: 1280, pxHeight: 800, className: 'gl-screen-wrap' });
+  // the screen as a high-resolution texture (HTML in a CSS3D layer rasterizes soft at this size and angle)
+  const scr = $('.echo3d-xray .e3-screen');
+  const txt = (sel) => ((scr && $(sel, scr)) ? $(sel, scr).textContent.trim() : '');
+  const top = scr ? $$('.scr-top span', scr).map((s) => s.textContent.trim()) : [];
+  const screenCanvas = document.createElement('canvas');
+  screenCanvas.width = 2048; screenCanvas.height = 1280;
+  drawHoodScreen(screenCanvas.getContext('2d'), 2048, 1280, {
+    place: top[0] || 'Maya · Seattle', time: top[1] || '10:15 AM',
+    kicker: txt('.xr-k') || 'Worth watching · Rose', title: txt('.xr-t') || 'Dizziness began after her lisinopril change.',
+    evidence: txt('.xr-e') || '',
+  });
+  const screenTex = new THREE.CanvasTexture(screenCanvas);
+  screenTex.anisotropy = 16;
+  echo.setScreenImage(screenTex, { fit: 'stretch' });
 
   // the layers: glass sheets aligned with the display
   const anchor = echo.screenAnchor;
@@ -1330,6 +1379,37 @@ async function build() {
   stage.on('resize', layout);
   layout();
   if (document.fonts) document.fonts.ready.then(layout);
+}
+
+function drawHoodScreen(ctx, w, h, d) {
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, '#1B1A33'); g.addColorStop(0.55, '#121524'); g.addColorStop(1, '#0B1A26');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  const glow = ctx.createRadialGradient(w * 0.15, h * 1.05, 0, w * 0.15, h * 1.05, w * 0.7);
+  glow.addColorStop(0, 'rgba(59,209,255,.22)'); glow.addColorStop(1, 'rgba(59,209,255,0)');
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(244,238,230,.75)';
+  ctx.font = '500 52px Inter, system-ui, sans-serif';
+  ctx.fillText(d.place, 110, 150);
+  ctx.textAlign = 'right'; ctx.fillText(d.time, w - 110, 150); ctx.textAlign = 'left';
+  ctx.fillStyle = '#FFB547';
+  ctx.font = '600 44px "JetBrains Mono", monospace';
+  spaced(ctx, d.kicker.toUpperCase(), 112, 470, 6);
+  ctx.fillStyle = '#F4EEE6';
+  ctx.font = '400 150px "Instrument Serif", Georgia, serif';
+  const words = d.title.split(' ');
+  let line = '', y = 650;
+  for (const wd of words) {
+    const test = line ? line + ' ' + wd : wd;
+    if (ctx.measureText(test).width > w - 240 && line) { ctx.fillText(line, 110, y); line = wd; y += 160; }
+    else line = test;
+  }
+  if (line) ctx.fillText(line, 110, y);
+  if (d.evidence) {
+    ctx.fillStyle = 'rgba(244,238,230,.78)';
+    ctx.font = '500 46px "JetBrains Mono", monospace';
+    spaced(ctx, d.evidence.toUpperCase(), 112, y + 130, 3);
+  }
 }
 
 function drawLayer(ctx, w, h, d) {

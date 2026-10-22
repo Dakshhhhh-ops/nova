@@ -729,7 +729,11 @@ code { font-family: var(--mono); font-size: .86em; }
 .gl-screen-wrap[data-state="notify"] .scr-wall { background: radial-gradient(70% 60% at 85% 100%, rgba(255, 181, 71, .22), transparent 70%), radial-gradient(60% 70% at 0% 0%, rgba(107, 76, 143, .25), transparent 70%), linear-gradient(180deg, #0B0E18, #070910); }
 
 /* day: the arc carousel under a living sky */
-.day.is-gl .day-sky, .day.is-gl .day-handle, .day.is-gl .day-hud, .day.is-gl .day-progress { display: none !important; }
+.day.is-gl .day-handle, .day.is-gl .day-hud, .day.is-gl .day-progress { display: none !important; }
+/* the 3D draws the sky; the neighborhood skyline stays, in front of it and behind the HUD */
+.day.is-gl .day-sky { display: block; position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.day.is-gl .day-sky > .sky, .day.is-gl .day-sky .stars, .day.is-gl .sky-arc { display: none; }
+.day.is-gl .skyline { height: 7vh; bottom: 40px; } /* sits on the frame's chin, not behind it */
 .day.is-gl .day-pin { position: relative; height: 100vh; height: 100svh; overflow: hidden; background: #2A2F55; }
 .day.is-gl .day-viewport { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .day.is-gl .day-track { display: block; }
@@ -802,7 +806,7 @@ code { font-family: var(--mono); font-size: .86em; }
 .gl-frame .hud-bl { left: 34px; bottom: 11px; }
 .gl-frame .hud-br { right: 34px; bottom: 11px; }
 .hud-c { font-size: 10px; color: rgba(244, 238, 230, .5); text-shadow: none; }
-.day.is-gl .gl-day-hud { bottom: 70px; }
+.day.is-gl .gl-day-hud { bottom: max(70px, calc(40px + 7vh + 10px)); } /* just above the rooftops */
 /* dots: text column left, scene right */
 .dots.is-gl .gl-host::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, #0A0B10 0, #0A0B10 calc(var(--scrim, 50vw) - 150px), rgba(10, 11, 16, 0) var(--scrim, 50vw)); }
 .dots.is-gl.is-pinned .dots-head { display: block; width: min(560px, 38vw); margin-left: max(var(--pad), (100vw - var(--maxw)) / 2); }
@@ -823,6 +827,15 @@ code { font-family: var(--mono); font-size: .86em; }
 .build.is-gl.is-x .layer p { font-size: 0; margin-top: 4px; }
 .build.is-gl.is-x .layer p b { display: block; font-size: 10.5px; color: var(--mist); margin: 0; }
 .build.is-gl.is-x .layer { padding: 9px 0 11px; }
+/* short windows: the five layer labels stay inside the frame */
+@media (max-height: 820px) {
+  .build.is-gl.is-x .layer { padding: 5px 0 7px; }
+  .build.is-gl.is-x .layer h3 { font-size: clamp(19px, 1.35vw, 24px); }
+}
+@media (max-height: 700px) {
+  .build.is-gl.is-x .layer p b { display: none; }
+  .build.is-gl.is-x .layer h3 { font-size: 19px; }
+}
 .cta.is-gl { align-items: center; padding: 0; }
 .cta.is-gl .cta-inner { padding-top: 27vh; }
 .cta.is-gl .cta-title { font-size: clamp(80px, 11vw, 210px); }

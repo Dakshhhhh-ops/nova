@@ -115,6 +115,8 @@ flowchart LR
   A -.-> BR
 ```
 
+Sequence diagrams for a voice turn, the escalation ladder, consent by elicitation, photo-to-plan reconciliation and OAuth account linking are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 | Layer | What it is |
 |---|---|
 | `nova_server/` | The Alexa+ integration: an MCP server on the official Python SDK (`mcp` 2.3). Streamable HTTP at `/mcp`, plus the care engine thread, vision and the Ring webhook. |

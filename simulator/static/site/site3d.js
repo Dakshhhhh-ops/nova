@@ -1360,7 +1360,9 @@ async function build() {
     echo.group.scale.setScalar(SC);
     pose(1);
     const bb = bounds();
-    const dx = (reg.x0 + reg.x1) / 2 - (bb.x0 + bb.x1) / 2, dy = (reg.y0 + reg.y1) / 2 - (bb.y0 + bb.y1) / 2;
+    // centred across; in the big layout it sits on the bottom of the section, as low as it can go at full size
+    const dx = (reg.x0 + reg.x1) / 2 - (bb.x0 + bb.x1) / 2;
+    const dy = reg === behind ? reg.y1 - bb.y1 : (reg.y0 + reg.y1) / 2 - (bb.y0 + bb.y1) / 2;
     stage.camera.setViewOffset(r.width, r.height, -dx, -dy, r.width, r.height);
     stage.camera.updateProjectionMatrix();
     pose(st.p);

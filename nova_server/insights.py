@@ -463,7 +463,7 @@ def _template_briefing(ctx: dict[str, Any]) -> dict[str, str]:
             "speech": f"{name} is doing well. Medications are at {adh.get('pct', 100)} percent and nothing needs your attention.",
         }
     top = ins[0]
-    first = lambda text: re.split(r"(?<=[.!?])\s+", text.strip())[0]  # noqa: E731
+    first = lambda text: re.split(r"(?<!Dr\.)(?<=[.!?])\s+", text.strip())[0]  # noqa: E731
     opener = (f"{name} is mostly okay, but one thing needs your attention." if top["severity"] != "info"
               else f"{name} is doing okay overall.")
     parts = [opener, f"{top['title']}. {first(top['detail'])}"]

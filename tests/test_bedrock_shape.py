@@ -65,3 +65,18 @@ def test_plain_completion_request_is_valid():
     with stub:
         out = b.complete("system", "prompt", json_mode=True)
     assert "Steady" in out
+
+
+def test_history_starting_with_an_announcement_is_valid():
+    b, stub = make_backend()
+    history = [{"role": "assistant", "text": "(Nova announcement) It's 6 PM, Rose. Time for your Metformin."},
+               {"role": "user", "text": "I took it"}]
+    msgs = Bedrock._to_bedrock(history)
+    assert msgs[0]["role"] == "user" and [m["role"] for m in msgs] == ["user", "assistant", "user"]
+    stub.add_response("converse", {
+        "output": {"message": {"role": "assistant", "content": [{"text": "Great."}]}},
+        "stopReason": "end_turn", "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2},
+        "metrics": {"latencyMs": 1},
+    })
+    with stub:
+        assert b.step("sys", history, TOOLS).text == "Great."

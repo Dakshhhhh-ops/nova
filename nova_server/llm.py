@@ -196,6 +196,9 @@ class Bedrock(Backend):
                 content = [{"json": result}] if isinstance(result, dict) else [{"text": str(result)}]
                 push("user", {"toolResult": {"toolUseId": m["id"], "content": content,
                                              "status": "error" if m.get("error") else "success"}})
+        if msgs and msgs[0]["role"] != "user":
+            # Converse must start with a user turn; a device can wake up with Nova speaking first.
+            msgs.insert(0, {"role": "user", "content": [{"text": "(The device is listening.)"}]})
         return msgs
 
 

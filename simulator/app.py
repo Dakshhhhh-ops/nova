@@ -105,6 +105,30 @@ async def handle_elicit(device: Device, params: ElicitRequestParams) -> ElicitRe
     return ElicitResult(action=answer["action"], content=answer.get("content"))
 
 
+def is_connection_error(exc: BaseException) -> bool:
+    """The MCP server went away (restart, network): reconnecting fixes it."""
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return any(k in text for k in ("connection closed", "connecterror", "connection refused", "remoteprotocolerror",
+                                   "readerror", "session terminated", "404 not found"))
+
+
+async def reconnect(device: Device) -> None:
+    log.warning("MCP connection to the Nova server was lost; reconnecting %s", device.id)
+    device.client = None  # the old session is dead; drop it rather than closing it from another task
+    await device.connect(MCP_URL)
+
+
+async def with_mcp(device: Device, op):
+    """Run an MCP operation for a device; on a lost connection, reconnect once and retry."""
+    try:
+        return await op()
+    except Exception as exc:
+        if not is_connection_error(exc):
+            raise
+        await reconnect(device)
+        return await op()
+
+
 async def connect_all() -> None:
     try:
         for d in DEVICES.values():
@@ -162,7 +186,7 @@ async def poll_announcements() -> None:
                 for d in DEVICES.values():
                     if d.client is None:
                         continue
-                    res = await d.client.read_resource("nova://announcements")
+                    res = await with_mcp(d, lambda d=d: d.client.read_resource("nova://announcements"))
                     text = next((getattr(c, "text", None) for c in res.contents if getattr(c, "text", None)), "{}")
                     items = json.loads(text).get("items", [])
                     for item in items:
@@ -238,7 +262,7 @@ async def chat(body: ChatIn) -> dict[str, Any]:
     device = device_or_404(body.device)
     agent: Agent = state["agent"]
     try:
-        out = await agent.run_turn(device, body.text.strip(), hub.emit)
+        out = await with_mcp(device, lambda: agent.run_turn(device, body.text.strip(), hub.emit))
     except Exception as exc:
         log.exception("turn failed")
         await hub.emit({"type": "trace", "device": device.id, "item": {"kind": "error", "message": str(exc)[:300]}})
@@ -275,7 +299,7 @@ async def app_call(body: AppCallIn) -> JSONResponse:
     device = device_or_404(body.device)
     await hub.emit({"type": "trace", "device": device.id, "item": {"kind": "tool_call", "name": body.name,
                                                                     "args": body.arguments, "from": "app"}})
-    result = await device.client.call_tool(body.name, body.arguments)
+    result = await with_mcp(device, lambda: device.client.call_tool(body.name, body.arguments))
     data = structured_of(result)
     await hub.emit({"type": "trace", "device": device.id, "item": {
         "kind": "tool_result", "name": body.name, "ok": not result.is_error, "speech": data.get("speech"),
@@ -288,7 +312,7 @@ async def app_call(body: AppCallIn) -> JSONResponse:
 async def timeline() -> dict[str, Any]:
     await ensure_connected()
     d = DEVICES["maya"]
-    res = await d.client.read_resource("nova://timeline")
+    res = await with_mcp(d, lambda: d.client.read_resource("nova://timeline"))
     text = next((getattr(c, "text", None) for c in res.contents if getattr(c, "text", None)), "{}")
     return json.loads(text)
 
@@ -357,7 +381,7 @@ async def set_clock(body: ClockIn) -> dict[str, Any]:
 async def list_announcements(device: str) -> dict[str, Any]:
     await ensure_connected()
     d = device_or_404(device)
-    result = await d.client.call_tool("read_notifications", {})
+    result = await with_mcp(d, lambda: d.client.call_tool("read_notifications", {}))
     return {"items": structured_of(result).get("items", [])}
 
 
@@ -371,7 +395,7 @@ async def ack_announcement(ann_id: int, body: AckIn) -> dict[str, Any]:
     await ensure_connected()
     d = device_or_404(body.device)
     action = body.action if body.action in ("acknowledged", "dismissed") else "acknowledged"
-    await d.client.call_tool("acknowledge_notification", {"notification_id": ann_id, "action": action})
+    await with_mcp(d, lambda: d.client.call_tool("acknowledge_notification", {"notification_id": ann_id, "action": action}))
     return {"ok": True}
 
 
@@ -399,7 +423,7 @@ async def vision(body: VisionIn) -> dict[str, Any]:
             else "(Maya photographs the after-visit summary) Read this and update the plan.")
     agent: Agent = state["agent"]
     try:
-        out = await agent.run_direct(device, tool, {"image_base64": body.image}, said, hub.emit)
+        out = await with_mcp(device, lambda: agent.run_direct(device, tool, {"image_base64": body.image}, said, hub.emit))
     except Exception as exc:
         log.exception("vision failed")
         await hub.emit({"type": "trace", "device": device.id, "item": {"kind": "error", "message": str(exc)[:300]}})

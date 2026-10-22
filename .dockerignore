@@ -3,3 +3,8 @@
 data/*.db*
 __pycache__
 .env
+qa
+demo
+tests
+docs
+*.md

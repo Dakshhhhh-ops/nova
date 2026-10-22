@@ -165,7 +165,8 @@ async def connect_all() -> None:
 async def lifespan(_: FastAPI):
     state["agent"] = await asyncio.to_thread(Agent, DEVICES)
     log.info("Brain: %s", state["agent"].brain_info()["label"])
-    await connect_all()
+    if not os.getenv("NOVA_LAZY_CONNECT"):
+        await connect_all()  # in single-process mode the MCP server isn't accepting yet: the poller connects
     poller = asyncio.create_task(poll_announcements())
     yield
     poller.cancel()
@@ -196,6 +197,8 @@ async def poll_announcements() -> None:
     tick = 0
     while True:
         try:
+            if not state["connected"] and tick % 3 == 0:
+                await connect_all()
             if state["connected"]:
                 for d in DEVICES.values():
                     if d.client is None:

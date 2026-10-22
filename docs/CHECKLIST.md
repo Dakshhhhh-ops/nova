@@ -25,7 +25,7 @@ Deadline: **Oct 23, 2026, 12:00 PM PDT** (Oct 24, 12:30 AM IST). Submit at least
 | Try-it link | https://nova-6kte.onrender.com (open it once a minute before judging: free hosting sleeps). For Amazon Nova there, add `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION=us-east-1` in the Render dashboard (never in the repo). |
 | Video URL | your YouTube link |
 | Track | **Alexa+** (self-hosted MCP server + simulated Alexa+ experience) |
-| Mini challenges | **AWS Builder**; **Open Source** only if `mcp-apps-lite-host` is public |
+| Mini challenges | **AWS Builder** and **Open Source** (`mcp-apps-lite-host` is public) |
 | AWS Builder: services and how | `docs/SUBMISSION.md` → "AWS Builder: integrations" |
 | Product feedback | `docs/SUBMISSION.md` → "Product feedback" |
 | Friction log (up to a 10% bonus) | `docs/SUBMISSION.md` → "Friction log" table |
@@ -34,8 +34,8 @@ Deadline: **Oct 23, 2026, 12:00 PM PDT** (Oct 24, 12:30 AM IST). Submit at least
 | Open Source fields | `docs/SUBMISSION.md` → "Open Source: required fields" |
 
 ## Open Source mini challenge (optional, $5k)
-- [ ] Create an empty public repo `Dakshhhhh-ops/mcp-apps-lite-host` on GitHub.
-- [ ] Push the local folder `C:\Users\daksh\OneDrive\Desktop\mcp-apps-lite-host` (v0.2 is committed; add the remote and push). Its CI runs the unit and browser tests.
+- [x] Create the public repo `Dakshhhhh-ops/mcp-apps-lite-host` on GitHub.
+- [x] Push v0.2 (done; CI runs the unit and browser tests and is green).
 - [ ] Put the URL in the Open Source fields.
 
 ## Final checks

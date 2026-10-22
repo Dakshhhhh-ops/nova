@@ -39,7 +39,7 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 - `tests/test_bedrock_shape.py`: Converse requests (tool use and plain) are validated against the botocore API model.
 
 ## Open Source: required fields
-- **Contribution URL:** https://github.com/Dakshhhhh-ops/mcp-apps-lite-host *(create this public repo and push the local folder before submitting)*
+- **Contribution URL:** https://github.com/Dakshhhhh-ops/mcp-apps-lite-host (public, MIT, CI green)
 - **Primary repo URL:** https://github.com/Dakshhhhh-ops/nova
 - **GitHub username:** Dakshhhhh-ops
 - **What it is:** `mcp-apps-lite-host` (v0.2) is a dependency-free ES module (MIT) that renders MCP Apps (`ui://`) views in any web page. It implements the full 2026-01-26 View ↔ Host message set (initialize, tool input including partial input, tool result, cancel, size and display modes, host-context changes, `tools/call` proxy with tool-visibility checks, `resources/read` and `list`, `ui/message`, model context, open-link, and a teardown that waits for the view) in a sandboxed iframe. It enforces the view's `_meta.ui.csp`, sets the iframe permissions `allow` attribute, and has a sandbox-proxy mode (a static `sandbox-proxy.html` on a second origin, as the spec requires for web hosts). It ships with 35 unit tests and 6 browser tests that run views built with the official `@modelcontextprotocol/ext-apps` SDK in Chromium; CI runs both.

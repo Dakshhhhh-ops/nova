@@ -34,24 +34,22 @@ NARRATOR = ("Matthew", "generative")
 
 # (narration, action, settle_seconds). The action runs after the narration line finishes.
 SCENES: list[tuple[str, str, float]] = [
-    ("Rose is eighty-one and lives alone in Columbus, Ohio. Her daughter Maya lives in Seattle. "
-     "Nova links Rose's Echo, her Ring doorbell and Maya's Echo, to catch medication mistakes before they happen.",
-     "landing", 2.0),
-    ("Nova doesn't wait to be asked. At eight, Rose's Echo reminds her about her morning pills.", "morning", 6.0),
-    ("Rose shows Alexa a bottle. Amazon Nova reads the label, and Nova checks it against her plan.", "pill_wrong", 7.0),
-    ("Her knee hurts, so she reaches for ibuprofen. Nova stops her, using her doctor's own instructions.", "pill_avoid", 6.0),
-    ("At nine, Nova checks in. Before her family hears about a symptom, Nova asks Rose.", "checkin", 8.0),
-    ("In Seattle, Maya asks how Mom is doing. Nova connects the dots in one sentence, and gives the evidence "
-     "only when she asks.", "briefing", 7.0),
-    ("At the front door, a Ring doorbell press arrives as a signed Ring webhook. Ring doesn't say who it is, "
-     "so Nova checks the calendar: it's Grace, the home aide, and she gets today's checklist.", "ring", 5.0),
-    ("After the cardiology visit, Maya photographs the summary. Nova reconciles the medication list, "
-     "and nothing changes until she approves.", "reconcile", 9.0),
-    ("Later, Rose picks up her old bottle. Nova catches it.", "pill_old", 7.0),
-    ("In the evening, the six o'clock pill is missed. Nova reminds Rose, follows up, and only then tells Maya.", "evening", 4.0),
-    ("Under the hood: twenty-five MCP tools over Streamable HTTP, a token for each person, MCP Apps on the Echo Show "
-     "screen, consent by elicitation, Ring webhooks, and Amazon Nova on Bedrock for language and vision.", "hood", 5.0),
-    ("Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge.", "end", 3.0),
+    ("Rose is eighty-one and lives alone in Columbus, Ohio. Her daughter Maya lives in Seattle. Nova links Rose's "
+     "Echo, her Ring doorbell and Maya's Echo, to catch medication mistakes before they happen.", "landing", 1.0),
+    ("Nova speaks first. At eight, Rose's Echo reminds her about her morning pills.", "morning", 4.0),
+    ("Her knee hurts, so she shows Alexa the ibuprofen. Amazon Nova reads the label, and Nova checks it against "
+     "her doctor's notes.", "pill_avoid", 5.0),
+    ("At nine, Nova checks in. Before her family hears about a symptom, Nova asks Rose.", "checkin", 3.0),
+    ("In Seattle, Maya asks how Mom is doing. One sentence first, the evidence when she asks.", "briefing", 1.5),
+    ("Nova reads the front door from Ring's own API. When Grace, the home aide, rings the bell, Nova knows "
+     "she's expected, and gives her today's checklist.", "ring", 4.0),
+    ("After the cardiology visit, Maya photographs the summary. Nova reconciles the medication list, and nothing "
+     "changes until she approves.", "reconcile", 5.0),
+    ("In the evening, the six o'clock pill is missed. Nova reminds Rose, follows up, and only then tells Maya.",
+     "evening", 2.0),
+    ("Under the hood: twenty-five MCP tools over Streamable HTTP, a token for each person, MCP Apps on the Echo "
+     "Show, consent by elicitation, Ring, and Amazon Nova on Bedrock.", "hood", 3.0),
+    ("Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge.", "end", 2.0),
 ]
 
 
@@ -83,21 +81,31 @@ class Recorder:
         self.narration: list[tuple[float, Path]] = []
         self.alexa: list[tuple[float, Path]] = []
         self.timeline: list[dict] = []
-        page.on("response", self._on_response)
+        self._routed = False
 
     def now(self) -> float:
         return time.monotonic() - self.t0
 
-    async def _on_response(self, resp) -> None:
-        if resp.url.endswith("/api/tts") and resp.status == 200:
-            at = self.now()
+    async def capture_tts(self) -> None:
+        """Every Alexa reply goes through /api/tts: fetch it here, keep a copy, hand the same bytes to the page."""
+        if self._routed:
+            return
+        self._routed = True
+
+        async def handle(route) -> None:
             try:
+                resp = await route.fetch()
                 body = await resp.body()
             except Exception:
+                await route.continue_()
                 return
-            p = self.tmp / f"alexa_{len(self.alexa):02d}.mp3"
-            p.write_bytes(body)
-            self.alexa.append((at, p))
+            if resp.status == 200 and body:
+                p = self.tmp / f"alexa_{len(self.alexa):02d}.mp3"
+                p.write_bytes(body)
+                self.alexa.append((self.now(), p))
+            await route.fulfill(response=resp, body=body)
+
+        await self.page.route("**/api/tts", handle)
 
     async def narrate(self, clip: Path, secs: float) -> None:
         self.narration.append((self.now(), clip))
@@ -124,6 +132,7 @@ class Recorder:
 
     async def run(self, clips: list[tuple[Path, float]]) -> None:
         page = self.page
+        await self.capture_tts()
         for (text, action, settle), (clip, secs) in zip(SCENES, clips):
             print(f"[{self.now():6.1f}s] {action}")
             if action == "landing":
@@ -148,7 +157,7 @@ class Recorder:
                 await self.demo("window.NovaDemo.showSample('kitchen', 'pill-atorvastatin')")
                 await self.demo("window.NovaDemo.tapReply('kitchen', 'I took it')")
             elif action == "pill_avoid":
-                await self.demo("window.NovaDemo.showSample('kitchen', 'pill-ibuprofen')")
+                await self.demo("window.NovaDemo.showSample('kitchen', 'pill-ibuprofen')", timeout=30)
             elif action == "checkin":
                 await self.demo("window.NovaDemo.setClock('08:58', 30)")
                 await page.wait_for_timeout(4000)
@@ -156,6 +165,17 @@ class Recorder:
                 await self.demo("Promise.race([window.NovaDemo.tapReply('kitchen', 'A bit dizzy again'), new Promise(r => setTimeout(r, 3000))])")
                 await page.wait_for_timeout(1500)
                 await self.demo("window.NovaDemo.answer('kitchen', true)")
+            elif action == "ring":
+                # the front door panel: Sync from Ring calls api.amazonvision.com and lists each call
+                try:
+                    await page.click(".ring-more", timeout=4000)
+                    await page.wait_for_timeout(500)
+                    await page.click(".rl-sync", timeout=4000)
+                    await page.wait_for_timeout(5500)
+                    await page.click(".ring-more", timeout=4000)  # close it again
+                except Exception as exc:
+                    print(f"  ! Ring panel: {type(exc).__name__}")
+                await self.demo("window.NovaDemo.ring('ding', 'grace')")
             elif action == "briefing":
                 await self.demo("window.NovaDemo.say('maya', \"How's Mom doing?\")")
                 await page.wait_for_timeout(7000)  # let the short answer play, then ask for the evidence
@@ -169,8 +189,8 @@ class Recorder:
             elif action == "pill_old":
                 await self.demo("window.NovaDemo.showSample('kitchen', 'pill-lisinopril')")
             elif action == "evening":
-                await self.demo("window.NovaDemo.setClock('17:55', 300)")
-                await page.wait_for_timeout(22000)
+                await self.demo("window.NovaDemo.setClock('17:58', 600)")
+                await page.wait_for_timeout(12000)
                 await self.demo("window.NovaDemo.setClock(null, 1)")
                 await self.demo("window.NovaDemo.tapReply('maya', 'Remind Mom again')")
             elif action == "hood":
@@ -202,6 +222,8 @@ def fallback(expr: str) -> str:
 
 
 def mix(video: Path, narration: list[tuple[float, Path]], alexa: list[tuple[float, Path]], out: Path) -> None:
+    narration = [(t, c) for t, c in narration if c.exists() and c.stat().st_size > 0]
+    alexa = [(t, c) for t, c in alexa if c.exists() and c.stat().st_size > 0]
     inputs = ["-i", str(video)]
     filters, labels = [], []
     for i, (at, clip) in enumerate([*narration, *alexa], start=1):

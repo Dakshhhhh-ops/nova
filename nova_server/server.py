@@ -1456,7 +1456,7 @@ async def ring_sync(request: Request) -> JSONResponse:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     api = ring_api.RingAPI.from_env()
     if api is None:
-        return JSONResponse({"ok": False, "linked": False, "calls": [],
+        return JSONResponse({"ok": False, "linked": False, "calls": [], "recorded": ring_api.recorded(store),
                              "error": "Ring isn't linked: set RING_ACCESS_TOKEN (Ring Developer Playground → "
                                       "Generate Token) or RING_REFRESH_TOKEN with RING_CLIENT_ID/RING_CLIENT_SECRET."})
     try:

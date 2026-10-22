@@ -1,0 +1,57 @@
+{
+ "data": {
+  "type": "device-capabilities",
+  "id": "ava1.ring.device.capabilities.6UH2CV6XZFRPBY4FJ33MUQ56BU5VLR3ZHLEII7XPVGYBYZRXRSOKMRHCFIF4HFAUEZE7FPKUWL3DYIXYQDTDUOESV32ZPECI",
+  "attributes": {
+   "smoke_detection": null,
+   "audio": {
+    "customizable_slots": null,
+    "supported_actions": null
+   },
+   "co_detection_listener": null,
+   "tamper_detection": null,
+   "contact_detection": null,
+   "battery_status": null,
+   "freeze_detection": null,
+   "flood_detection": null,
+   "video": {
+    "configurations": [
+     "resolution_mode"
+    ],
+    "codecs": [
+     "AVC"
+    ],
+    "ratio": "16:9",
+    "max_resolution": 1080,
+    "supported_resolutions": [
+     1080
+    ]
+   },
+   "motion_detection": {
+    "configurations": [
+     "enabled",
+     "motion_zones"
+    ]
+   },
+   "image_enhancements": {
+    "configurations": [
+     "color_night_vision",
+     "privacy_zones",
+     "snapshot"
+    ]
+   },
+   "glass_break_detection": null
+  },
+  "relationships": {
+   "data": {},
+   "configurations": {
+    "links": {
+     "related": "/v1/devices/ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ/configurations"
+    }
+   }
+  }
+ },
+ "meta": {
+  "time": "2026-10-22T21:38:47Z"
+ }
+}

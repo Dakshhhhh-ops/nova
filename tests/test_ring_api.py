@@ -174,3 +174,45 @@ def test_not_linked_says_how_to_link(monkeypatch):
     out = client.post("/integrations/ring/sync", headers={"x-nova-ring-secret": server.RING_SECRET}).json()
     assert out["linked"] is False and "RING_ACCESS_TOKEN" in out["error"]
     assert client.get("/integrations/ring/status").json()["linked"] is False
+
+
+def test_sync_reads_real_playground_responses(household):
+    """Real api.amazonvision.com responses (Ring Developer Playground sandbox doorbell, names scrubbed)."""
+    store, engine = household
+    devices = fixture("live_devices.json")
+    did = devices["data"][0]["id"]
+    routes = {
+        "/v1/users/me": fixture("live_users_me.json"),
+        "/v1/devices": devices,
+        f"/v1/devices/{did}/status": fixture("live_status.json"),
+        f"/v1/devices/{did}/capabilities": fixture("live_capabilities.json"),
+        f"/v1/history/devices/{did}/events": fixture("live_events.json"),
+    }
+    seen: list[str] = []
+
+    def transport(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        return httpx.Response(200, json=routes[request.url.path])
+
+    ring_api._CAPS.pop(did, None)
+    api = ring_api.RingAPI("playground-token", transport=httpx.MockTransport(transport))
+    res = ring_api.sync(store, engine, api, real_now=NOW)
+    assert res["ok"] and res["source"] == "live"
+    dev = res["devices"][0]
+    assert dev["model"] == "Doorbell Pro" and dev["online"] is True and dev["reported_at"]
+    assert dev["capabilities"] and dev["events"] == 0 and res["imported"] == []
+    assert seen[:2] == ["/v1/users/me", "/v1/devices"] and f"/v1/history/devices/{did}/events" in seen
+
+
+def test_without_a_token_sync_shows_the_recorded_playground_sync(monkeypatch):
+    """A fresh deploy with no (or an expired) Playground token still shows real Ring data, labelled recorded."""
+    from starlette.testclient import TestClient
+
+    for k in ("RING_ACCESS_TOKEN", "RING_REFRESH_TOKEN", "RING_CLIENT_ID", "RING_CLIENT_SECRET"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("NOVA_RING_SNAPSHOT", str(Path(tempfile.mkdtemp()) / "none.json"))
+    app = server.mcp.streamable_http_app()
+    with TestClient(app) as client:
+        res = client.post("/integrations/ring/sync", headers={"x-nova-ring-secret": server.RING_SECRET}).json()
+    assert res["linked"] is False and res["recorded"]["devices"][0]["model"] == "Doorbell Pro"
+    assert all(c["status"] == 200 for c in res["recorded"]["calls"])

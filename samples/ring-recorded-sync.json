@@ -1,0 +1,55 @@
+{
+ "at": "2026-10-23T03:11:53",
+ "account": {
+  "id": "ava1.ring.account.OU5ZOTV43UGMURAIP2GDZO3Z47IOZ5Y4V4LLLCEQAB3KK63K7HFQZA7VMWCH5WYOHO43QUZSA4SVAY7SM4TAONKGMO74W2ZK",
+  "first_name": "Playground"
+ },
+ "calls": [
+  {
+   "method": "GET",
+   "path": "/v1/users/me",
+   "status": 200,
+   "ms": 1746
+  },
+  {
+   "method": "GET",
+   "path": "/v1/devices",
+   "status": 200,
+   "ms": 1365
+  },
+  {
+   "method": "GET",
+   "path": "/v1/devices/ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ/status",
+   "status": 200,
+   "ms": 1443
+  },
+  {
+   "method": "GET",
+   "path": "/v1/devices/ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ/capabilities",
+   "status": 200,
+   "ms": 1438
+  },
+  {
+   "method": "GET",
+   "path": "/v1/history/devices/ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ/events?event_types=ding,motion.human",
+   "status": 200,
+   "ms": 1383
+  }
+ ],
+ "devices": [
+  {
+   "id": "ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ",
+   "name": "Playground Device",
+   "model": "Doorbell Pro",
+   "image_url": "https://app-content.ring.com/shared/images/devices/square_device_images/DoorbellPro/rvdp_3x.png",
+   "online": true,
+   "reported_at": "2026-10-22T21:37:11Z",
+   "capabilities": [
+    "1080p video",
+    "motion zones",
+    "color night vision"
+   ],
+   "events": 0
+  }
+ ]
+}

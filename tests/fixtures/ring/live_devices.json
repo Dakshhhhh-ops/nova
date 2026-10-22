@@ -1,0 +1,53 @@
+{
+ "data": [
+  {
+   "type": "devices",
+   "id": "ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ",
+   "attributes": {
+    "name": "Front Door",
+    "image_url": "https://app-content.ring.com/shared/images/devices/square_device_images/DoorbellPro/rvdp_3x.png"
+   },
+   "relationships": {
+    "configurations": {
+     "data": {
+      "type": "device-configurations",
+      "id": "ava1.ring.device.configurations.BJZYMTCJ4RJQMADDAKZZTQ36GYE6XQPAMQEXILIZN6VWSTYOST4ZIRAGPXOT6Z7LYRY5GP2MOZSAVXBHRPKPDVCPRR32GEUBFWW7IJCTRYRHI7QTNU2MXQX3DA"
+     },
+     "links": {
+      "related": "/v1/devices/ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ/configurations"
+     }
+    },
+    "capabilities": {
+     "data": {
+      "type": "device-capabilities",
+      "id": "ava1.ring.device.capabilities.6UH2CV6XZFRPBY4FJ33MUQ56BU5VLR3ZHLEII7XPVGYBYZRXRSOKMRHCFIF4HFAUEZE7FPKUWL3DYIXYQDTDUOESV32ZPECI"
+     },
+     "links": {
+      "related": "/v1/devices/ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ/capabilities"
+     }
+    },
+    "status": {
+     "data": {
+      "type": "device-status",
+      "id": "ava1.ring.device.status.BI4ILBJYVSYW5IZQNTNVLK2RMFYJU2WHYHK7U65ZVQ563J5CBKHV4ILI4D47UDIPTICPX2EUNQ57MGYEJ7WS5JU3NX6KVJIV"
+     },
+     "links": {
+      "related": "/v1/devices/ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ/status"
+     }
+    },
+    "location": {
+     "data": {
+      "type": "locations",
+      "id": "ava1.ring.location.SJMSL3IK4XWWMGPRWVGPR3ZCUNIKH75H4CAS6GIFQGRXKZLNUEIAYU3CIN5RMB6LBTZJE5N754MXU7EZC3OJXCYVUDBY4RLH5RPDTQZRZ2HOJXFTHFYPHVKTRA"
+     },
+     "links": {
+      "related": "/v1/devices/ava1.ring.device.A6GM2YGEP6KGFRPRVLH2YM37ZCR67JBG7F7HADY6VJXV36B7Z3CGJ2HMGOIOXNHAFHBOKZ5GPSOP36D4UOGUVRTYP4ATYNTZ/location"
+     }
+    }
+   }
+  }
+ ],
+ "meta": {
+  "time": "2026-10-22T21:38:44Z"
+ }
+}

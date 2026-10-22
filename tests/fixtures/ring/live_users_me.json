@@ -1,0 +1,11 @@
+{
+ "data": {
+  "type": "users",
+  "id": "ava1.ring.account.PLAYGROUND",
+  "attributes": {
+   "first_name": "Playground",
+   "last_name": "<hidden>",
+   "email": "<hidden>"
+  }
+ }
+}

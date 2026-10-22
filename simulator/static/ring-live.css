@@ -1,0 +1,32 @@
+/* Live Ring account block inside the front-door popover (ring-live.js). */
+.rl-live { display: grid; gap: 8px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, .08); min-width: 0; }
+.rl-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rl-src { font: 500 10.5px/1 "JetBrains Mono", ui-monospace, monospace; padding: 4px 7px; border-radius: 999px; letter-spacing: .02em; }
+.rl-src.is-live { color: #9ED9B0; background: rgba(158, 217, 176, .13); }
+.rl-src.is-recorded { color: #FFB547; background: rgba(255, 181, 71, .13); }
+.rl-body { display: grid; gap: 6px; font-size: 12.5px; line-height: 1.4; min-width: 0; }
+.rl-dev { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: center; }
+.rl-dev > div { display: grid; gap: 2px; min-width: 0; }
+.rl-dev img { width: 34px; height: 34px; object-fit: contain; border-radius: 8px; background: rgba(255, 255, 255, .06); }
+.rl-dev strong { font-weight: 600; }
+.rl-state { display: flex; align-items: center; gap: 5px; font-size: 12px; opacity: .85; flex-wrap: wrap; }
+.rl-caps { font-size: 11px; opacity: .6; }
+.rl-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .35); display: inline-block; }
+.rl-dot.on { background: #4ADE80; box-shadow: 0 0 0 3px rgba(74, 222, 128, .18); }
+.rl-dot.off { background: #FF6B57; }
+.rl-muted { opacity: .6; }
+.rl-warn { color: #FFB547; font-size: 12px; }
+.rl-events { margin: 0; padding-left: 16px; display: grid; gap: 2px; }
+.rl-calls { margin: 0; padding: 6px 8px; list-style: none; display: grid; gap: 3px; background: rgba(0, 0, 0, .25); border-radius: 8px; font-size: 10.5px; max-height: 120px; overflow: auto; }
+.rl-calls li { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.rl-calls .rl-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-calls .rl-code { color: #9ED9B0; flex: none; }
+.rl-calls li.bad .rl-code { color: #FF6B57; }
+.rl-sync { justify-self: start; font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 999px; border: 0; cursor: pointer; color: #0A0B10; background: #59A9FF; }
+.rl-sync:disabled { opacity: .55; cursor: progress; }
+.rl-live.busy .rl-body { opacity: .5; }
+
+/* The popover is narrow for the four demo buttons; give the account block room. */
+body .ring-pop:has(.rl-live), body.is3d .ring-pop:has(.rl-live), body:not(.is3d) .ring-pop:has(.rl-live) { width: 292px; max-width: calc(100vw - 24px); }
+.rl-mono { font-family: var(--mono, "JetBrains Mono", ui-monospace, monospace); font-size: 10.5px; letter-spacing: 0; text-transform: none; }
+.rl-live .rp-k { text-transform: uppercase; }

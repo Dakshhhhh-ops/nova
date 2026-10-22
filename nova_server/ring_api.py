@@ -212,12 +212,18 @@ def snapshot_path(store: Store) -> Path:
     return Path(os.getenv("NOVA_RING_SNAPSHOT") or Path(store.path).parent / "ring-last-sync.json")
 
 
+SEED_SNAPSHOT = Path(__file__).resolve().parent.parent / "samples" / "ring-recorded-sync.json"
+
+
 def recorded(store: Store) -> dict[str, Any] | None:
-    """The last successful live sync (no token, no email), for when the short-lived token has expired."""
-    try:
-        return json.loads(snapshot_path(store).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
+    """The last successful live sync (no token, no email), for when the short-lived token has expired.
+    A fresh deploy has none yet, so it falls back to a real sync recorded from the Ring Developer Playground."""
+    for path in (snapshot_path(store), SEED_SNAPSHOT):
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+    return None
 
 
 def sync(store: Store, engine: Any, api: RingAPI, *, real_now: datetime | None = None) -> dict[str, Any]:

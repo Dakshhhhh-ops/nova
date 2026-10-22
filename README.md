@@ -171,7 +171,7 @@ It drives the story in real Chrome, captures Alexa's spoken replies, adds an Ama
 ```bash
 uv run pytest -q
 ```
-29 tests cover:
+32 tests cover:
 - the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
 - Ring events, live message delivery;
 - pill checks (wrong time, already taken, outdated strength), reconciliation and approval;

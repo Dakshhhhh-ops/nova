@@ -192,11 +192,36 @@ async def fetch_clock() -> dict[str, Any]:
     return data
 
 
+AUTO_RESET_MIN = float(os.getenv("NOVA_AUTO_RESET_MINUTES", "0") or 0)
+
+
+async def auto_reset_if_idle() -> None:
+    """On a shared public demo, start the next visitor from a clean story after a quiet spell."""
+    import time as _time
+
+    if not AUTO_RESET_MIN or state.get("auto_reset_done"):
+        return
+    if _time.monotonic() - state.get("last_activity", _time.monotonic()) < AUTO_RESET_MIN * 60:
+        return
+    from datetime import datetime as _dt
+
+    async with httpx.AsyncClient(timeout=10) as http:
+        await http.post(f"{MCP_BASE}/demo/clock", json={"time": _dt.now().strftime("%H:%M"), "speed": 1})
+        await http.post(f"{MCP_BASE}/demo/reset")
+    for d in DEVICES.values():
+        d.history.clear()
+    state["auto_reset_done"] = True
+    log.info("demo idle for %s min: reset to a clean household", AUTO_RESET_MIN)
+    await hub.emit({"type": "reset"})
+
+
 async def poll_announcements() -> None:
     """Deliver Nova's proactive announcements to each device (reading nova://announcements over MCP)."""
     tick = 0
     while True:
         try:
+            if tick % 30 == 0:
+                await auto_reset_if_idle()
             if not state["connected"] and tick % 3 == 0:
                 await connect_all()
             if state["connected"]:
@@ -224,6 +249,17 @@ async def poll_announcements() -> None:
 
 
 app = FastAPI(title="Nova · Alexa+ simulator", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def track_activity(request, call_next):
+    """Visitor actions (not background polling) count as activity for the idle auto-reset."""
+    if request.method == "POST" and request.url.path.startswith("/api/"):
+        import time as _time
+
+        state["last_activity"] = _time.monotonic()
+        state["auto_reset_done"] = False
+    return await call_next(request)
 
 
 async def ensure_connected() -> None:

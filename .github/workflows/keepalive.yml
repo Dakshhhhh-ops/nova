@@ -1,0 +1,14 @@
+name: keep the live demo awake
+
+# Render's free plan sleeps after 15 minutes idle; a light ping keeps the judge link instant.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: curl -fsS -m 90 https://nova-6kte.onrender.com/healthz || true

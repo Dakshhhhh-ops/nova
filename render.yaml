@@ -7,6 +7,10 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
     envVars:
+      - key: TZ
+        value: America/New_York   # the household lives in Columbus, Ohio
+      - key: NOVA_AUTO_RESET_MINUTES
+        value: "30"               # shared public demo: next visitor starts from a clean story
       - key: NOVA_LLM
         value: auto            # Amazon Nova on Bedrock when AWS keys are set below, offline router otherwise
       - key: AWS_REGION

@@ -33,7 +33,7 @@ export const SKY_KEYS = Object.freeze([
   [24, ['#0A0B10', '#121833', '#1B2347']],
 ]);
 
-const RING_BLUE = '#2F9BFF';
+const RING_BLUE = '#3FA6FF';
 const SERIF_URL = 'https://cdn.jsdelivr.net/npm/@fontsource/instrument-serif@5.2.8/files/instrument-serif-latin-400-normal.woff';
 const SERIF_ITALIC_URL = 'https://cdn.jsdelivr.net/npm/@fontsource/instrument-serif@5.2.8/files/instrument-serif-latin-400-italic.woff';
 const HELVETIKER_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/fonts/helvetiker_bold.typeface.json';
@@ -425,7 +425,8 @@ export function createSky(options = {}) {
 
   const colors = { top: new THREE.Color(), mid: new THREE.Color(), horizon: new THREE.Color() };
   const sunDirection = new THREE.Vector3(0, 1, -1).normalize();
-  let hours = 12, exposure = o.exposure, flatColor = null;
+  const moonDirection = new THREE.Vector3(0, 1, -1).normalize();
+  let hours = 12, exposure = o.exposure, flatColor = null, sunElev = 0, nightAmt = 1;
   const tmp = new THREE.Color();
 
   function apply() {
@@ -457,14 +458,19 @@ export function createSky(options = {}) {
     uniforms.uMoon.value.set(lerp(-0.85, 0.85, clamp(tm, 0, 1)), -0.3 + 1.0 * Math.sin(Math.PI * clamp(tm, 0, 1)));
     uniforms.uMoonVis.value = moonUp ? smooth(clamp(Math.sin(Math.PI * tm) / 0.25, 0, 1)) * s.night : 0;
     uniforms.uNight.value = s.night;
-    const lx = sunUp ? sx : uniforms.uMoon.value.x;
-    const ly = sunUp ? sy : uniforms.uMoon.value.y;
-    sunDirection.set(lx * 6, 2.5 + ly * 5, -7).normalize();
+    // world-space directions towards the sun and moon (behind the scene, +y up; below the horizon when set),
+    // matching where they are drawn on the backdrop
+    const sunArc = Math.sin(Math.PI * ts), moonArc = Math.sin(Math.PI * tm);
+    sunDirection.set(sx * 6, 4 * sunArc + 1.2 * (sy + 0.42), -7).normalize();
+    moonDirection.set(uniforms.uMoon.value.x * 6, 4 * moonArc + 1.2 * (uniforms.uMoon.value.y + 0.3), -7).normalize();
+    sunElev = s.sun; nightAmt = s.night;
   }
 
   const sky = {
-    mesh, kind: 'sky', colors, sunDirection, uniforms,
+    mesh, kind: 'sky', colors, sunDirection, moonDirection, uniforms,
     get hours() { return hours; },
+    get sun() { return sunElev; },     // 0..1 sun elevation (0 at night)
+    get night() { return nightAmt; },  // 0..1
     setTime(hh) { hours = hh; flatColor = null; apply(); },
     setFlat(color) { flatColor = color; apply(); },
     setExposure(e) { exposure = e; apply(); },
@@ -562,7 +568,7 @@ export function createStage(container, options = {}) {
   const o = {
     background: 'sky', bloom: true, css3d: true, quality: 'auto', pixelRatioCap: 1.75,
     fov: 30, camera: [0, 1.4, 11], target: [0, 0.9, 0], timeOfDay: 20.5, exposure: 1.0,
-    autoStart: true, ...options,
+    autoStart: true, autoPause: true, environment: true, ...options,
   };
   o.fx = { grain: 0.035, vignette: 0.22, scanlines: 0, aberration: 0, ...(options.fx || {}) };
 
@@ -596,12 +602,22 @@ export function createStage(container, options = {}) {
     Object.assign(cssLayer.style, { position: 'absolute', left: '0', top: '0', zIndex: '0', pointerEvents: 'none' });
     container.insertBefore(cssLayer, container.firstChild);
     container.insertBefore(canvas, cssLayer.nextSibling);
+    // Focusing an input inside a 3D-transformed, overflow:hidden layer can scroll that layer and
+    // shift every screen: keep the structural layers pinned at 0,0.
+    cssLayer.addEventListener('scroll', (e) => {
+      const t = e.target;
+      if (t === cssLayer || t.parentNode === cssLayer || t.parentNode?.parentNode === cssLayer || t.classList?.contains('nova3d-screen')) {
+        if (t.scrollTop || t.scrollLeft) { t.scrollTop = 0; t.scrollLeft = 0; }
+      }
+    }, true);
   } else {
     container.insertBefore(canvas, container.firstChild);
   }
 
   const scene = new THREE.Scene();
-  scene.environment = studioEnvironment(renderer);
+  // shared PMREM studio environment (reflections); false skips it (faster start, flatter metals),
+  // or pass your own THREE.Texture
+  scene.environment = o.environment === false ? null : o.environment?.isTexture ? o.environment : studioEnvironment(renderer);
   const camera = new THREE.PerspectiveCamera(o.fov, 1, 0.05, 400);
   camera.position.set(...o.camera);
   const camTarget = new THREE.Vector3(...o.target);
@@ -694,10 +710,11 @@ export function createStage(container, options = {}) {
   function setBackground(bg) {
     bgMode = bg;
     if (bg === 'transparent') {
-      if (sky) { sky.mesh.removeFromParent(); }
+      if (sky) { sky.mesh.removeFromParent(); ticking.delete(sky); }
     } else {
       if (!sky) { sky = createSky({ time: timeOfDay, exposure: renderer.toneMappingExposure }); }
       if (!sky.mesh.parent) scene.add(sky.mesh);
+      ticking.add(sky);
       sky.setAspect(width / height);
       if (bg === 'sky') sky.setTime(timeOfDay); else sky.setFlat(bg);
     }
@@ -720,10 +737,10 @@ export function createStage(container, options = {}) {
     rim.intensity = lerp(0.9, 1.4, day) + golden * 1.4;
     if (sky && bgMode === 'sky') {
       sky.setTime(hours);
-      rim.position.copy(sky.sunDirection).multiplyScalar(10);
+      rim.position.copy(sky.sun > 0.02 ? sky.sunDirection : sky.moonDirection).multiplyScalar(10);
       rim.position.z = Math.min(rim.position.z, -3);
     }
-    scene.environmentIntensity = lerp(0.75, 1.0, day);
+    scene.environmentIntensity = lerp(0.75, 1.0, day) + 0.5 * s.sun; // reflections brighten under a bright sky
     emit('time', { hours });
   }
 
@@ -839,6 +856,10 @@ export function createStage(container, options = {}) {
         if (slowSum / 120 > 0.022 && quality === 'high') setQuality('low');
       }
     }
+    advance(dt);
+    render();
+  }
+  function advance(dt) {
     if (fly) {
       fly.t += dt;
       const k = easeOutExpo(clamp(fly.t / fly.d, 0, 1));
@@ -850,6 +871,23 @@ export function createStage(container, options = {}) {
     }
     for (const h of ticking) h._tick(dt, elapsed, stage);
     for (const fn of frameFns) { try { fn(dt, elapsed); } catch (e) { console.error(e); } }
+  }
+  // Compile every material's shaders for the scene's render target up front (uses
+  // KHR_parallel_shader_compile where available), so the first frames don't hitch.
+  function compileAsync() {
+    if (!renderer.compileAsync || !sceneRT) return Promise.resolve();
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(sceneRT);
+    let p;
+    try { p = renderer.compileAsync(scene, camera); } catch (e) { p = Promise.resolve(); }
+    renderer.setRenderTarget(prev);
+    return Promise.resolve(p).then(() => undefined, () => undefined);
+  }
+  // advance time by dt seconds and render once (deterministic capture while the loop is stopped)
+  function step(dt = 1 / 60) {
+    dt = Math.min(Math.max(dt, 0), 0.1);
+    elapsed += dt;
+    advance(dt);
     render();
   }
   function render() {
@@ -877,10 +915,19 @@ export function createStage(container, options = {}) {
   let wasRunning = false;
   const onVis = () => {
     if (document.hidden) { wasRunning = running; stop(); }
-    else if (wasRunning) start();
+    else if (wasRunning && !offscreen) start();
   };
   document.addEventListener('visibilitychange', onVis);
 
+  // pause while the container is scrolled out of view (landing page sections)
+  let offscreen = false, pausedByView = false;
+  const io = o.autoPause && typeof IntersectionObserver === 'function' ? new IntersectionObserver((entries) => {
+    const vis = entries[entries.length - 1].isIntersecting;
+    offscreen = !vis;
+    if (!vis && running) { pausedByView = true; stop(); }
+    else if (vis && pausedByView) { pausedByView = false; start(); }
+  }, { rootMargin: '120px' }) : null;
+  io?.observe(container);
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => resize()) : null;
   ro?.observe(container);
   const onWinResize = () => resize();
@@ -895,6 +942,7 @@ export function createStage(container, options = {}) {
     window.removeEventListener('resize', onWinResize);
     _mq?.removeEventListener?.('change', onMq);
     ro?.disconnect();
+    io?.disconnect();
     stage._router?.dispose();
     for (const x of [...pickables.values()]) x?.dispose?.();
     sky?.dispose();
@@ -909,7 +957,7 @@ export function createStage(container, options = {}) {
   }
 
   Object.assign(stage, {
-    add, remove, pick, project, resize, start, stop, render, dispose,
+    add, remove, pick, project, resize, start, stop, render, step, compileAsync, dispose,
     setTimeOfDay, setBackground, setQuality, setBloom, setFx, setCamera, flyTo,
     getQuality: () => quality,
     onFrame(fn) { frameFns.add(fn); return () => frameFns.delete(fn); },
@@ -943,6 +991,9 @@ function getRouter(stage) {
         active = { g, id: e.pointerId };
         try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
         e.preventDefault();
+        // no text selection on the live HTML screens while something is being dragged over them
+        try { window.getSelection()?.removeAllRanges(); } catch { /* ignore */ }
+        document.documentElement.classList.add('nova3d-gesture');
         el.style.cursor = g.cursor || el.style.cursor;
         break;
       }
@@ -967,9 +1018,18 @@ function getRouter(stage) {
     active = null;
     try { el.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
     el.style.cursor = '';
+    document.documentElement.classList.remove('nova3d-gesture');
     g.up(e, cancelled);
   };
   const onUp = (e) => up(e, false), onCancel = (e) => up(e, true);
+  const noSelect = (e) => { if (active) e.preventDefault(); };
+  document.addEventListener('selectstart', noSelect);
+  if (!document.getElementById('nova3d-style')) {
+    const st = document.createElement('style');
+    st.id = 'nova3d-style';
+    st.textContent = '.nova3d-gesture, .nova3d-gesture * { user-select: none !important; -webkit-user-select: none !important; }';
+    document.head.appendChild(st);
+  }
   el.addEventListener('pointerdown', down);
   el.addEventListener('pointermove', move);
   el.addEventListener('pointerup', onUp);
@@ -980,6 +1040,7 @@ function getRouter(stage) {
     dispose() {
       el.removeEventListener('pointerdown', down); el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', onUp); el.removeEventListener('pointercancel', onCancel);
+      document.removeEventListener('selectstart', noSelect);
     },
   };
   stage._router = router;
@@ -1341,13 +1402,22 @@ export function createEchoShow(options = {}) {
       setScreenMode(screenTexture ? 'image' : 'idle');
       return el;
     },
-    setScreenImage(src) {
+    setScreenImage(src, { fit = 'cover' } = {}) {
       if (screenTexture && !screenTexture.userData.external) screenTexture.dispose();
       screenTexture = null;
       if (src == null) { if (!cssObj) setScreenMode('idle'); face.imageMat.map = null; face.imageMat.needsUpdate = true; return Promise.resolve(); }
       const assign = (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.anisotropy = 8;
+        // 'cover': crop to the display's aspect (centred sideways, top-anchored for tall images such as
+        // documents); 'stretch': fill as-is
+        const im = tex.image, iw = im && (im.videoWidth || im.naturalWidth || im.width), ih = im && (im.videoHeight || im.naturalHeight || im.height);
+        tex.repeat.set(1, 1); tex.offset.set(0, 0);
+        if (fit === 'cover' && iw && ih) {
+          const ia = iw / ih, sa = screen.aspect;
+          if (ia > sa) { tex.repeat.x = sa / ia; tex.offset.x = (1 - tex.repeat.x) / 2; }
+          else { tex.repeat.y = ia / sa; tex.offset.y = 1 - tex.repeat.y; }
+        }
         screenTexture = tex;
         face.imageMat.map = tex; face.imageMat.needsUpdate = true;
         if (!cssObj) setScreenMode('image');
@@ -1403,7 +1473,7 @@ export function createRingDoorbell(options = {}) {
     black: { color: '#1a1b1e', roughness: 0.42, metalness: 0.5 },
   };
   const f = finishes[o.finish] || finishes.nickel;
-  const plateMat = new THREE.MeshPhysicalMaterial({ ...f, roughnessMap: brushedTexture(), anisotropy: 0.6, anisotropyRotation: Math.PI / 2, clearcoat: 0.3, clearcoatRoughness: 0.3, envMapIntensity: 1.2 });
+  const plateMat = new THREE.MeshPhysicalMaterial({ ...f, roughnessMap: brushedTexture(), anisotropy: 0.35, anisotropyRotation: Math.PI / 2, clearcoat: 0.2, clearcoatRoughness: 0.35, envMapIntensity: 1.05 });
   const bodyGeo = new THREE.ExtrudeGeometry(roundedRectShape(W - 2 * b, H - 2 * b, 0.21), { depth: D, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 5, curveSegments: 24 });
   bodyGeo.translate(0, H / 2, -D / 2);
   const body = new THREE.Mesh(bodyGeo, plateMat);
@@ -1469,17 +1539,17 @@ export function createRingDoorbell(options = {}) {
     },
     _tick(dt) {
       const rm = prefersReducedMotion();
-      let base = state === 'off' ? 0 : state === 'live' ? 1.6 : 0.28, arcA = 0;
+      let base = state === 'off' ? 0 : state === 'live' ? 2.6 : 0.3, arcA = 0;
       if (flashKind) {
         flashT += dt;
         if (flashKind === 'ding') {
-          if (flashT < 2.2) { arcA = 4.2; base = Math.max(base, 0.5); if (!rm) cur.arcPos -= dt * 7.5; }
-          else { base = Math.max(base, 3.2 * (1 - (flashT - 2.2) / 0.9)); }
-          if (rm) { arcA = 0; base = Math.max(base, 2.4 * (1 - flashT / 3.1)); }
+          if (flashT < 2.2) { arcA = 9; base = Math.max(base, 0.7); if (!rm) cur.arcPos -= dt * 7.5; }
+          else { base = Math.max(base, 6 * (1 - (flashT - 2.2) / 0.9)); }
+          if (rm) { arcA = 0; base = Math.max(base, 4 * (1 - flashT / 3.1)); }
           if (flashT > 3.1) { flashKind = null; flashResolve?.(); flashResolve = null; }
         } else {
           const p = flashT < 2 ? Math.pow(Math.sin(Math.PI * ((flashT / 1.0) % 1)), 2) : 0;
-          base = Math.max(base, 0.3 + 3.2 * p * (rm ? 0.6 : 1));
+          base = Math.max(base, 0.3 + 6 * p * (rm ? 0.6 : 1));
           if (flashT > 2) { flashKind = null; flashResolve?.(); flashResolve = null; }
         }
       }
@@ -1487,7 +1557,7 @@ export function createRingDoorbell(options = {}) {
       cur.arcA = damp(cur.arcA, arcA, 10, dt);
       ringU.uBase.value = cur.base; ringU.uArcA.value = cur.arcA; ringU.uArcPos.value = cur.arcPos;
       const g = cur.base + cur.arcA * 0.35;
-      halo.material.opacity = clamp(g * (quality === 'high' ? 0.08 : 0.2), 0, 0.8);
+      halo.material.opacity = clamp(g * (quality === 'high' ? 0.05 : 0.12), 0, 0.8);
     },
     _setQuality(q) { quality = q; },
     dispose() { flashResolve?.(); disposeObject(group); },
@@ -1769,9 +1839,10 @@ function logoMaterials(finish, quality) {
         .replace('#include <lights_physical_fragment>', `
           {
             float nv = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
-            float k = (1.0 - nv) * 1.25 + uIriShift + normal.y * 0.18;
+            // hue from view angle, surface orientation and position: bands sweep as the mark turns
+            float k = (1.0 - nv) * 1.9 + dot(normal, vec3(0.35, 0.55, 0.0)) + (vViewPosition.x + vViewPosition.y) * 0.22 + uIriShift;
             vec3 hue = 0.55 + 0.45 * cos(6.28318 * (vec3(0.0, 0.33, 0.67) + k));
-            diffuseColor.rgb *= mix(vec3(1.0), hue, 0.8);
+            diffuseColor.rgb *= mix(vec3(1.0), hue, 0.78);
           }
           #include <lights_physical_fragment>`);
     };
@@ -1918,16 +1989,18 @@ export function enableDrag(stage, handles, options = {}) {
   function presentPose(st, t) {
     const tp = targetPos(t, new THREE.Vector3());
     const n = targetNormal(t, new THREE.Vector3());
-    const dist = t.distance ?? 0.95;
+    const dist = t.distance ?? 1.1;
     const world = tp.clone().addScaledVector(n, dist);
     // centre the object's body on the lens rather than its base
     const box = new THREE.Box3().setFromObject(st.g);
     const hgt = isFinite(box.max.y) ? (box.max.y - box.min.y) : 0.5;
-    world.y -= hgt * 0.5;
+    world.y += -hgt * 0.5 + (t.offsetY ?? -0.15); // centre the object a little below the lens
     dummy.position.copy(world);
     dummy.lookAt(tp.x, world.y, tp.z);
     const faceTarget = dummy.quaternion.clone();
-    const q = st.homeQ.clone().slerp(faceTarget, t.turn ?? 0.6);
+    // a flat sheet turned towards the device reads as a sliver to the viewer: keep it facing out by default
+    const turn = t.turn ?? (st.h.kind === 'paper' ? 0 : 0.35);
+    const q = st.homeQ.clone().slerp(faceTarget, turn);
     const parent = st.g.parent;
     if (parent) {
       parent.updateWorldMatrix(true, false);
@@ -2385,6 +2458,8 @@ export function createArcCarousel(stage, items, options = {}) {
     get index() { return index; },
     select, next() { select(target + 1); }, prev() { select(target - 1); },
     setEnabled(v) { enabled = !!v; },
+    // repaint every card face (e.g. once the page's web fonts have loaded)
+    redraw() { cards.forEach((c) => c.redraw()); },
     _tick(dt, t) {
       const rm = prefersReducedMotion();
       if (!dragging) pos = rm ? damp(pos, target, 14, dt) : damp(pos, target, 7, dt);
@@ -2432,7 +2507,7 @@ export function createArcCarousel(stage, items, options = {}) {
 // hundreds of MB of GPU memory.
 let _frameStyle = false;
 export function screenFrame(container = document.body, options = {}) {
-  const o = { bezel: true, glare: true, scanlines: true, grain: true, vignette: true, radius: 28, intensity: 1, thickness: null, ...options };
+  const o = { bezel: true, glare: true, scanlines: true, grain: true, vignette: true, radius: 28, intensity: 1, thickness: null, chin: null, ...options };
   if (!_frameStyle) {
     _frameStyle = true;
     const st = document.createElement('style');
@@ -2471,9 +2546,10 @@ export function screenFrame(container = document.body, options = {}) {
   function apply() {
     const I = clamp(o.intensity, 0, 2);
     const th = o.bezel ? (o.thickness ?? (innerWidth < 720 ? 6 : 12)) : 0;
+    const chin = o.bezel ? Math.max(th, o.chin ?? th) : 0; // a deeper bottom bezel, like a monitor's chin
     el.style.setProperty('--nf-r', (o.bezel ? o.radius : 0) + 'px');
-    el.style.setProperty('--nf-t', th + 'px');
-    glass.style.inset = bezel.style.inset = th + 'px';
+    el.style.setProperty('--nf-t', Math.max(th, chin) + 'px');
+    glass.style.inset = bezel.style.inset = `${th}px ${th}px ${chin}px ${th}px`;
     bezel.style.display = o.bezel ? '' : 'none';
     grain.style.display = o.grain ? '' : 'none';
     grain.style.opacity = String(0.16 * I);

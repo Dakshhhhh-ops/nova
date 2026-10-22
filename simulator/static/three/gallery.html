@@ -150,7 +150,7 @@
   let stage;
   try {
     stage = N.createStage($('#stage'), {
-      background: 'sky', timeOfDay: +(params.get('t') || 20.5), quality: params.get('q') || 'high',
+      background: params.get('bg') || 'sky', timeOfDay: +(params.get('t') || 20.5), quality: params.get('q') || 'high',
       camera: [0.05, 3.0, 13.4], target: [0.05, 0.95, 0.6],
     });
   } catch (err) {

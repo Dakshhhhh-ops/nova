@@ -101,16 +101,23 @@ class Recorder:
         self.narration.append((self.now(), clip))
         await asyncio.sleep(secs + 0.25)
 
-    async def demo(self, expr: str, timeout: float = 45) -> None:
-        """Call window.NovaDemo; fall back to the HTTP API when the hook isn't there."""
-        has_hook = await self.page.evaluate("() => !!window.NovaDemo")
+    async def wait_ready(self, timeout: float = 30) -> None:
         try:
-            if has_hook:
-                await asyncio.wait_for(self.page.evaluate(f"async () => {{ await window.NovaDemo.ready; return await {expr}; }}"), timeout)
-            else:
-                await asyncio.wait_for(self.page.evaluate(f"async () => {{ return await ({fallback(expr)}); }}"), timeout)
+            await asyncio.wait_for(self.page.evaluate("async () => { if (window.NovaDemo) await window.NovaDemo.ready; }"), timeout)
         except Exception as exc:
-            print(f"  ! {expr[:60]}: {exc}")
+            print(f"  ! stage not ready after {timeout}s: {type(exc).__name__}")
+
+    async def demo(self, expr: str, timeout: float = 25) -> None:
+        """Call window.NovaDemo; fall back to the HTTP API when the hook isn't there. Never blocks the take."""
+        if self.page.is_closed():
+            return
+        try:
+            has_hook = await self.page.evaluate("() => !!window.NovaDemo")
+            body = f"async () => {{ return await {expr}; }}" if has_hook else f"async () => {{ return await ({fallback(expr)}); }}"
+            # Fire the call; don't wait longer than `timeout` for it to settle (the page keeps running either way).
+            await asyncio.wait_for(asyncio.shield(asyncio.ensure_future(self.page.evaluate(body))), timeout)
+        except Exception as exc:
+            print(f"  ! {expr[:60]}: {type(exc).__name__} {str(exc)[:80]}")
         self.timeline.append({"t": round(self.now(), 2), "do": expr})
 
     async def run(self, clips: list[tuple[Path, float]]) -> None:
@@ -126,7 +133,7 @@ class Recorder:
                     await page.wait_for_timeout(int(secs * 100))
                 await narr
                 await page.goto(self.base + "/live", wait_until="domcontentloaded")
-                await page.wait_for_timeout(2500)
+                await self.wait_ready()
                 await self.demo("window.NovaDemo.setClock('07:55', 1)")
                 await page.wait_for_timeout(1500)
                 continue
@@ -236,10 +243,16 @@ async def main() -> None:
                                         record_video_dir=str(tmp), record_video_size={"width": 1920, "height": 1080})
         page = await ctx.new_page()
         rec = Recorder(page, args.url, tmp)
-        await rec.run(clips)
+        try:
+            await rec.run(clips)
+        except Exception as exc:  # e.g. the browser closed: keep what was recorded
+            print(f"  ! take ended early: {type(exc).__name__}: {str(exc)[:120]}")
         video_path = Path(await page.video.path())
-        await ctx.close()
-        await browser.close()
+        try:
+            await ctx.close()
+            await browser.close()
+        except Exception:
+            pass
 
     (tmp / "timeline.json").write_text(json.dumps({"timeline": rec.timeline,
                                                    "narration": [(t, p.name) for t, p in rec.narration],

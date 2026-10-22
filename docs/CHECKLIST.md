@@ -22,7 +22,7 @@ Deadline: **Oct 23, 2026, 12:00 PM PDT** (Oct 24, 12:30 AM IST). Submit at least
 | Project description | `docs/SUBMISSION.md` → "Project description" |
 | Built with | `docs/SUBMISSION.md` → "Built with" line |
 | GitHub repo | https://github.com/Dakshhhhh-ops/nova (public, MIT `LICENSE` at the root) |
-| Try-it link | https://nova-6kte.onrender.com (open it once a minute before judging: free hosting sleeps). For Amazon Nova there, add `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION=us-east-1` in the Render dashboard (never in the repo). |
+| Try-it link | https://nova-6kte.onrender.com (open it once a minute before judging: free hosting sleeps). For Amazon Nova there, add `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION=us-east-1` in the Render dashboard (never in the repo). Don't rely on `RING_ACCESS_TOKEN` there: Playground tokens expire in about 30 minutes, and the recorded Playground sync covers it. |
 | Video URL | your YouTube link |
 | Track | **Alexa+** (self-hosted MCP server + simulated Alexa+ experience) |
 | Mini challenges | **AWS Builder** and **Open Source** (`mcp-apps-lite-host` is public) |

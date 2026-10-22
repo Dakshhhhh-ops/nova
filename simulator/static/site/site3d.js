@@ -1014,7 +1014,7 @@ async function build() {
   const DEF = [
     { name: 'Alexa+ agent', sub: 'Amazon Nova · Converse tool use', color: COL.nova, motif: 'ring' },
     { name: 'MCP', sub: 'Streamable HTTP · bearer token', color: COL.nova, motif: 'lines' },
-    { name: 'Nova server', sub: '22 tools · care engine · insights · vision · Ring', color: COL.nova, motif: 'grid' },
+    { name: 'Nova server', sub: '24 tools · care engine · insights · vision · Ring', color: COL.nova, motif: 'grid' },
     { name: 'Amazon Nova', sub: 'Amazon Bedrock · language + vision', color: COL.amber, motif: 'orb' },
   ];
   const stack = new THREE.Group();

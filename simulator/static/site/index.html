@@ -780,7 +780,7 @@
           </div>
           <div class="xl-plane" data-layer="1"><span class="xl-name">Alexa+ agent</span><span class="xl-sub">Amazon Nova · Converse tool use</span><span class="xl-mark" data-mark="1"></span></div>
           <div class="xl-plane xl-mcp" data-layer="2"><span class="xl-name">MCP</span><span class="xl-sub">Streamable HTTP · OAuth 2.1</span><span class="xl-mark" data-mark="2"></span></div>
-          <div class="xl-plane" data-layer="3"><span class="xl-name">Nova server</span><span class="xl-sub">22 tools · care engine · insights · vision · Ring</span><span class="xl-mark" data-mark="3"></span></div>
+          <div class="xl-plane" data-layer="3"><span class="xl-name">Nova server</span><span class="xl-sub">24 tools · care engine · insights · vision · Ring</span><span class="xl-mark" data-mark="3"></span></div>
           <div class="xl-plane xl-nova" data-layer="4"><span class="xl-name">Amazon Nova</span><span class="xl-sub">Amazon Bedrock · language + vision</span><span class="xl-mark" data-mark="4"></span></div>
           <span class="xl-packet"></span>
           <div class="e3-face e3-back"></div>
@@ -797,17 +797,17 @@
       <li class="layer" data-layer="0"><span class="ly-i mono">L1</span><h3>The screen</h3><p><b class="mono">MCP Apps</b> Five <code>ui://</code> views render on the Echo Show: today, briefing, visit brief, pill check, reconciliation.</p></li>
       <li class="layer" data-layer="1"><span class="ly-i mono">L2</span><h3>Alexa+</h3><p><b class="mono">Agent</b> Calls Nova's tools. In the simulator it runs on Amazon Nova 2 Lite with Bedrock Converse tool use, and Amazon Polly speaks.</p></li>
       <li class="layer" data-layer="2"><span class="ly-i mono">L3</span><h3>MCP</h3><p><b class="mono">Streamable HTTP · OAuth 2.1</b> Account linking with dynamic client registration and PKCE gives each person a token, so the same tool answers Rose and Maya differently. Consent travels as an elicitation.</p></li>
-      <li class="layer" data-layer="3"><span class="ly-i mono">L4</span><h3>Nova server</h3><p><b class="mono">22 tools · 8 resources</b> A care engine on the household clock, an insight engine, vision, refills and a Ring webhook, over SQLite.</p></li>
+      <li class="layer" data-layer="3"><span class="ly-i mono">L4</span><h3>Nova server</h3><p><b class="mono">24 tools · 8 resources</b> A care engine on the household clock, an insight engine, vision, refills and a Ring webhook, over SQLite.</p></li>
       <li class="layer" data-layer="4"><span class="ly-i mono">L5</span><h3>Amazon Nova</h3><p><b class="mono">Amazon Bedrock</b> Reads pill bottles and paperwork, writes the briefings. The rules underneath are deterministic and tested.</p></li>
     </ol>
   </div>
 
   <div class="wrap build-after">
     <div class="nums">
-      <div class="num r3d"><p class="num-v"><span data-count="22">22</span></p><p class="num-k mono">MCP tools</p><p class="num-d">Structured output on every tool, with a <code>speech</code> line written for voice.</p></div>
+      <div class="num r3d"><p class="num-v"><span data-count="24">24</span></p><p class="num-k mono">MCP tools</p><p class="num-d">Structured output on every tool, with a <code>speech</code> line written for voice.</p></div>
       <div class="num r3d"><p class="num-v"><span data-count="8">8</span></p><p class="num-k mono">Resources</p><p class="num-d"><code>nova://announcements</code> is how Nova speaks first, alongside the circle and the timeline.</p></div>
       <div class="num r3d"><p class="num-v"><span data-count="5">5</span></p><p class="num-k mono">MCP Apps views</p><p class="num-d">Rendered on the Echo Show screens, calling tools back through the host.</p></div>
-      <div class="num r3d"><p class="num-v"><span data-count="35">35</span></p><p class="num-k mono">Tests</p><p class="num-d">The escalation ladder, pill checks, refills, privacy, OAuth, Bedrock request shapes and a real Streamable HTTP round trip.</p></div>
+      <div class="num r3d"><p class="num-v"><span data-count="41">41</span></p><p class="num-k mono">Tests</p><p class="num-d">The escalation ladder, pill checks, refills, privacy, OAuth, Bedrock request shapes and a real Streamable HTTP round trip.</p></div>
     </div>
 
     <div class="trace r3d" aria-label="A sample of Nova's MCP traffic">

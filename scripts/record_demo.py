@@ -38,6 +38,7 @@ SCENES: list[tuple[str, str, float]] = [
      "This is Nova, a care circle for Alexa plus.", "landing", 2.0),
     ("Nova doesn't wait to be asked. At eight, Rose's Echo reminds her about her morning pills.", "morning", 6.0),
     ("Rose shows Alexa a bottle. Amazon Nova reads the label, and Nova checks it against her plan.", "pill_wrong", 7.0),
+    ("Her knee hurts, so she reaches for ibuprofen. Nova stops her, using her doctor's own instructions.", "pill_avoid", 6.0),
     ("At nine, Nova checks in. Before her family hears about a symptom, Nova asks Rose.", "checkin", 8.0),
     ("In Seattle, Maya asks how Mom is doing. Nova connects the dots: the dizziness began two days after her "
      "blood pressure dose was doubled, and her home readings dropped.", "briefing", 9.0),
@@ -137,6 +138,8 @@ class Recorder:
             elif action == "pill_wrong":
                 await self.demo("window.NovaDemo.showSample('kitchen', 'pill-atorvastatin')")
                 await self.demo("window.NovaDemo.tapReply('kitchen', 'I took it')")
+            elif action == "pill_avoid":
+                await self.demo("window.NovaDemo.showSample('kitchen', 'pill-ibuprofen')")
             elif action == "checkin":
                 await self.demo("window.NovaDemo.setClock('08:58', 30)")
                 await page.wait_for_timeout(4000)

@@ -48,6 +48,7 @@ Messages between family members arrive the same way, live, on the other person's
   - Wrong time: *"That's atorvastatin, your bedtime pill. Put it back. Right now it's time for…"*
   - Already taken: *please don't take another.*
   - Not on her list, or an outdated strength: *"This bottle is lisinopril 20 mg, but your plan now says 10 mg."*
+  - Something her doctor said to avoid: *"Please don't take ibuprofen, Rose. Your knee discharge instructions say to avoid it because of blood pressure and kidney function. The same notes say: for pain, acetaminophen up to 3,000 mg a day."*
 - **Medication reconciliation from paperwork.** Maya photographs the after-visit summary. Nova extracts the medication list and reconciles it with the current plan as *change / start / stop / continue*, with the doctor's reasons. Nothing changes until Maya taps **Approve**. Then Rose's plan updates, the instructions become a care note, and Rose hears in plain words what changed.
 
 ### 3. It connects the dots, with evidence
@@ -111,7 +112,7 @@ flowchart LR
 |---|---|
 | `nova_server/` | The Alexa+ integration: an MCP server on the official Python SDK (`mcp` 2.3). Streamable HTTP at `/mcp`, plus the care engine thread, vision and the Ring webhook. |
 | `simulator/` | A simulated Alexa+: two Echo devices and a Ring doorbell, each Echo with its own MCP session and bearer token, an Amazon Nova tool-use agent, an MCP Apps host, live announcement delivery, a time-lapse clock and a protocol inspector. |
-| `samples/` | Demo photos (three prescription bottles, an after-visit summary) and their generator. All names are fictional. |
+| `samples/` | Demo photos (three prescription bottles, an over-the-counter ibuprofen bottle, an after-visit summary) and their generator. All names are fictional. |
 | `skills/nova-care/` | An Agent Skill that teaches any agent how to run Nova conversations well. |
 
 ### MCP features used
@@ -171,10 +172,10 @@ It drives the story in real Chrome, captures Alexa's spoken replies, adds an Ama
 ```bash
 uv run pytest -q
 ```
-35 tests cover:
+36 tests cover:
 - the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
 - Ring events, live message delivery;
-- pill checks (wrong time, already taken, outdated strength), reconciliation and approval;
+- pill checks (wrong time, already taken, outdated strength, a drug the doctor said to avoid), reconciliation and approval;
 - BP limits read from the doctor's notes, the dizziness insight with its BP evidence;
 - privacy, grounded answers, red flags, Bedrock request shapes;
 - a real Streamable HTTP round trip with bearer auth and a consent elicitation;

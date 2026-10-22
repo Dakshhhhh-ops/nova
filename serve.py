@@ -18,7 +18,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PORT = int(os.getenv("PORT", "8080"))
-PUBLIC_URL = os.getenv("NOVA_PUBLIC_URL", f"http://127.0.0.1:{PORT}").rstrip("/")
+# Public URL: explicit, or what the host tells us (Render, Hugging Face Spaces), or localhost.
+PUBLIC_URL = (os.getenv("NOVA_PUBLIC_URL") or os.getenv("RENDER_EXTERNAL_URL")
+              or (f"https://{os.environ['SPACE_HOST']}" if os.getenv("SPACE_HOST") else "")
+              or f"http://localhost:{PORT}").rstrip("/")
 os.environ["NOVA_PUBLIC_URL"] = PUBLIC_URL
 os.environ.setdefault("NOVA_MCP_URL", f"http://127.0.0.1:{PORT}/mcp")
 os.environ["NOVA_LAZY_CONNECT"] = "1"

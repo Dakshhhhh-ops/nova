@@ -1,0 +1,17 @@
+# Render blueprint: New → Blueprint → pick this repo. Free plan sleeps when idle.
+services:
+  - type: web
+    name: nova
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: NOVA_LLM
+        value: auto            # Amazon Nova on Bedrock when AWS keys are set below, offline router otherwise
+      - key: AWS_REGION
+        value: us-east-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false            # set in the Render dashboard (optional)
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false

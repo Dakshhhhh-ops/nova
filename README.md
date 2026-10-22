@@ -115,7 +115,7 @@ flowchart LR
   A -.-> BR
 ```
 
-Sequence diagrams for a voice turn, the escalation ladder, consent by elicitation, photo-to-plan reconciliation and OAuth account linking are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Submitting? See [docs/CHECKLIST.md](docs/CHECKLIST.md). Sequence diagrams for a voice turn, the escalation ladder, consent by elicitation, photo-to-plan reconciliation and OAuth account linking are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 | Layer | What it is |
 |---|---|

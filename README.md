@@ -1,257 +1,289 @@
-# Nova · catches medication mistakes before they happen
+<div align="center">
 
-**Nova catches medication mistakes before they happen, and connects the dots (like a dose change and new dizziness) for an older adult who lives alone and the family who worry about her.**
+# Nova
 
-It links three places on Alexa+: **the living room** (Rose's Echo Show in her kitchen), **the front door** (her Ring doorbell) and **the cloud** (Maya's Echo Show in Seattle, and Nova itself).
+**Medication safety and care coordination for Alexa+**
 
-It doesn't wait to be asked. It reminds Rose when her pill is due, follows up, and only then tells her daughter. It reads pill bottles and the doctor's paperwork with Amazon Nova. It notices when the front door hasn't opened all morning, and it connects small signals into the one insight that matters: *"her dizziness started two days after the blood pressure dose was doubled."*
+Nova catches medication mistakes before they happen and connects the signals a family would miss,<br/>
+for an older adult who lives alone and the people who care for her.
 
-Nova is a self-hosted **MCP server** (Streamable HTTP, MCP 2026-07-28, compatible with 2025-11-25), the integration path Alexa+ uses for third-party experiences. The repo also ships a **simulated Alexa+**: two Echo Shows and a Ring doorbell in the browser, with an agent that runs on **Amazon Nova models in Amazon Bedrock**.
+[![Tests](https://github.com/Dakshhhhh-ops/nova/actions/workflows/ci.yml/badge.svg)](https://github.com/Dakshhhhh-ops/nova/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![MCP 2026-07-28](https://img.shields.io/badge/MCP-2026--07--28-0aa)
+![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)
 
-> **Try it live:** https://nova-6kte.onrender.com (story) · https://nova-6kte.onrender.com/live (live demo) · MCP endpoint `https://nova-6kte.onrender.com/mcp` (free hosting: the first load after idle takes ~30–50 s)
->
-> Tracks: **Alexa+** (self-hosted MCP server + simulated Alexa+ experience) and **Ring** (Ring Partner API: devices, status, event history, signed webhooks) · Mini challenges: **AWS Builder** (Amazon Bedrock with Amazon Nova, multimodal; Amazon Polly) and **Open Source** ([mcp-apps-lite-host](https://github.com/Dakshhhhh-ops/mcp-apps-lite-host))
+[**Live demo**](https://nova-6kte.onrender.com/live) · [Story page](https://nova-6kte.onrender.com) · [Architecture](docs/ARCHITECTURE.md) · [Submission notes](docs/SUBMISSION.md)
 
-![Maya asks "How's Mom doing?" and Nova connects Rose's dizziness to her recent dose change](docs/img/briefing.png)
+</div>
 
-| Rose is asked before her family is told | A doctor-visit brief, one voice command away |
-|---|---|
-| ![Consent prompt on Rose's Echo Show](docs/img/consent.png) | ![Visit brief on Maya's Echo Show](docs/img/visit.png) |
+![Nova's story page: "Care that speaks first."](docs/img/landing.jpg)
 
 ---
 
-## Why
+## Contents
 
-- More than 53 million Americans are unpaid family caregivers (AARP, *Caregiving in the U.S.*, 2020), many of them long-distance.
-- About one in four adults 65+ falls each year (CDC).
-- Medication changes at a doctor's visit or a hospital discharge are where mistakes happen: an old bottle in the cabinet, a new dose nobody wrote down.
-- The early signals are small and scattered: a skipped evening pill, "I felt a bit woozy getting up", an aide's blood pressure reading, a quiet morning. Nobody sees them together until something goes wrong.
+- [Overview](#overview)
+- [What Nova does](#what-nova-does)
+- [Architecture](#architecture)
+- [Integrations](#integrations)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [MCP reference](#mcp-reference)
+- [Testing](#testing)
+- [Security, privacy and compliance](#security-privacy-and-compliance)
+- [Project structure](#project-structure)
+- [Roadmap](#roadmap)
+- [License](#license)
 
-Voice is the right interface: no app to learn, no screen to unlock, and Alexa is already in the kitchen.
+## Overview
 
-## Who would ship this
-Nova is an integration a care brand hosts and Alexa+ calls, so it has natural owners:
-- **Home-care agencies** (Grace's employer) offer Nova to clients' families: aides see the plan and log visits, and families get the briefing and escalations.
-- **Medicare Advantage and Part D plans** are scored on medication adherence for diabetes drugs, RAS antagonists (such as lisinopril) and statins: Rose's exact three prescriptions. Reminders, the escalation ladder and refill nudges move those numbers.
-- **Pharmacies** use the refill flow and the reconciliation after a visit, which is where dose errors happen.
-- **Families directly**, through Alexa+ account linking, with the older adult in control of what's shared.
+More than 53 million Americans are unpaid family caregivers (AARP, *Caregiving in the U.S.*, 2020), many of them far from the person they look after. The risky moments are predictable: a new dose after a doctor's visit, an old bottle still in the cabinet, a missed evening pill. The early warning signs are small and scattered: "I felt a bit woozy getting up", an aide's blood pressure reading, a quiet morning. Nobody sees them together until something goes wrong.
+
+Nova brings them together on the devices the household already uses. It connects three places on Alexa+:
+
+| Place | Device | Role |
+|---|---|---|
+| **The living room** | Rose's Echo Show 8 | Reminders, pill checks, daily check-ins, consent |
+| **The front door** | Rose's Ring doorbell | Visits, deliveries, a quiet morning, a door opening at night |
+| **The cloud** | Maya's Echo Show 15, and Nova | Briefings, escalations, plan changes, the visit brief |
+
+Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard Alexa+ uses for third-party experiences. This repository also includes a **simulated Alexa+** (two Echo Shows and a Ring doorbell in the browser) whose agent runs on **Amazon Nova in Amazon Bedrock**, because Alexa+ developer preview access isn't generally available.
 
 ## What Nova does
 
-### 1. It speaks first: the proactive care engine
-A care engine runs on the household clock and turns the care plan into **announcements** on the right device:
+**It speaks first.** A care engine runs on the household clock and turns the care plan into announcements on the right device.
 
-| When | Nova |
+| When | What happens |
 |---|---|
-| 6:00 PM, dose due | Rose's Echo: *"It's 6 PM, Rose. Time for your Metformin with your meal. That's the large white oblong pill."* (quick replies: *I took it* · *Remind me in 10 minutes* · *I'll skip it tonight*) |
-| 6:30 PM, still not taken | *"Just checking, Rose: have you taken your 6 PM Metformin yet?"* |
-| 7:30 PM, still not taken | Maya's Echo glows yellow: *"Mom hasn't taken her 6 PM Metformin. I reminded her at 6 PM and 6:30 PM."* An alert opens. |
-| 9:00 AM, no check-in yet | *"Good morning, Rose! How are you feeling today?"* |
-| 11:00 AM, a quiet home | No pills logged, no movement at the door: *"Is everything okay?"* At 11:30 with no answer, the family gets an **urgent** notification. |
-| Evening before an appointment | *"Tomorrow at 10:30 you see Dr. Patel. Leo is driving you. Want me to get your visit brief ready?"* |
-| After the visit | *"Dr. Patel asked for a blood pressure reading every morning before your pills."* |
+| 6:00 PM, a dose is due | Rose's Echo: *"It's 6 PM, Rose. Time for your Metformin with your meal."* |
+| 6:30 PM, not yet taken | A gentle follow-up on Rose's Echo |
+| 7:30 PM, still not taken | Maya's Echo: *"Mom hasn't taken her 6 PM Metformin. I reminded her at 6 PM and 6:30 PM."* |
+| 9:00 AM | The morning check-in: *"How are you feeling today?"* |
+| 11:00 AM, a quiet home | No pills logged and no movement at the door: a wellness check, then an urgent alert to the family |
+| A bottle running low | A refill nudge, sent to the pharmacy with a pickup plan |
 
-Messages between family members arrive the same way, live, on the other person's Echo. A **time-lapse clock** plays a whole day in a minute for the demo.
+**It sees.** Rose holds a bottle up to the Echo Show camera. Amazon Nova reads the label and Nova checks it against her plan: the right pill at the right time, a pill already taken, an outdated strength, or a medicine her doctor said to avoid (*"Please don't take ibuprofen, Rose…"*). Maya photographs an after-visit summary, and Nova proposes the plan changes (*change, start, stop, continue*, with the doctor's reasons). Nothing changes until she approves.
 
-### 2. It sees: Amazon Nova multimodal
-- **"Is this the right pill?"** Rose holds a bottle up to the Echo Show camera. Nova reads the label and checks it against her plan:
-  - Right pill, right time: *take one now.*
-  - Wrong time: *"That's atorvastatin, your bedtime pill. Put it back. Right now it's time for…"*
-  - Already taken: *please don't take another.*
-  - Not on her list, or an outdated strength: *"This bottle is lisinopril 20 mg, but your plan now says 10 mg."*
-  - Something her doctor said to avoid: *"Please don't take ibuprofen, Rose. Your knee discharge instructions say to avoid it because of blood pressure and kidney function. The same notes say: for pain, acetaminophen up to 3,000 mg a day."*
-- **Medication reconciliation from paperwork.** Maya photographs the after-visit summary. Nova extracts the medication list and reconciles it with the current plan as *change / start / stop / continue*, with the doctor's reasons. Nothing changes until Maya taps **Approve**. Then Rose's plan updates, the instructions become a care note, and Rose hears in plain words what changed.
+**It connects the dots, with evidence.** *"How's Mom doing?"* gets a one-sentence answer and a card that fits one screen:
 
-### 3. It connects the dots, with evidence
-*"How's Mom doing?"* gives a spoken briefing plus an on-screen card:
-> *Dizziness began after her lisinopril change.* Home BP averaged 152/91 before the change and 110/66 since. Rose has mentioned dizziness 4 times since Oct 15. Grace saw her unsteady. Dr. Patel's notes say to call about dizziness (614-555-0190).
+> **Dizziness began after her lisinopril change.** Home BP averaged 152/91 before the change and 110/66 since. Rose has mentioned dizziness four times since Oct 15. Grace saw her unsteady. Dr. Patel's notes say to call about dizziness.
 
-It also tracks evening doses slipping while mornings hold, mood, pain and sleep trends, and *"she's stopped her walks"*. Every insight comes from deterministic, testable rules and carries its evidence. Amazon Nova only writes the language.
+Insights come from deterministic, tested rules, and each one carries its evidence. Amazon Nova writes the words. Nova never diagnoses.
 
-### 4. It listens to the front door: Ring
-**Nova calls the Ring Partner API** (`https://api.amazonvision.com`, `nova_server/ring_api.py`): `GET /v1/users/me` for the linked account, `GET /v1/devices` and `/v1/devices/{id}/status` to know the doorbell is online, and `GET /v1/history/devices/{id}/events?event_types=ding,motion.human` (following the `page[key]` cursor) to pull doorbell presses and people at the door. It asks for nothing else: no vehicles, animals, video or snapshots, and it keeps no Ring email or address. New events become care signals. A fresh one is announced, and an older one goes on the timeline quietly, because nobody needs "Grace is at the door" an hour after she left. Nova syncs every 5 minutes, when a caregiver asks *"Has Grace been by?"* (`recent_activity`), and on demand. In the live demo, open **Front door ⋯ → Sync from Ring**: Nova calls `api.amazonvision.com` (users/me, devices, status, capabilities, history) and shows the real doorbell (model, online state, last check-in), every call with its HTTP status, and a **Live** or **Recorded** label. A doorbell that goes offline is a care signal too, and it's real: the Developer Playground doorbell reported `online: false` during our testing, and Nova raised it. Without a token (as on the hosted demo, since Playground tokens last about 30 minutes), the panel shows a real recorded Playground sync, labelled Recorded. Link an account with `RING_ACCESS_TOKEN` (Ring Developer Playground → Generate Token, about 30 minutes) or, in production, a refresh token from Ring account linking.
+**It reads the front door.** Nova calls the **Ring Partner API** for the linked doorbell's status and event history, and takes Ring's signed webhooks in real time. A doorbell press at the time of a scheduled visit tells Nova the home aide has arrived, and she gets her visit checklist.
 
-For real time, Nova also takes **Ring Partner API Webhook v1.1** events at `/integrations/ring/webhook` (`button_press`, `motion_detected`, `device_online` / `device_offline`). It checks Ring's `X-Signature` (HMAC-SHA256 over the raw body) before reading anything, drops redelivered events by `meta.request_id`, and answers 200 right away (Ring retries 5xx, never 4xx). Ring doesn't say who rang, so Nova matches a doorbell press against the care calendar: a press near Grace's 10:00 visit is Grace, and she gets her visit checklist. We don't have Ring partner credentials, so the simulator sends the same signed payloads; with credentials you set `NOVA_RING_SIGNING_KEY` and register the URL in the Ring Developer Portal.
+**It stays respectful.** Spoken replies are one or two sentences, with the details one *"tell me more"* away. Rose is asked before her family hears about a symptom, and she decides what the circle can see. Emergencies skip every question.
 
-What the front door becomes:
-- *Grace arrived at Mom's at 10:02*, logged as a visit and announced to the family.
-- *The front door opened at 2:14 AM*: an urgent notification (night wandering).
-- No movement all morning feeds the wellness check.
-
-### 5. It stays safe and respectful
-- **Double-dose guard**: *"You already took Lisinopril at 8:14 AM, so please don't take another one."*
-- **Grounded answers**: *"Can I take ibuprofen for my knee?"* is answered only from the doctor's notes, with the source.
-- **Consent first**: *"Would you like me to let Maya and Leo know you're feeling dizzy?"* (MCP elicitation). Emergencies skip the question.
-- **Rose is in charge**: she decides what the circle sees (`set_sharing`); only she can change it.
-- **Blood pressure by voice**, checked against the limits Dr. Patel wrote.
-- **Refills before they run out**: Nova counts pills, nudges at 10 AM when a bottle has five days left, sends the refill to the pharmacy, and says when it's ready and who can pick it up.
-- **Doctor-visit brief** with adherence, symptoms with first-seen dates, and questions to ask.
+| Rose is asked before her family is told, while Maya sees the evidence | A doctor-visit brief, one request away |
+|---|---|
+| ![The live demo: a consent question on Rose's Echo Show and the briefing card on Maya's](docs/img/live-demo.jpg) | ![A visit brief on Maya's Echo Show](docs/img/visit-brief.jpg) |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph Browser["Alexa+ simulator (browser)"]
+  subgraph Browser["Simulated Alexa+ (browser)"]
     R["Rose's Echo Show 8<br/>voice · camera"]
-    D["Ring doorbell<br/>front door"]
-    M["Maya's Echo Show 15<br/>notifications"]
+    D["Ring doorbell"]
+    M["Maya's Echo Show 15"]
     I["Inspector: live MCP trace"]
   end
   subgraph Sim["simulator/ (FastAPI)"]
     A["Alexa+ agent<br/>Amazon Nova · Converse tool use"]
     H["MCP Apps host"]
-    P["Announcement poller<br/>(nova://announcements)"]
-    V["Polly voice"]
+    P["Announcement poller"]
+    V["Amazon Polly voice"]
   end
   subgraph Nova["nova_server/ (MCP server)"]
-    T["25 tools · 8 resources · 2 prompts<br/>5 ui:// views"]
+    T["25 tools · 8 resources · 2 prompts<br/>5 MCP Apps views"]
     E["Care engine<br/>(household clock)"]
     X["Insight engine"]
     S["Vision: pill check,<br/>reconciliation"]
-    W["Ring webhook"]
+    G["Ring: API client + webhook"]
     DB[("SQLite")]
   end
   R & M <-->|HTTP + SSE| Sim
-  D -->|events| W
-  A <-->|"Streamable HTTP · Bearer token per person"| T
+  A <-->|"Streamable HTTP · OAuth 2.1 token per person"| T
   P <-->|resources/read| T
+  D -->|signed webhook| G
+  G <-->|Ring Partner API| RING["api.amazonvision.com"]
   T --> X & S --> DB
   E --> DB
-  W --> E
-  X -.->|language| BR["Amazon Bedrock<br/>Amazon Nova 2 Lite"]
+  G --> E
+  X -.->|language| BR["Amazon Bedrock<br/>Amazon Nova"]
   S -.->|images| BR
   A -.-> BR
 ```
 
-Submitting? See [docs/CHECKLIST.md](docs/CHECKLIST.md). Sequence diagrams for a voice turn, the escalation ladder, consent by elicitation, photo-to-plan reconciliation and OAuth account linking are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-| Layer | What it is |
+| Component | Description |
 |---|---|
-| `nova_server/` | The Alexa+ integration: an MCP server on the official Python SDK (`mcp` 2.3). Streamable HTTP at `/mcp`, plus the care engine thread, vision and the Ring webhook. |
-| `simulator/` | A simulated Alexa+: two Echo devices and a Ring doorbell, each Echo with its own MCP session and bearer token, an Amazon Nova tool-use agent, an MCP Apps host (published on its own as [mcp-apps-lite-host](https://github.com/Dakshhhhh-ops/mcp-apps-lite-host)), live announcement delivery, a time-lapse clock and a protocol inspector. |
-| `samples/` | Demo photos (three prescription bottles, an over-the-counter ibuprofen bottle, an after-visit summary) and their generator. All names are fictional. |
-| `skills/nova-care/` | An Agent Skill that teaches any agent how to run Nova conversations well. |
+| `nova_server/` | The Alexa+ integration. An MCP server on the official Python SDK (`mcp` 2.3) with Streamable HTTP at `/mcp`, an OAuth 2.1 authorization server, the care engine, the insight engine, vision, and the Ring Partner API client and webhook. |
+| `simulator/` | A simulated Alexa+: two Echo Shows and a Ring doorbell. Each Echo has its own MCP session and per-person token, an agent loop on Amazon Nova, an MCP Apps host, live announcement delivery, and a protocol inspector. |
+| `simulator/static/site/` | The story page, with Three.js scenes. |
+| `samples/` | Demo images (prescription bottles, an over-the-counter bottle, an after-visit summary) and their generator. |
+| `skills/nova-care/` | An Agent Skill that teaches agents how to run Nova conversations. |
 
-### MCP features used
-- **Streamable HTTP**; negotiates **2026-07-28** and serves **2025-11-25** clients (what Alexa+ speaks today; verified with an `initialize` against the Docker image).
-- **Account linking with OAuth 2.1**: protected-resource metadata (RFC 9728), authorization-server metadata (RFC 8414), dynamic client registration (RFC 7591), PKCE, refresh-token rotation and revocation. The `/link` page is where a person says who they are in the circle (Login with Amazon or Cognito in production). Identity comes from the token, so the same tool answers differently for Rose and Maya. Demo bearer tokens still work for the simulator.
-- **Structured output** with an `outputSchema` on every tool; each result carries a `speech` line written for TTS.
-- **Tool annotations** and **icons**.
-- **MCP Apps** (`io.modelcontextprotocol/ui`): five `ui://` views (today, briefing, visit brief, pill check, reconciliation) that render on the Echo Show screens and call tools back through the host. Camera-only tools use `_meta.ui.visibility: ["app"]` so the model never sees them.
-- **Elicitation** for consent through SDK resolvers: an `InputRequiredResult` round trip on 2026-07-28, or `elicitation/create` on 2025-11-25.
-- **Resources as a delivery queue**: `nova://announcements` is how Nova speaks first (on Alexa+ this maps to proactive notifications), alongside `nova://circle` and `nova://timeline`. **Prompts**: `morning_checkin`, `caregiver_briefing`.
+![How it works: the Echo Show and the layers behind it](docs/img/how-it-works.jpg)
 
-### How Amazon Nova is used (AWS Builder)
-- **Simulated Alexa+ brain** (`simulator/agent.py`): the tool-use loop on the **Bedrock Converse API** with Amazon Nova (default `*.amazon.nova-2-lite-v1:0`, region-aware, falling back to Nova Lite and Micro).
-- **Vision** (`nova_server/vision.py`, `llm.vision_json`): Amazon Nova reads pill-bottle labels and after-visit summaries (Converse image blocks). The reconciliation after it is deterministic.
-- **Language** (`nova_server/insights.py`): the spoken caregiver briefing, structured extraction from free-form check-ins, answers grounded only in the care notes, and doctor-visit briefs.
-- **Amazon Polly** (generative voice) speaks replies and announcements.
-- Request shapes are validated against the botocore API model in tests (`tests/test_bedrock_shape.py`).
-- **Graceful degradation:** without AWS, Nova falls back to a local Ollama model (`qwen3:8b`, and `qwen3-vl` for vision), then to deterministic rules and sample-photo fixtures. The demo never breaks.
+Sequence diagrams for a voice turn, the escalation ladder, consent by elicitation, photo-to-plan reconciliation, account linking and the Ring integration are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Run it
+## Integrations
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+### Alexa+ (Model Context Protocol)
+- **Streamable HTTP**, negotiating MCP **2026-07-28** and serving **2025-11-25** clients.
+- **Account linking with OAuth 2.1**: protected-resource metadata (RFC 9728), authorization-server metadata (RFC 8414), dynamic client registration (RFC 7591), PKCE, refresh-token rotation and revocation. Identity comes from the token, so the same tool answers differently for Rose and for Maya.
+- **MCP Apps** (`io.modelcontextprotocol/ui`): five `ui://` views (today, briefing, visit brief, pill check, reconciliation) render on the Echo Show screens and call tools back through the host. Camera-only tools are hidden from the model with `_meta.ui.visibility: ["app"]`.
+- **Elicitation** for consent, through SDK resolvers, and only when the client supports it.
+- **Structured output** with an `outputSchema` on every tool, a short `speech` line for voice and `more` for *"tell me more"*.
+- **Resources as a delivery queue**: `nova://announcements` is how Nova speaks first (proactive notifications on Alexa+).
+
+### Amazon Nova on Amazon Bedrock
+- **Agent loop** (`simulator/agent.py`): tool use through the Bedrock Converse API (Amazon Nova 2 Lite by default, with region-aware inference profiles and Nova Lite and Micro as fallbacks). When a tool returns a ready-to-speak line, the agent speaks it without a second model call.
+- **Vision** (`nova_server/vision.py`): Amazon Nova reads pill-bottle labels and after-visit summaries. The reconciliation that follows is deterministic.
+- **Language** (`nova_server/insights.py`): the caregiver briefing, structured check-in extraction, answers grounded only in the care notes, and visit briefs.
+- **Resilience**: a throttled or unavailable Bedrock falls back per turn (a local Ollama model, then a deterministic router) and is retried in the background, so Amazon Nova takes over again without a restart.
+
+### Ring Partner API
+- **API client** (`nova_server/ring_api.py`): `GET /v1/users/me`, `/v1/devices`, `/v1/devices/{id}/status`, `/v1/devices/{id}/capabilities` and `/v1/history/devices/{id}/events?event_types=ding,motion.human`, following the `page[key]` cursor. Nova asks only for doorbell presses and people at the door, and stores no Ring email or address.
+- **Webhooks** (`/integrations/ring/webhook`): Webhook v1.1 events, with the `X-Signature` HMAC-SHA256 verified over the raw body before parsing, deduplication by `meta.request_id`, and an immediate `200`.
+- In the live demo, **Front door → Sync from Ring** shows each Ring API call with its status, labelled **Live** or **Recorded**.
+
+### Amazon Polly
+Generative voices speak every reply and announcement in the simulator, and narrate the demo video.
+
+## Getting started
+
+**Requirements:** Python 3.12+, [uv](https://docs.astral.sh/uv/), and Chrome (for the microphone and camera). AWS credentials are optional.
 
 ```bash
 git clone https://github.com/Dakshhhhh-ops/nova && cd nova
 uv sync
-cp .env.example .env        # AWS_REGION, NOVA_LLM, NOVA_MODEL_ID (optional)
+cp .env.example .env
 
-# one command: MCP server + simulator, opens the browser (picks free ports if 8765/8080 are taken)
-uv run python run.py
-
-# or separately
-uv run python -m nova_server      # http://127.0.0.1:8765/mcp
-uv run python -m simulator        # http://127.0.0.1:8080
+uv run python run.py          # MCP server + simulator; opens the browser
 ```
 
-Open the simulator in Chrome (for the microphone and camera). Try:
-1. **Reset demo**, then jump the clock to **5:55 PM** at **300×** and watch the reminder ladder reach Maya.
-2. Rose: **Show Alexa** → a sample bottle (or your webcam).
-3. Maya: **Scan paperwork** → the after-visit summary → **Approve**. Then Rose shows the old lisinopril bottle.
-4. Ring: **Grace arrives**.
+Or run the two processes separately:
 
-**Which brain?** `NOVA_LLM=auto` (default) uses Amazon Bedrock when your AWS credentials work; otherwise a local Ollama model; otherwise a deterministic offline router. The active brain is shown in the top bar. `NOVA_CLOCK=08:20` starts the household clock at a given time.
+```bash
+uv run python -m nova_server  # MCP server   http://127.0.0.1:8765/mcp
+uv run python -m simulator    # simulator    http://127.0.0.1:8080  (story at /, live demo at /live)
+```
+
+### A five-minute walkthrough
+1. Open **/live** and press **Reset**.
+2. **Rose:** **Show Alexa → Ibuprofen**. Nova reads the label and stops her, citing her doctor's notes.
+3. **Maya:** *"How's Mom doing?"*, then *"Tell me more."*
+4. **Front door → Grace arrives.** The aide gets her checklist and the family is told.
+5. **Maya:** **Scan paperwork → after-visit summary → Approve.** Then Rose shows the old lisinopril bottle.
+6. Drag the sun to just before 6 PM and press **Fast-forward** to watch the reminder escalate to Maya.
+
+### Connect an MCP client
+- **MCP Inspector:** `npx @modelcontextprotocol/inspector`, URL `http://127.0.0.1:8765/mcp`. Use its OAuth flow (Nova's account-linking page opens), or send the header `Authorization: Bearer nova-demo-maya` (also `nova-demo-rose`, `nova-demo-leo` and `nova-demo-grace`).
+- **stdio clients:** `uv run python -m nova_server --stdio --as rose`.
 
 ### Deploy
-- **Render** (what the live link uses): `render.yaml` is a one-click Blueprint. It runs `serve.py`, which serves the story page, the live demo and the MCP server on one port and reads the public URL from Render.
-- **Any container host / AWS App Runner:** `docker build -t nova .` then run with `PORT` and `NOVA_PUBLIC_URL=https://your.host` (the OAuth metadata and allowed hosts use it). Add AWS credentials or an instance role for Amazon Nova and Polly.
+- **Render:** `render.yaml` is a one-click Blueprint. `serve.py` serves the story page, the live demo and the MCP server on one port.
+- **Containers:** `docker build -t nova .`, then run with `PORT` and `NOVA_PUBLIC_URL=https://your.host`. Add AWS credentials or an instance role for Amazon Nova and Polly.
 
-### Connect other MCP clients
-- **MCP Inspector**: `npx @modelcontextprotocol/inspector`, URL `http://127.0.0.1:8765/mcp` (or the live `https://nova-6kte.onrender.com/mcp`). Either run its OAuth flow (it registers itself and opens Nova's account-linking page), or set the header `Authorization: Bearer nova-demo-maya` (or `nova-demo-rose`, `nova-demo-leo`, `nova-demo-grace`).
-- **stdio** (Claude Desktop, Kiro, Claude Code): `uv run python -m nova_server --stdio --as rose`.
-- **Docker**: `docker build -t nova-mcp . && docker run -p 8765:8765 -e NOVA_PUBLIC_URL=https://your.host nova-mcp`.
+## Configuration
 
-### Record the demo video
-```bash
-uv run --with playwright --with imageio-ffmpeg --with boto3 python scripts/record_demo.py --url http://127.0.0.1:8080
-```
-It drives the story in real Chrome, captures Alexa's spoken replies, adds an Amazon Polly narrator, and writes `demo/nova-demo.mp4` (under 3 minutes).
+All settings are environment variables (see [.env.example](.env.example)).
 
-### Tests
-```bash
-uv run pytest -q
-```
-68 tests cover:
-- the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
-- the Ring Partner API client against recorded-shape responses (required headers, pagination, 401/429/503 handling, dedupe, fresh vs backfilled events, minimum-necessary event types) and Ring webhooks (signature check, dedupe, event mapping, visitor matched from the calendar), live message delivery;
-- pill checks (wrong time, already taken, outdated strength, a drug the doctor said to avoid), reconciliation and approval;
-- BP limits read from the doctor's notes, the dizziness insight with its BP evidence;
-- privacy, grounded answers, red flags, Bedrock request shapes, and Amazon Nova taking over again by itself once a throttled quota resets;
-- a real Streamable HTTP round trip with bearer auth and a consent elicitation;
-- the full OAuth account-linking flow (discovery, registration, PKCE, linking, token exchange, single-use codes, refresh rotation);
-- the simulator's HTTP API (chat with cards, camera, Ring, clock, notifications, reset) against a real MCP server, and that a model turn speaks the tool's `speech` line without a second model call.
+| Variable | Default | Purpose |
+|---|---|---|
+| `NOVA_LLM` | `auto` | Agent brain: `auto` (Bedrock, then Ollama, then rules), `bedrock`, `ollama` or `rules` |
+| `AWS_REGION` | `us-east-1` | Region for Amazon Bedrock and Polly (standard AWS credential chain) |
+| `NOVA_MODEL_ID` | | Pin a specific Amazon Nova model or inference profile |
+| `NOVA_LLM_RETRY_SECONDS` | `600` | How often an unavailable Bedrock is retried in the background |
+| `RING_ACCESS_TOKEN` | | Ring Developer Playground token (about 30 minutes) |
+| `RING_REFRESH_TOKEN`, `RING_CLIENT_ID`, `RING_CLIENT_SECRET` | | Production Ring account linking |
+| `RING_POLL_SECONDS` | `300` | Event-history backfill interval when Ring is linked |
+| `NOVA_RING_SIGNING_KEY` | | Key Ring signs webhooks with |
+| `NOVA_PUBLIC_URL` | | Public base URL (OAuth metadata and allowed hosts) |
+| `NOVA_CLOCK` | | Start the household clock at a given time, e.g. `08:20` |
+| `NOVA_DEMO` | `1` | Demo-only routes (`/demo/reset`, `/demo/clock`); set `0` in production |
+| `SIMULATOR_PORT` | `8080` | Simulator port |
 
-## Tools
+## MCP reference
+
+**Tools (25)**
 
 | Tool | Who | What |
 |---|---|---|
-| `get_today` (UI) | both | Today's doses (taken/due/missed/upcoming), appointments, unread messages |
-| `log_medication` | both | Log by name, purpose or appearance; double-dose guard |
-| `check_medication` | both | "Did I take…", "what's the pink pill for?" |
+| `get_today` (UI) | both | Today's doses, appointments and unread messages |
+| `log_medication` | both | Log a dose by name, purpose or appearance, with a double-dose guard |
+| `check_medication` | both | "Did I take…?", "What's the pink pill for?" |
 | `daily_checkin` | Rose | Free-form check-in → structured signals, red flags, consent |
-| `log_vitals` | both | Blood pressure by voice, checked against the doctor's limits |
-| `list_appointments` / `get_vitals` | both | "When is my doctor appointment?" (who's driving, where); "What's Mom's blood pressure?" (last reading, average, doctor's range) |
-| `visit_checklist` | aide/family | "What should I do at Rose's today?" (missed doses, symptoms to check, refills to pick up); also sent to Grace when she rings the doorbell |
-| `request_refill` | both | Refill to the pharmacy, with pickup plan; pill supply is tracked automatically |
-| `send_message` / `read_messages` | both | Circle messaging, delivered live as announcements |
+| `log_vitals` / `get_vitals` | both | Blood pressure by voice, checked against the doctor's limits |
+| `list_appointments` | both | Upcoming visits, with who's driving and where |
+| `visit_checklist` | aide, family | What to do at Rose's today; sent to the aide when she arrives |
+| `request_refill` | both | Refill to the pharmacy with a pickup plan |
+| `send_message` / `read_messages` | both | Messages within the circle, delivered live |
 | `read_notifications` / `snooze_reminder` | both | "What are my notifications?", "Remind me in 10 minutes" |
-| `ask_care_notes` | both | Grounded answers from doctors' notes, with sources |
+| `ask_care_notes` | both | Answers grounded in the doctors' notes, with sources |
 | `get_help` | Rose | Alert the whole circle now |
-| `care_briefing` (UI) | family | Status, adherence, BP and mood trends, insights with evidence, alerts |
+| `care_briefing` (UI) | family | Status, adherence, trends, insights with evidence, alerts |
 | `prepare_visit` (UI) | both | Doctor-visit brief with questions to ask |
-| `recent_activity` | family | Front door (Ring), doses and check-ins over the last hours |
-| `check_pill_photo` (UI, camera) | Rose | Amazon Nova reads the bottle; right pill, right time, right strength? |
+| `recent_activity` | family | Front door (Ring), doses and check-ins |
+| `check_pill_photo` (UI, camera) | Rose | Amazon Nova reads the bottle and Nova checks it |
 | `read_care_document` (UI, camera) | family | Amazon Nova reads the paperwork; reconciliation proposal |
-| `apply_care_changes` | family | Approve or discard the proposed changes |
-| `list_alerts` / `resolve_alert` | family | Open alerts, mark handled |
-| `set_sharing` | Rose | Privacy: what the circle can see |
+| `apply_care_changes` | family | Approve or discard proposed plan changes |
+| `list_alerts` / `resolve_alert` | family | Open alerts; mark one handled |
+| `set_sharing` | Rose | What the circle can see |
 | `acknowledge_notification` (app only) | both | Device screens acknowledge announcements |
 
-## Running it for real: health data
-Nova handles protected health information (medications, symptoms, blood pressure), so a real deployment is a HIPAA project, not just a hosting choice. The demo uses a fictional household and is **not** a HIPAA deployment as it stands. Here is what changes for a care organization running it:
+**Resources:** `nova://announcements`, `nova://circle`, `nova://timeline`, and the five `ui://nova/*` views. **Prompts:** `morning_checkin`, `caregiver_briefing`.
 
-- **Who signs what.** The home-care agency, health plan or pharmacy runs Nova in its own AWS account and signs a **Business Associate Addendum (BAA) with AWS** (through AWS Artifact). Families link their Alexa accounts to that organization's Nova.
-- **Only HIPAA-eligible services.** Amazon Bedrock (and Bedrock AgentCore) and Amazon Polly are on AWS's HIPAA Eligible Services list, and compute and storage come from the same list (for example Amazon ECS and Amazon RDS). Amazon Bedrock doesn't store prompts and completions or use them to train models.
-- **Encryption everywhere.** TLS on every hop (Alexa+ → Nova is MCP over HTTPS). SQLite is replaced by Amazon RDS encrypted with AWS KMS, with encrypted backups.
-- **Minimum necessary, already in the design.** Identity comes from the token, never from speech. Caregivers see only the categories Rose shares (`set_sharing`, which only she can change). Nova asks before telling the family about a symptom. Plan changes need a person's approval. Every dose, alert and change records who did it (`logged_by`, `handled_by`, `created_by`); production adds a full access log.
-- **Voice in a shared room.** Spoken lines stay short and general; the details go on the screen or behind "tell me more". In production, caregiver devices would require an Alexa voice profile or PIN before health details.
-- **Retention and exit.** Data is kept for the care relationship. Unlinking the account revokes Nova's tokens (OAuth revocation is already implemented), and the organization can export or delete a household's data on request.
-- **Not a medical device.** Nova doesn't diagnose or change treatment. It relays the care team's own instructions, shows its evidence, and asks a person to approve plan changes, so it stays a care-coordination tool.
-- **Who pays.** The organization that owns the care relationship licenses Nova per household (home-care agencies, Medicare Advantage and Part D plans scored on adherence, pharmacies). Families pay nothing extra.
+## Testing
 
-## Safety and privacy
-- **No diagnosis, no new medical advice.** Medication and symptom answers come from the care team's own notes, with sources. Plan changes need a person's approval.
-- **The older adult is in charge.** Consent before sharing symptoms; per-category sharing only she can change.
-- **Emergencies are not gated.** Falls, chest pain, breathing trouble and stroke signs alert everyone and tell her to call 911.
-- **Identity comes from the token**, never from what someone says. The Ring webhook verifies Ring's HMAC-SHA256 signature over the raw body before parsing it.
-- The household, names, pharmacy and hospital in the demo are fictional.
+```bash
+uv run pytest -q
+```
+
+68 tests run in CI on every push. They cover:
+- the care engine (the escalation ladder, snooze, check-ins and wellness checks);
+- pill checks and reconciliation;
+- the dizziness insight and its evidence, BP limits, privacy, grounded answers and red flags;
+- a real Streamable HTTP session with bearer auth and elicitation, and the full OAuth 2.1 account-linking flow;
+- the Ring API client against recorded responses, and the Ring webhooks (signature, dedupe, event mapping);
+- Bedrock request shapes against the botocore model, and Amazon Nova recovering by itself after throttling;
+- the simulator's HTTP API end to end.
+
+## Security, privacy and compliance
+
+- **No diagnosis.** Answers about medications and symptoms come from the care team's own notes, with sources. Plan changes need a person's approval.
+- **The older adult is in charge.** Rose is asked before her family hears about a symptom, and only she can change what's shared.
+- **Emergencies are never gated.** Falls, chest pain, breathing trouble and stroke signs alert everyone and tell her to call 911.
+- **Identity comes from the token**, never from speech. Ring webhooks are verified before they're parsed.
+- **Minimum necessary.** Nova requests only the Ring events it needs, keeps spoken replies general, and puts details on screen or behind "tell me more".
+
+**Running Nova with real health data** makes it a HIPAA project. The operator (a home-care agency, health plan or pharmacy) runs Nova in its own AWS account under a Business Associate Addendum and uses HIPAA-eligible services only: Amazon Bedrock, Amazon Polly, Amazon ECS and Amazon RDS encrypted with AWS KMS, with TLS on every hop and an access log. Unlinking an account revokes Nova's tokens. The demo household, people, pharmacy and clinic are fictional, and this repository is not a HIPAA deployment as it stands.
+
+## Project structure
+
+```
+nova/
+├── nova_server/        MCP server: tools, OAuth, care engine, insights, vision, Ring
+│   └── views/          MCP Apps views (ui://nova/*)
+├── simulator/          Simulated Alexa+: agent loop, MCP Apps host, devices
+│   └── static/         Live demo (/live) and story page (site/)
+├── samples/            Demo images and fixtures
+├── skills/nova-care/   Agent Skill
+├── scripts/            Demo-video recorder, UI checks
+├── tests/              pytest suite (68 tests)
+├── docs/               Architecture, design, demo script, submission notes
+├── serve.py            Single-port server for deployment
+└── run.py              Local launcher
+```
 
 ## Roadmap
-- Production account linking (Login with Amazon or Amazon Cognito) and deployment on Amazon Bedrock AgentCore Runtime.
-- Ring account linking in production (OAuth refresh tokens per household) and registering the webhook URL in the Ring Developer Portal. Alexa proactive notifications for announcements.
-- Amazon Nova Sonic for full-duplex voice; Fire TV ambient cards in the living room.
+
+- Production account linking with Login with Amazon or Amazon Cognito, and deployment on Amazon Bedrock AgentCore Runtime.
+- Per-household Ring account linking and a registered webhook endpoint.
+- Alexa proactive notifications for announcements.
+- Amazon Nova Sonic for full-duplex voice, and ambient cards on Fire TV.
 
 ## License
-MIT. See [LICENSE](LICENSE).
+
+[MIT](LICENSE). Built for the Amazon Developer *Build, Ship, Shape* hackathon. The open-source MCP Apps host used by the simulator is published separately as [mcp-apps-lite-host](https://github.com/Dakshhhhh-ops/mcp-apps-lite-host).

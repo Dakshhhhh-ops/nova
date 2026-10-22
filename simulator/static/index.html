@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nova · Catches medication mistakes before they happen</title>
-<meta name="description" content="Nova links Rose's Echo, Maya's Echo and the Ring at the front door into one care circle on Alexa+. It catches medication mistakes before they happen and connects the dots, like a dose change and new dizziness.">
+<meta name="description" content="Nova connects Rose's Echo, her daughter's Echo and her Ring doorbell into one care circle on Alexa+. It catches medication mistakes before they happen.">
 <meta name="theme-color" content="#0A0B10">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%233BD1FF' stroke-width='3' stroke-dasharray='15 2.3'/%3E%3Ccircle cx='16' cy='16' r='4.2' fill='%233BD1FF'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -127,7 +127,7 @@
       <header class="sec-head">
         <span class="sec-index mono">02 — The circle</span>
         <h2 class="display" data-split>Today in the <em>circle</em></h2>
-        <p class="sec-lede">Doses, check-ins, messages, the front door and everything Nova said first. Drag the strip, or keep scrolling.</p>
+        <p class="sec-lede">Doses, check-ins, messages, front-door events and every announcement Nova made.</p>
       </header>
       <div class="rail" id="rail">
         <div class="rail-track" id="circleList"></div>
@@ -141,7 +141,7 @@
     <header class="sec-head">
       <span class="sec-index mono">03 — Under the hood</span>
       <h2 class="display" data-split>Under the <em>hood</em></h2>
-      <p class="sec-lede">Every turn is a real agent loop on Amazon Nova, calling a real MCP server over Streamable HTTP. Watch it happen.</p>
+      <p class="sec-lede">Each turn runs the Alexa+ agent loop, which calls the Nova MCP server over Streamable HTTP. The trace shows every step.</p>
     </header>
     <div class="hood-grid">
       <ol class="flow" id="flow">
@@ -158,12 +158,12 @@
           <button class="text-btn small" id="clearTrace" type="button">Clear</button>
         </div>
         <div class="trace-scroll" id="tracePane" data-lenis-prevent>
-          <p class="trace-empty" id="traceEmpty">Talk to either Echo Show, drag a bottle onto Rose's, or scrub the sun. Every model step, tool call and proactive message lands here.</p>
+          <p class="trace-empty" id="traceEmpty">Talk to either Echo Show, show Rose's Echo a pill bottle, or move the clock. Every model step, tool call and announcement appears here.</p>
           <div class="trace-list" id="traceList"></div>
         </div>
       </div></div>
     </div>
-    <footer class="page-foot"><p class="foot-line">Nova links Rose's Echo, Maya's Echo and the Ring at the front door into one care circle on Alexa+. It catches medication mistakes before they happen and connects the dots, like a dose change and new dizziness.</p><span class="mono">Nova · Echo Show · Amazon Nova · MCP</span></footer>
+    <footer class="page-foot"><p class="foot-line">Nova connects Rose's Echo, her daughter's Echo and her Ring doorbell into one care circle on Alexa+. It catches medication mistakes before they happen.</p><span class="mono">Alexa+ · Amazon Nova · Ring · MCP</span></footer>
   </section>
 </main>
 
@@ -180,8 +180,7 @@
 <!-- Retro-tech HUD around the frame -->
 <div class="hud" id="hud" aria-hidden="true">
   <i class="hud-c tl"></i><i class="hud-c tr"></i><i class="hud-c bl"></i><i class="hud-c br"></i>
-  <div class="hud-l bl-txt mono"><span class="rec"><i></i>Live</span><span>TC <b id="hudTc">00:00:00:00</b></span></div>
-  <div class="hud-l br-txt mono"><span>39.96° N · 83.00° W</span></div>
+  <div class="hud-l bl-txt mono"><span class="rec"><i></i>Live</span></div>
 </div>
 
 <div class="grain" aria-hidden="true"></div>

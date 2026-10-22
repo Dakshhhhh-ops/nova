@@ -654,9 +654,13 @@ code { font-family: var(--mono); font-size: .86em; }
 /* ============ RESPONSIVE ============ */
 @media (min-width: 1180px) {
   .nav-links { display: flex; gap: 28px; justify-self: end; margin-right: 150px; grid-column: 3; grid-row: 1; }
-  .nav-links a { position: relative; opacity: .7; transition: opacity .3s; }
+  .nav-links a { position: relative; opacity: .7; transition: opacity .3s; white-space: nowrap; }
   .nav-links a:hover { opacity: 1; }
   .btn-nav { grid-column: 3; grid-row: 1; }
+}
+/* the live clock in the nav yields to the section links on narrower desktops */
+@media (min-width: 1180px) and (max-width: 1599px) {
+  .nav-meta { display: none; }
 }
 @media (max-width: 1100px) {
   .hero-grid { grid-template-columns: 1fr; gap: 0; }

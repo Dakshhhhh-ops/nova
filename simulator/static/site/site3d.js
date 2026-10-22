@@ -333,8 +333,8 @@ function frameHud() {
   };
   gsap.ticker.add(tick);
   cleanups.push(() => gsap.ticker.remove(tick));
-  const CH = [['.hero', 'CH 00 · Kitchen'], ['#day', 'CH 01 · A day'], ['#dots', 'CH 02 · The dots'], ['#sees', 'CH 03 · It sees'],
-    ['#build', 'CH 04 · Under the hood'], ['#meet', 'CH 05 · Meet Nova']].map(([sel, label]) => [$(sel), label]).filter((x) => x[0]);
+  const CH = [['.hero', '00 · Kitchen'], ['#day', '01 · A day'], ['#dots', '02 · Insights'], ['#sees', '03 · Vision'],
+    ['#build', '04 · How it works'], ['#meet', '05 · Meet Nova']].map(([sel, label]) => [$(sel), label]).filter((x) => x[0]);
   let lastCh = 0, curCh = '';
   const chTick = () => {
     const now = performance.now();

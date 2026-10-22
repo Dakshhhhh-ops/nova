@@ -1088,7 +1088,7 @@ class Device {
     this.ui.visionBtn.title = this.visionKind === "pill" ? "Show Alexa a pill bottle" : "Scan paperwork";
     this.ui.visionBtn.setAttribute("aria-label", this.ui.visionBtn.title);
     this.ui.backTitle.textContent = `Under the hood · ${this.shortName}`;
-    this.ui.dropHint.textContent = this.visionKind === "pill" ? `Drop to show ${this.shortName}'s Alexa` : "Drop to scan";
+    this.ui.dropHint.textContent = this.visionKind === "pill" ? `Drop to show ${this.shortName}'s Echo` : "Drop to scan";
 
     const room = String(p.device || "").split("·")[1]?.trim();
     const city = String(p.location || "").split(",")[0].trim();

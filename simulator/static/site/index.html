@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nova · Care that speaks first</title>
-<meta name="description" content="Nova catches medication mistakes before they happen and connects the dots, like a dose change and new dizziness, across Rose's Echo, Maya's Echo and the Ring at her front door. An MCP server for Alexa+ with Amazon Nova on Amazon Bedrock.">
+<meta name="description" content="Nova catches medication mistakes before they happen and spots the patterns a family would miss, like a dose change followed by new dizziness. It connects Rose's Echo, her daughter's Echo and the Ring doorbell at her front door. An MCP server for Alexa+ with Amazon Nova on Amazon Bedrock.">
 <meta name="theme-color" content="#0A0B10">
 <meta property="og:title" content="Nova · Care that speaks first">
 <meta property="og:description" content="Catches medication mistakes before they happen. Built for Alexa+ on MCP and Amazon Nova.">
@@ -81,8 +81,7 @@
 <div class="cursor" aria-hidden="true"><div class="cursor-ring"><span class="cursor-label"></span></div><div class="cursor-dot"></div></div>
 <div class="grain" aria-hidden="true"></div>
 <div class="hud" aria-hidden="true">
-  <p class="hud-c hud-bl mono"><span class="hud-rec"></span>Source: Alexa+ <span class="sep">/</span> <span data-hud-ch>CH 00 · Kitchen</span></p>
-  <p class="hud-c hud-br mono">Nova v1 <span class="sep">/</span> TC <span data-hud-tc>00:00:00:00</span></p>
+  <p class="hud-c hud-bl mono"><span class="hud-rec"></span><span data-hud-ch>00 · Kitchen</span></p>
 </div>
 
 <!-- ============ NAV ============ -->
@@ -94,9 +93,9 @@
   <p class="nav-meta mono" aria-label="Rose's local time"><span class="live-dot" aria-hidden="true"></span>Rose's kitchen <span class="sep">/</span> Columbus, OH <span class="sep">/</span> <time data-clock>--:--</time></p>
   <nav class="nav-links mono" aria-label="Sections">
     <a href="#day">A day</a>
-    <a href="#dots">The dots</a>
-    <a href="#sees">It sees</a>
-    <a href="#build">Build</a>
+    <a href="#dots">Insights</a>
+    <a href="#sees">Vision</a>
+    <a href="#build">How it works</a>
   </nav>
   <a class="btn btn-nav magnetic" href="/live" data-cursor="Live"><span class="btn-label">Live demo</span><span class="btn-arrow" aria-hidden="true">&#8599;</span></a>
 </header>
@@ -117,12 +116,12 @@
         <span class="line"><span class="line-in">Care that</span></span>
         <span class="line"><span class="line-in">speaks <em>first</em>.</span></span>
       </h1>
-      <p class="hero-lede reveal-up">Nova catches medication mistakes before they happen and connects the dots, like a dose change and new dizziness, across Rose's Echo, Maya's Echo and the Ring at her front door.</p>
+      <p class="hero-lede reveal-up">Nova catches medication mistakes before they happen and spots the patterns a family would miss, like a dose change followed by new dizziness. It connects Rose's Echo, her daughter's Echo and the Ring doorbell at her front door.</p>
       <div class="hero-ctas reveal-up">
-        <a class="btn btn-primary magnetic" href="/live" data-cursor="Enter"><span class="btn-fill" aria-hidden="true"></span><span class="btn-label">Enter the live demo</span><span class="btn-arrow" aria-hidden="true">&#8594;</span></a>
+        <a class="btn btn-primary magnetic" href="/live" data-cursor="Enter"><span class="btn-fill" aria-hidden="true"></span><span class="btn-label">Try the live demo</span><span class="btn-arrow" aria-hidden="true">&#8594;</span></a>
         <a class="link-u mono" href="#day">See a day with Nova</a>
       </div>
-      <p class="hero-stats mono reveal-up">53M unpaid family caregivers in the U.S. (AARP, 2020) <span class="sep">·</span> 1 in 4 adults over 65 falls each year (CDC)</p>
+      <p class="hero-stats mono reveal-up">53 million unpaid family caregivers in the U.S. (AARP, 2020)</p>
     </div>
 
     <figure class="hero-device" aria-label="Rose's Echo Show 8 on the kitchen counter, showing Nova's 6 PM reminder">
@@ -187,9 +186,7 @@
   </div>
 
   <div class="hero-foot wrap mono" aria-hidden="true">
-    <span>(00)</span>
     <span class="scroll-cue"><span>Scroll</span><i></i></span>
-    <span>Build, Ship, Shape · Alexa+ track</span>
   </div>
 </section>
 
@@ -200,7 +197,7 @@
     <div class="gl-day-hud wrap mono" aria-hidden="true">
       <span class="gdh-l"><span class="idx">01</span> A day with Nova</span>
       <span class="gdh-clock" data-gl-clock>7:55 AM</span>
-      <span class="gdh-r"><span class="gdh-hint">Scroll, drag the cards or the clock, or use the arrow keys</span></span>
+      <span class="gdh-r"><span class="gdh-hint">Scroll or drag to move through the day</span></span>
     </div>
     <button type="button" class="gl-sun" aria-label="Drag to change the time of day" data-cursor="Drag"><span class="mono">Drag the sun</span></button>
     <div class="day-sky" aria-hidden="true">
@@ -240,7 +237,7 @@
       <ol class="day-track" role="list">
         <li class="moment moment-intro" data-hour="7.75">
           <h2 class="display" id="day-title">From the first pill to the <em>Sunday digest</em>.</h2>
-          <p class="mi-copy">Nova runs on the household clock. It doesn't wait to be asked: it reminds, follows up, and only then tells the family. Scroll or drag to move through the day.</p>
+          <p class="mi-copy">Nova runs on the household's clock. It reminds, follows up, and brings in the family only when it needs to.</p>
           <p class="mi-hint mono"><svg viewBox="0 0 24 12" aria-hidden="true"><path d="M1 6h22M5 2 1 6l4 4M19 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>Drag</p>
         </li>
 
@@ -253,7 +250,7 @@
 
         <li class="moment moment-wide" data-hour="8.1" data-tod="dawn" data-tone="amber">
           <div class="m-time"><span class="m-hm">8:06</span><span class="m-ap mono">AM</span></div>
-          <p class="m-tag mono"><span class="m-ring"></span>It sees · Amazon Nova vision</p>
+          <p class="m-tag mono"><span class="m-ring"></span>Vision · Amazon Nova</p>
           <p class="m-context">Rose's knee hurts. She holds the ibuprofen up to the camera.</p>
           <blockquote class="m-quote">&#8220;Please don't take ibuprofen, Rose&#8230;&#8221;</blockquote>
           <ul class="m-evidence mono">
@@ -273,7 +270,7 @@
         <li class="moment moment-wide" data-hour="10.03" data-tod="day" data-tone="amber">
           <div class="m-time"><span class="m-hm">10:02</span><span class="m-ap mono">AM</span></div>
           <p class="m-tag mono"><span class="m-ring"></span>Ring doorbell · Maya's Echo Show 15</p>
-          <p class="m-context">Ring Partner API webhooks, signature-verified. A doorbell press near Grace's 10:00 visit is Grace, so she gets her visit checklist.</p>
+          <p class="m-context">Ring Partner API. A doorbell press at the time of Grace's 10:00 visit tells Nova the home aide has arrived, and Grace gets her visit checklist.</p>
           <blockquote class="m-quote">&#8220;Grace arrived at Mom's at 10:02.&#8221;</blockquote>
           <ul class="m-evidence mono">
             <li><span>10:00</span>&#8220;Rose, you have about 3 days of Metformin left. Want me to order a refill?&#8221;</li>
@@ -283,7 +280,7 @@
 
         <li class="moment moment-alert" data-hour="19.5" data-tod="dusk" data-tone="amber">
           <div class="m-time"><span class="m-hm">7:30</span><span class="m-ap mono">PM</span></div>
-          <p class="m-tag mono"><span class="m-ring"></span>After 90 minutes · Maya's Echo glows yellow</p>
+          <p class="m-tag mono"><span class="m-ring"></span>Escalation · Maya's Echo Show 15</p>
           <blockquote class="m-quote">&#8220;Mom hasn't taken her 6 PM Metformin. I reminded her at 6 PM and 6:30 PM.&#8221;</blockquote>
           <p class="m-ladder mono"><b class="done">6:00</b><i class="on"></i><b class="done">6:30</b><i class="on"></i><b class="on amber">7:30</b></p>
         </li>
@@ -308,7 +305,7 @@
 <section class="dots" id="dots" data-theme="dark" aria-labelledby="dots-title">
   <div class="dots-pin">
     <div class="wrap dots-head">
-      <div class="sec-head"><span class="idx mono">02</span><span class="hair"></span><span class="mono">It connects the dots</span></div>
+      <div class="sec-head"><span class="idx mono">02</span><span class="hair"></span><span class="mono">Insights</span></div>
       <h2 class="display sec-title-s" id="dots-title">One signal is noise. Four is a <em>pattern</em>.</h2>
       <p class="dots-lede">No single signal is alarming. Together, they're worth a call.</p>
     </div>
@@ -446,7 +443,7 @@
           <li><span class="mono">Aide</span>Grace saw her unsteady getting up, Oct 19</li>
           <li><span class="mono">Notes</span>Dr. Patel's notes say to call about dizziness: 614-555-0190</li>
         </ul>
-        <p class="in-foot mono">Deterministic rules find it. Amazon Nova writes the words. Nova never diagnoses.</p>
+        <p class="in-foot mono">Found by tested, deterministic rules. Worded by Amazon Nova. Nova never diagnoses.</p>
       </article>
     </div>
   </div>
@@ -456,9 +453,9 @@
 <section class="sees" id="sees" data-theme="light" aria-labelledby="sees-title">
   <div class="wrap">
     <div class="sees-head">
-      <div class="sec-head"><span class="idx mono">03</span><span class="hair"></span><span class="mono">It sees · Amazon Nova multimodal</span></div>
+      <div class="sec-head"><span class="idx mono">03</span><span class="hair"></span><span class="mono">Vision · Amazon Nova multimodal</span></div>
       <h2 class="display sec-title-s" id="sees-title"><span class="line"><span class="line-in">It sees what's in her <em>hand</em>.</span></span></h2>
-      <p class="sees-lede">Rose's knee hurts and she reaches for ibuprofen. She holds the bottle up to her Echo Show: Amazon Nova reads the label, and Nova checks it against her plan and her doctors' own notes.</p>
+      <p class="sees-lede">Rose's knee hurts and she reaches for ibuprofen. She holds the bottle up to her Echo Show. Amazon Nova reads the label, and Nova checks it against her medication plan and her doctor's notes.</p>
     </div>
 
     <div class="lab">
@@ -540,7 +537,7 @@
         </div>
       <div class="lab-notes">
         <p class="lab-context mono">It's 6:02 PM · Plan after Dr. Patel's visit: Lisinopril 10 mg</p>
-            <p class="sees-more mono">Also reads paperwork: Maya photographs the after-visit summary, Nova proposes the changes, and nothing changes until a person approves. <a class="link-u" href="/live">Try it in the live demo &#8594;</a></p>
+            <p class="sees-more mono">It reads paperwork too. When Maya photographs an after-visit summary, Nova proposes the plan changes and applies nothing until someone approves. <a class="link-u" href="/live">Try it in the live demo &#8594;</a></p>
       </div>
     </div>
   </div>
@@ -580,9 +577,9 @@
   <div class="build-pin">
     <div class="gl-host gl-build" aria-hidden="true"></div>
     <div class="wrap build-head">
-      <div class="sec-head"><span class="idx mono">04</span><span class="hair"></span><span class="mono">Under the hood</span></div>
+      <div class="sec-head"><span class="idx mono">04</span><span class="hair"></span><span class="mono">How it works</span></div>
       <h2 class="display sec-title-s" id="build-title">Built on Alexa+'s <em>open standard</em>.</h2>
-      <p class="build-lede">Rose's Echo in the kitchen, Maya's Echo in Seattle, the Ring at the front door, and Nova in the cloud: a self-hosted MCP server, the path Alexa+ uses for third-party experiences, with OAuth 2.1 for each person in the circle. The brain is Amazon Nova on Amazon Bedrock.</p>
+      <p class="build-lede">Nova is a self-hosted MCP server, the open standard Alexa+ uses for third-party experiences. Each person in the circle links their own account with OAuth 2.1, and Amazon Nova on Amazon Bedrock does the reasoning.</p>
       <p class="build-nums mono">25&nbsp;tools <span class="sep">·</span> 8&nbsp;resources <span class="sep">·</span> 5&nbsp;MCP&nbsp;Apps&nbsp;views <span class="sep">·</span> 68&nbsp;tests <span class="sep">·</span> OAuth&nbsp;2.1</p>
     </div>
 
@@ -623,7 +620,7 @@
       <li class="layer" data-layer="0"><span class="ly-i mono">L1</span><h3>The screen</h3><p><b class="mono">MCP Apps</b> Five <code>ui://</code> views render on the Echo Show: today, briefing, visit brief, pill check, reconciliation.</p></li>
       <li class="layer" data-layer="1"><span class="ly-i mono">L2</span><h3>Alexa+</h3><p><b class="mono">Agent</b> Calls Nova's tools. In the simulator it runs on Amazon Nova 2 Lite with Bedrock Converse tool use, and Amazon Polly speaks.</p></li>
       <li class="layer" data-layer="2"><span class="ly-i mono">L3</span><h3>MCP</h3><p><b class="mono">Streamable HTTP · OAuth 2.1</b> Account linking with dynamic client registration and PKCE gives each person a token, so the same tool answers Rose and Maya differently. Consent travels as an elicitation.</p></li>
-      <li class="layer" data-layer="3"><span class="ly-i mono">L4</span><h3>Nova server</h3><p><b class="mono">25 tools · 8 resources</b> A care engine on the household clock, an insight engine, vision, refills and signed Ring Partner API webhooks, over SQLite.</p></li>
+      <li class="layer" data-layer="3"><span class="ly-i mono">L4</span><h3>Nova server</h3><p><b class="mono">25 tools · 8 resources</b> A care engine on the household clock, an insight engine, vision, refills, and the Ring Partner API (API calls plus signed webhooks).</p></li>
       <li class="layer" data-layer="4"><span class="ly-i mono">L5</span><h3>Amazon Nova</h3><p><b class="mono">Amazon Bedrock</b> Reads pill bottles and paperwork, writes the briefings. The rules underneath are deterministic and tested.</p></li>
     </ol>
   </div>
@@ -644,7 +641,7 @@
     <h2 class="display cta-title" id="cta-title"><span class="line"><span class="line-in">Meet <em>Nova</em>.</span></span></h2>
     <p class="cta-lede">The whole household runs live in your browser. Reset the demo, jump the clock to 5:55 PM, and watch the reminder find its way to Maya.</p>
     <div class="cta-actions">
-      <a class="btn btn-primary btn-xl magnetic" href="/live" data-cursor="Enter"><span class="btn-fill" aria-hidden="true"></span><span class="btn-label">Enter the live demo</span><span class="btn-arrow" aria-hidden="true">&#8594;</span></a>
+      <a class="btn btn-primary btn-xl magnetic" href="/live" data-cursor="Enter"><span class="btn-fill" aria-hidden="true"></span><span class="btn-label">Try the live demo</span><span class="btn-arrow" aria-hidden="true">&#8594;</span></a>
       <a class="btn btn-ghost-l magnetic" href="https://github.com/Dakshhhhh-ops/nova" target="_blank" rel="noopener" data-cursor="Code"><span class="btn-label">Read the code</span><span class="btn-arrow" aria-hidden="true">&#8599;</span></a>
     </div>
   </div>
@@ -660,8 +657,8 @@
 
 <footer class="foot">
   <div class="wrap foot-inner mono">
-    <p>Built for the Amazon Developer Build, Ship, Shape hackathon · Alexa+ track · The household is fictional.</p>
-    <p>Amazon Nova · Amazon Bedrock · Amazon Polly · Model Context Protocol</p>
+    <p>Built for the Amazon Developer Build, Ship, Shape hackathon. The household in this demo is fictional.</p>
+    <p>Amazon Nova · Amazon Bedrock · Amazon Polly · Ring Partner API · Model Context Protocol</p>
     <a href="#top" class="foot-top">Back to top &#8593;</a>
   </div>
 </footer>

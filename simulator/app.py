@@ -41,7 +41,7 @@ DEVICES = {
         [
             "What's my day look like?",
             "I just took my pink pill",
-            "I'm feeling a bit dizzy this morning and my knee hurts",
+            "I'm feeling a bit dizzy this morning",
             "Any messages for me?",
             "Can I take ibuprofen for my knee?",
             "Tell Maya I loved Lily's recital video",

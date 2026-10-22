@@ -311,8 +311,12 @@ function spaced(ctx, text, x, y, spacing) {
 function frameHud() {
   doc.classList.add('gl-frame');
   if (N.screenFrame) {
-    const f = N.screenFrame(document.body, { bezel: true, glare: true, scanlines: true, grain: true, vignette: true, radius: 26, intensity: 0.9, chin: 40 });
+    // grain comes from the page's own static layer (.grain), so it looks the same before and after WebGL starts
+    const f = N.screenFrame(document.body, { bezel: true, glare: true, scanlines: false, grain: false, vignette: true, radius: 26, intensity: 0.9, chin: 40 });
     cleanups.push(() => f.dispose && f.dispose());
+    // ease the bezel in rather than popping it over a page that's already on screen
+    const fr = document.querySelector('.nova-frame');
+    if (fr) { fr.style.opacity = '0'; requestAnimationFrame(() => { fr.style.transition = 'opacity .9s ease'; fr.style.opacity = '1'; }); }
   }
   const tc = $('[data-hud-tc]'), ch = $('[data-hud-ch]');
   let fmt;

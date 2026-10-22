@@ -67,6 +67,31 @@ def bottle(drug: str, directions: str, prescriber: str, rx: str, filled: str, qt
     img.save(HERE / out, optimize=True)
 
 
+def otc_bottle(out: str) -> None:
+    """A store-brand pain reliever: white bottle, blue label (no pharmacy label, no patient name)."""
+    w, h = 900, 640
+    img = counter_background(w, h)
+    shadow = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(shadow).rounded_rectangle([270, 150, 670, 610], radius=60, fill=110)
+    img.paste((90, 70, 50), mask=shadow.filter(ImageFilter.GaussianBlur(18)))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([300, 60, 600, 150], radius=16, fill=(30, 70, 150))  # cap
+    for x in range(312, 592, 12):
+        d.line([(x, 72), (x, 138)], fill=(45, 90, 175), width=4)
+    d.rounded_rectangle([250, 135, 650, 600], radius=56, fill=(246, 246, 242), outline=(214, 214, 208), width=3)
+    d.rounded_rectangle([268, 150, 318, 580], radius=24, fill=(255, 255, 255))  # highlight
+    d.rectangle([265, 220, 635, 520], fill=(28, 74, 160))
+    d.rectangle([265, 470, 635, 520], fill=(200, 40, 50))
+    y = 236
+    d.text((285, y), "ELM STREET HEALTH", font=font(18, True), fill=(220, 230, 250)); y += 34
+    d.text((285, y), "IBUPROFEN", font=font(46, True), fill=(255, 255, 255)); y += 58
+    d.text((285, y), "TABLETS, 200 MG", font=font(24, True), fill=(255, 255, 255)); y += 36
+    d.text((285, y), "Pain reliever / fever reducer (NSAID)", font=font(17), fill=(220, 230, 250)); y += 28
+    d.text((285, y), "100 COATED TABLETS", font=font(17), fill=(220, 230, 250))
+    d.text((285, 482), "COMPARE TO A NATIONAL BRAND", font=font(15, True), fill=(255, 255, 255))
+    img.save(HERE / out, optimize=True)
+
+
 def visit_summary(out: str) -> None:
     w, h = 1100, 1420
     img = Image.new("RGB", (w, h), (250, 250, 247))
@@ -132,6 +157,10 @@ FIXTURES = {
         "name": "Metformin", "strength": "500 mg", "directions": "Take 1 tablet by mouth twice daily with meals",
         "patient": "Rose Alvarez", "pharmacy": "Elm Street Pharmacy", "prescriber": "Dr. James Moore",
         "label_text": "METFORMIN HCL 500 MG TABLET. TAKE 1 TABLET BY MOUTH TWICE DAILY WITH MEALS", "confidence": 0.96}},
+    "pill-ibuprofen.png": {"kind": "pill", "label": "Ibuprofen (over the counter)", "data": {
+        "name": "Ibuprofen", "strength": "200 mg", "directions": "Pain reliever / fever reducer (NSAID)",
+        "patient": None, "pharmacy": None, "prescriber": None,
+        "label_text": "ELM STREET HEALTH IBUPROFEN TABLETS, 200 MG. Pain reliever / fever reducer (NSAID)", "confidence": 0.96}},
     "after-visit-summary.png": {"kind": "document", "label": "After-visit summary (cardiology)", "data": {
         "title": "After Visit Summary", "provider": "Dr. Anika Patel", "facility": "Ohio Heart Center", "date": "10/24/2026",
         "medications": [
@@ -158,6 +187,7 @@ def main() -> None:
            "10/13/2026", "30", "pill-lisinopril.png")
     bottle("METFORMIN HCL 500 MG TABLET", "TAKE 1 TABLET BY MOUTH\nTWICE DAILY WITH MEALS", "Dr. James Moore", "4470981",
            "09/28/2026", "60", "pill-metformin.png")
+    otc_bottle("pill-ibuprofen.png")
     visit_summary("after-visit-summary.png")
     fixtures = {}
     for name, meta in FIXTURES.items():

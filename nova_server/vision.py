@@ -119,6 +119,15 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
         return {**base, "verdict": "unclear", "advice": "Hold the label closer to the camera, in good light.",
                 "speech": "I couldn't read that label. Can you hold it a little closer to the camera?"}
     med = match_medication(store, elder["id"], data.get("name"))
+    avoid = avoid_note(store, elder["id"], data.get("name") or "")
+    if avoid and not med:
+        note, sentence, alternative = avoid
+        src = note["source"].split("·")[0].strip().lower()
+        return {**base, "verdict": "avoid", "source": note["source"],
+                "advice": f"Don't take it. {sentence}" + (f" {alternative}" if alternative else ""),
+                "speech": f"Please don't take {data['name'].lower()}, {name}. Your {src} say to avoid it"
+                          f"{' ' + _because(sentence) if _because(sentence) else ''}."
+                          + (f" The same notes say: {alternative[0].lower() + alternative[1:]}" if alternative else "")}
     if not med:
         return {**base, "verdict": "not_on_list",
                 "advice": "Don't take it. Ask Maya or the pharmacist before taking anything new.",
@@ -158,6 +167,26 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
             "advice": f"Put this one back until {speak_times(times)}." + (f" Take {speak} now." if speak else ""),
             "speech": f"That's {med['name']}, your {speak_times(times)} pill for {med['purpose']}. "
                       f"It isn't due now, so put it back.{others}"}
+
+
+def avoid_note(store: Store, person_id: str, drug: str) -> tuple[dict[str, Any], str, str | None] | None:
+    """Find a care-note sentence telling this person to avoid the drug, plus the suggested alternative."""
+    d = (drug or "").lower().split()[0] if drug else ""
+    if not d:
+        return None
+    for n in store.care_notes(person_id):
+        sentences = re.split(r"(?<=[.!?])\s+", n["text"])
+        for s in sentences:
+            low = s.lower()
+            if d in low and re.search(r"\bavoid|do not take|don't take", low):
+                alt = next((x for x in sentences if x is not s and re.search(r"for pain|instead|is okay|is ok", x.lower())), None)
+                return n, s.strip(), alt.strip() if alt else None
+    return None
+
+
+def _because(sentence: str) -> str:
+    m = re.search(r"\b(because of [^.]+)", sentence, flags=re.I)
+    return m.group(1) if m else ""
 
 
 def speak_times(times: list[str]) -> str:

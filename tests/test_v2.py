@@ -231,3 +231,11 @@ async def test_logging_doses_uses_supply():
     after = {m["id"]: m["supply"] for m in server.store.medications("rose")}
     assert after["metformin"] == before["metformin"] - 1
     assert out["low_supply"] and "refill" in out["speech"]
+
+
+async def test_pill_check_catches_a_drug_the_doctor_said_to_avoid():
+    freeze_and_seed(at(11, 0))
+    out = await call("check_pill_photo", {"image_base64": b64("pill-ibuprofen.png")})
+    assert out["verdict"] == "avoid"
+    assert "don't take ibuprofen" in out["speech"].lower()
+    assert "blood pressure" in out["speech"] and "acetaminophen" in out["speech"].lower()

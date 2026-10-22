@@ -44,6 +44,21 @@
       "confidence": 0.96
     }
   },
+  "7bcf4abb24bdd41fde1cc00289944c40000b84cbc94fdb4bf777944e1eb3add8": {
+    "file": "pill-ibuprofen.png",
+    "kind": "pill",
+    "label": "Ibuprofen (over the counter)",
+    "data": {
+      "name": "Ibuprofen",
+      "strength": "200 mg",
+      "directions": "Pain reliever / fever reducer (NSAID)",
+      "patient": null,
+      "pharmacy": null,
+      "prescriber": null,
+      "label_text": "ELM STREET HEALTH IBUPROFEN TABLETS, 200 MG. Pain reliever / fever reducer (NSAID)",
+      "confidence": 0.96
+    }
+  },
   "e180bdc4c7d06df194fd731258b69c8cf3b033e871d525c5053bfd0183c3f338": {
     "file": "after-visit-summary.png",
     "kind": "document",

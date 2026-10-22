@@ -22,6 +22,7 @@ Deadline: **Oct 23, 2026, 12:00 PM PDT** (Oct 24, 12:30 AM IST). Submit at least
 | Project description | `docs/SUBMISSION.md` → "Project description" |
 | Built with | `docs/SUBMISSION.md` → "Built with" line |
 | GitHub repo | https://github.com/Dakshhhhh-ops/nova (public, MIT `LICENSE` at the root) |
+| Try-it link | https://nova-6kte.onrender.com (open it once a minute before judging: free hosting sleeps) |
 | Video URL | your YouTube link |
 | Track | **Alexa+** (self-hosted MCP server + simulated Alexa+ experience) |
 | Mini challenges | **AWS Builder**; **Open Source** only if `mcp-apps-lite-host` is public |

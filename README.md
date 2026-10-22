@@ -6,6 +6,8 @@ It doesn't wait to be asked. It reminds Rose when her pill is due, follows up, a
 
 Nova is a self-hosted **MCP server** (Streamable HTTP, MCP 2026-07-28, compatible with 2025-11-25), the integration path Alexa+ uses for third-party experiences. The repo also ships a **simulated Alexa+**: two Echo Shows and a Ring doorbell in the browser, with an agent that runs on **Amazon Nova models in Amazon Bedrock**.
 
+> **Try it live:** https://nova-6kte.onrender.com (story) · https://nova-6kte.onrender.com/live (live demo) · MCP endpoint `https://nova-6kte.onrender.com/mcp` (free hosting: the first load after idle takes ~30–50 s)
+>
 > Track: **Alexa+** (self-hosted MCP server + simulated Alexa+ experience) · Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova, multimodal; Amazon Polly)
 
 ![Maya asks "How's Mom doing?" and Nova connects Rose's dizziness to her recent dose change](docs/img/briefing.png)
@@ -166,8 +168,12 @@ Open the simulator in Chrome (for the microphone and camera). Try:
 
 **Which brain?** `NOVA_LLM=auto` (default) uses Amazon Bedrock when your AWS credentials work; otherwise a local Ollama model; otherwise a deterministic offline router. The active brain is shown in the top bar. `NOVA_CLOCK=08:20` starts the household clock at a given time.
 
+### Deploy
+- **Render** (what the live link uses): `render.yaml` is a one-click Blueprint. It runs `serve.py`, which serves the story page, the live demo and the MCP server on one port and reads the public URL from Render.
+- **Any container host / AWS App Runner:** `docker build -t nova .` then run with `PORT` and `NOVA_PUBLIC_URL=https://your.host` (the OAuth metadata and allowed hosts use it). Add AWS credentials or an instance role for Amazon Nova and Polly.
+
 ### Connect other MCP clients
-- **MCP Inspector**: `npx @modelcontextprotocol/inspector`, URL `http://127.0.0.1:8765/mcp`. Either run its OAuth flow (it registers itself and opens Nova's account-linking page), or set the header `Authorization: Bearer nova-demo-maya` (or `nova-demo-rose`, `nova-demo-leo`, `nova-demo-grace`).
+- **MCP Inspector**: `npx @modelcontextprotocol/inspector`, URL `http://127.0.0.1:8765/mcp` (or the live `https://nova-6kte.onrender.com/mcp`). Either run its OAuth flow (it registers itself and opens Nova's account-linking page), or set the header `Authorization: Bearer nova-demo-maya` (or `nova-demo-rose`, `nova-demo-leo`, `nova-demo-grace`).
 - **stdio** (Claude Desktop, Kiro, Claude Code): `uv run python -m nova_server --stdio --as rose`.
 - **Docker**: `docker build -t nova-mcp . && docker run -p 8765:8765 -e NOVA_PUBLIC_URL=https://your.host nova-mcp`.
 

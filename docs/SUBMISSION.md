@@ -2,6 +2,10 @@
 
 Copy each section into the matching Devpost field.
 
+## Links
+- Live: https://nova-6kte.onrender.com (story page) · https://nova-6kte.onrender.com/live (live demo) · MCP endpoint https://nova-6kte.onrender.com/mcp
+- Code: https://github.com/Dakshhhhh-ops/nova
+
 ## Tracks
 - Primary track: **Alexa+** (self-hosted MCP server over Streamable HTTP, plus a simulated Alexa+ experience in a web app)
 - Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova models, including multimodal; Amazon Polly)

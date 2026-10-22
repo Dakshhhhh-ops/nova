@@ -677,7 +677,7 @@ export function createStage(container, options = {}) {
   function resize() {
     const w = Math.max(1, container.clientWidth), h = Math.max(1, container.clientHeight);
     width = w; height = h;
-    dpr = quality === 'high' ? Math.min(window.devicePixelRatio || 1, o.pixelRatioCap) : 1;
+    dpr = (quality === 'high' || o.crisp) ? Math.min(window.devicePixelRatio || 1, o.pixelRatioCap) : 1;
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;

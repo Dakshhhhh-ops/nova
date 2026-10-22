@@ -283,7 +283,7 @@ function canvasTexture(w, h, draw) {
   draw(ctx, w, h);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 16; // three clamps to the GPU's max; keeps text sharp on planes seen at an angle
   return tex;
 }
 
@@ -1167,7 +1167,7 @@ async function build() {
   if (!sec || !host) return;
   sec.classList.add('is-gl', 'is-x');
   const stage = makeStage(host, {
-    quality: 'low', background: 'transparent', bloom: false, css3d: true, fov: 30, pixelRatioCap: 1.25,
+    quality: 'low', crisp: true, background: 'transparent', bloom: false, css3d: true, fov: 30, pixelRatioCap: 2,
     camera: [0, 1.0, 11], target: [0, 0.75, 0], timeOfDay: 22,
     fx: { grain: 0, vignette: 0, scanlines: 0, aberration: 0 },
   });
@@ -1229,11 +1229,22 @@ async function build() {
   // the 3D lives between the text column and the labels, 48px clear of both
   const head = $('.build-head', sec);
   const corners = [];
-  const box = new THREE.Box3();
+  const box = new THREE.Box3(), _solid = new THREE.Box3();
   function bounds() {
     stage.scene.updateMatrixWorld(true);
     corners.length = 0;
-    box.setFromObject(echo.group);
+    // the Echo's solid parts only: its contact shadow and glow planes are wider than the device and would
+    // shrink the whole stack
+    box.makeEmpty();
+    echo.group.traverse((o) => {
+      if (!o.isMesh || !o.visible || !o.geometry) return;
+      const m = o.material;
+      if (m && m.transparent && m.depthWrite === false) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      _solid.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+      box.union(_solid);
+    });
+    if (box.isEmpty()) box.setFromObject(echo.group);
     for (let i = 0; i < 8; i++) corners.push(new THREE.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
     planes.forEach((m) => {
       const g = m.geometry.parameters;
@@ -1245,22 +1256,35 @@ async function build() {
   }
   function layout() {
     const r = host.getBoundingClientRect();
-    const textRight = Math.max(...$$('.sec-head, h2, .build-lede, .build-nums', head).map((el) => el.getBoundingClientRect().right));
+    const textEls = $$('.sec-head, h2, .build-lede, .build-nums', head).map((el) => el.getBoundingClientRect());
+    const textRight = Math.max(...textEls.map((b) => b.right));
+    const textLeft = Math.min(...textEls.map((b) => b.left));
+    const textBottom = Math.max(...textEls.map((b) => b.bottom));
     const labelLeft = Math.min(...labels.map((l) => l.getBoundingClientRect().left - (+gsap.getProperty(l, 'x') || 0)));
     labelRel = labels.map((l) => { const b = l.getBoundingClientRect(); return { x: b.left - r.left - (+gsap.getProperty(l, 'x') || 0), y: b.top - r.top }; });
-    const reg = { x0: textRight + 48, x1: labelLeft - 48, y0: r.top + 96, y1: r.bottom - 40 - 48 };
-    stage.camera.clearViewOffset();
-    stage.setCamera({ position: [0, 1.0, 11], target: [0, 0.75, 0] });
-    C = worldAt(stage, r.left + r.width * 0.5, r.top + r.height * 0.6, 0);
-    SC = 1;
-    echo.group.position.copy(C);
-    for (let k = 0; k < 3; k++) {
-      echo.group.scale.setScalar(SC);
-      pose(1);
-      const bb = bounds();
-      const f = Math.min((reg.x1 - reg.x0) / (bb.x1 - bb.x0), (reg.y1 - reg.y0) / (bb.y1 - bb.y0)) * 0.96;
-      SC = clamp(SC * f, 0.2, 4);
+    // two places the 3D can live, 48px clear of the text and the labels: beside the text column, or under it.
+    // Take whichever lets it be bigger: a bigger stack is a readable stack.
+    const beside = { x0: textRight + 48, x1: labelLeft - 48, y0: r.top + 96, y1: r.bottom - 40 - 48 };
+    const under = { x0: textLeft, x1: labelLeft - 48, y0: textBottom + 48, y1: r.bottom - 40 - 48 };
+    function fit(reg) {
+      stage.camera.clearViewOffset();
+      stage.setCamera({ position: [0, 1.0, 11], target: [0, 0.75, 0] });
+      C = worldAt(stage, r.left + r.width * 0.5, r.top + r.height * 0.6, 0);
+      SC = 1;
+      echo.group.position.copy(C);
+      for (let k = 0; k < 3; k++) {
+        echo.group.scale.setScalar(SC);
+        pose(1);
+        const bb = bounds();
+        const f = Math.min((reg.x1 - reg.x0) / (bb.x1 - bb.x0), (reg.y1 - reg.y0) / (bb.y1 - bb.y0)) * 0.96;
+        SC = clamp(SC * f, 0.2, 4);
+      }
+      return SC;
     }
+    const ok = (g) => g.x1 - g.x0 > 200 && g.y1 - g.y0 > 200;
+    const sBeside = ok(beside) ? fit(beside) : 0, sUnder = ok(under) ? fit(under) : 0;
+    const reg = sUnder > sBeside * 1.15 ? under : beside;
+    fit(reg);
     echo.group.scale.setScalar(SC);
     pose(1);
     const bb = bounds();
@@ -1319,12 +1343,15 @@ function drawLayer(ctx, w, h, d) {
   if (d.motif === 'grid') { for (let r = 0; r < 3; r++) for (let k = 0; k < 7; k++) { ctx.beginPath(); ctx.arc(170 + k * 114, 110 + r * 80, 9, 0, Math.PI * 2); ctx.fill(); } }
   if (d.motif === 'orb') { const o = ctx.createRadialGradient(w / 2, h * 0.38, 0, w / 2, h * 0.38, h * 0.32); o.addColorStop(0, hexA(c, 0.7)); o.addColorStop(1, hexA(c, 0)); ctx.fillStyle = o; ctx.fillRect(0, 0, w, h); }
   ctx.restore();
-  ctx.fillStyle = '#F4EEE6';
-  ctx.font = '400 84px "Instrument Serif"';
-  ctx.fillText(d.name, 60, h - 108);
-  ctx.fillStyle = 'rgba(244,238,230,.72)';
-  ctx.font = '500 24px "JetBrains Mono"';
-  spaced(ctx, d.sub.toUpperCase(), 62, h - 58, 3);
+  // big, high-contrast type: these planes are small on screen and seen at an angle
+  ctx.fillStyle = '#FFFFFF';
+  ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 10;
+  ctx.font = '400 128px "Instrument Serif"';
+  ctx.fillText(d.name, 60, h - 120);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(244,238,230,.9)';
+  ctx.font = '600 30px "JetBrains Mono"';
+  spaced(ctx, d.sub.split(' · ')[0].toUpperCase(), 64, h - 62, 3);
 }
 function hexA(hex, a) {
   const n = parseInt(hex.slice(1), 16);

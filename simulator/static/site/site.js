@@ -295,7 +295,13 @@
     document.addEventListener('pointerleave', function () { c.classList.add('is-hidden'); });
     addEventListener('pointerdown', function () { c.classList.add('is-down'); });
     addEventListener('pointerup', function () { c.classList.remove('is-down'); });
-    gsap.ticker.add(function () { rx = lerp(rx, x, 0.2); ry = lerp(ry, y, 0.2); gx(rx); gy(ry); });
+    gsap.ticker.add(function () {
+      // same feel at 30, 60 or 144 fps: ~0.45 of the gap per 60 Hz frame, and snap when close
+      var k = 1 - Math.pow(0.55, gsap.ticker.deltaRatio(60));
+      rx = lerp(rx, x, k); ry = lerp(ry, y, k);
+      if (Math.abs(rx - x) < 0.3 && Math.abs(ry - y) < 0.3) { rx = x; ry = y; }
+      gx(rx); gy(ry);
+    });
     var forced = null;
     NOVA.cursorLabel = function (t) {
       forced = t || null;

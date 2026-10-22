@@ -193,7 +193,7 @@ It drives the story in real Chrome, captures Alexa's spoken replies, adds an Ama
 ```bash
 uv run pytest -q
 ```
-66 tests cover:
+68 tests cover:
 - the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
 - the Ring Partner API client against recorded-shape responses (required headers, pagination, 401/429/503 handling, dedupe, fresh vs backfilled events, minimum-necessary event types) and Ring webhooks (signature check, dedupe, event mapping, visitor matched from the calendar), live message delivery;
 - pill checks (wrong time, already taken, outdated strength, a drug the doctor said to avoid), reconciliation and approval;

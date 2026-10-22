@@ -42,7 +42,7 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 - **Contribution URL:** https://github.com/Dakshhhhh-ops/mcp-apps-lite-host *(create this public repo and push the local folder before submitting)*
 - **Primary repo URL:** https://github.com/Dakshhhhh-ops/nova
 - **GitHub username:** Dakshhhhh-ops
-- **What it is:** `mcp-apps-lite-host` is a dependency-free ES module (MIT) that renders MCP Apps (`ui://`) views in any web page. It implements the View ↔ Host JSON-RPC protocol from the ext-apps spec (initialize handshake, tool-input/tool-result, size-changed, `tools/call` proxy, `ui/message`, teardown) in a sandboxed iframe.
+- **What it is:** `mcp-apps-lite-host` is a dependency-free ES module (MIT) that renders MCP Apps (`ui://`) views in any web page. It implements the View ↔ Host JSON-RPC protocol from the ext-apps spec (initialize handshake, tool-input/tool-result, size-changed, `tools/call` proxy, `ui/message`, teardown) in a sandboxed iframe, and ignores messages from any other window. It ships with 13 tests (`node --test`, no dependencies) run in CI on Node 18/20/22, an API reference, a protocol-coverage table and security notes.
 - **Why it matters:** The ext-apps repo ships view SDKs and a basic example host, but there was no small drop-in host for custom web apps, simulators or dashboards. Anyone building an Alexa+ simulation, an MCP inspector or a product UI can now show MCP Apps views in a few lines. It was extracted from Nova's Echo Show simulator.
 
 ## Product feedback

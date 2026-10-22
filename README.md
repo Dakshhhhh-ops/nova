@@ -141,7 +141,7 @@ git clone https://github.com/Dakshhhhh-ops/nova && cd nova
 uv sync
 cp .env.example .env        # AWS_REGION, NOVA_LLM, NOVA_MODEL_ID (optional)
 
-# one command: MCP server + simulator, opens the browser
+# one command: MCP server + simulator, opens the browser (picks free ports if 8765/8080 are taken)
 uv run python run.py
 
 # or separately

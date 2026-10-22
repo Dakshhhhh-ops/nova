@@ -46,6 +46,7 @@ DEVICES = {
             "Can I take ibuprofen for my knee?",
             "Tell Maya I loved Lily's recital video",
             "My blood pressure is 118 over 72",
+            "Order a refill of my metformin",
             "Remind me in 10 minutes",
         ],
     ),

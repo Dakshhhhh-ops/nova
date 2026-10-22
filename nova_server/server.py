@@ -1190,8 +1190,17 @@ async def healthz(_: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "server": "nova", "people": len(store.people())})
 
 
+DEMO_ROUTES = os.getenv("NOVA_DEMO", "1") not in ("0", "false", "no")
+
+
+def _demo_disabled() -> JSONResponse | None:
+    return None if DEMO_ROUTES else JSONResponse({"error": "demo routes are disabled (NOVA_DEMO=0)"}, status_code=404)
+
+
 @mcp.custom_route("/demo/reset", methods=["POST"])
 async def demo_reset(request: Request) -> JSONResponse:
+    if (blocked := _demo_disabled()) is not None:
+        return blocked
     body = await _json(request)
     if body.get("time"):
         set_clock(body["time"])
@@ -1203,6 +1212,8 @@ async def demo_reset(request: Request) -> JSONResponse:
 @mcp.custom_route("/demo/clock", methods=["GET", "POST"])
 async def demo_clock(request: Request) -> JSONResponse:
     """The household clock. Jumping back in time re-seeds the demo so the history stays consistent."""
+    if request.method == "POST" and (blocked := _demo_disabled()) is not None:
+        return blocked
     if request.method == "POST":
         body = await _json(request)
         before = now()

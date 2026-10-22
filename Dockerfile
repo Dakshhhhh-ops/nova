@@ -5,6 +5,6 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY nova_server ./nova_server
-ENV NOVA_MCP_HOST=0.0.0.0 NOVA_MCP_PORT=8765 PYTHONUNBUFFERED=1
+ENV NOVA_MCP_HOST=0.0.0.0 NOVA_MCP_PORT=8765 PYTHONUNBUFFERED=1 NOVA_DEMO=0
 EXPOSE 8765
 CMD ["uv", "run", "--no-sync", "python", "-m", "nova_server"]

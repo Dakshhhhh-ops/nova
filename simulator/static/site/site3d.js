@@ -31,16 +31,18 @@ export async function boot() {
     frameHud();
     await hero(); mark('hero');
     document.dispatchEvent(new CustomEvent('nova:gl-hero'));
-    await heroSettled; mark('hero settled');
+    // the intro gets the GPU to itself, but only while someone is watching it: scrolling away starts the builds
+    await Promise.race([heroSettled, scrolledAway()]); mark('hero settled');
     await fontsReady(); mark('fonts');
     for (const [name, build_] of [['day', day], ['dots', dots], ['sees', sees], ['build', build], ['cta', cta]]) {
-      await idle(); mark('idle');
+      const near = document.getElementById(name === 'cta' ? 'meet' : name);
+      await idle(near); mark('idle');
       await build_(); mark(name);
       const st_ = stages[stages.length - 1];
       if (st_ && st_.compileAsync) { await st_.compileAsync(); mark(name + ' compile'); }
       // first frame now (texture uploads, remaining programs), while nobody is scrolling
-      if (st_) { await idle(); warmTextures(st_); st_.render(); mark(name + ' warm'); }
-      await idle();
+      if (st_) { await idle(near); warmTextures(st_); st_.render(); mark(name + ' warm'); }
+      await idle(near);
       ST.sort();
       ST.refresh(); mark('refresh');
     }
@@ -55,9 +57,19 @@ export async function boot() {
 let lastScroll = 0;
 addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive: true });
 addEventListener('wheel', () => { lastScroll = performance.now(); }, { passive: true });
-function idle() {
+function scrolledAway() {
+  return new Promise((resolve) => {
+    const on = () => { if (scrollY > innerHeight * 0.2) { removeEventListener('scroll', on); resolve(); } };
+    addEventListener('scroll', on, { passive: true });
+    on();
+  });
+}
+// wait for a quiet moment, unless the section being built is about to come on screen: then a short hitch
+// beats showing its unstyled fallback
+function idle(near) {
   return new Promise((resolve) => {
     const check = () => {
+      if (near && near.getBoundingClientRect().top < innerHeight * 1.6) { requestAnimationFrame(() => resolve()); return; }
       const quiet = performance.now() - lastScroll;
       if (quiet < 300) { setTimeout(check, 320 - quiet); return; }
       if (window.requestIdleCallback) requestIdleCallback(() => resolve(), { timeout: 200 }); else setTimeout(resolve, 30);

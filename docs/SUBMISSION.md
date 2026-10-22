@@ -4,31 +4,31 @@ Copy each section into the matching Devpost field.
 
 ## Tracks
 - Primary track: **Alexa+** (self-hosted MCP server over Streamable HTTP, plus a simulated Alexa+ experience in a web app)
-- Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova models, Amazon Polly)
+- Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova models, including multimodal; Amazon Polly)
 - Mini challenge: **Open Source** (see below; enter only once the repo is public)
 
 ## Project description
 
-**Nova is a care circle for Alexa+.** It lets an older adult who lives alone and the family who worry about them share one voice-first care circle.
+**Nova turns Alexa+ into a proactive, multimodal care circle** for an older adult who lives alone and the family who worry about them.
 
-Rose, 81, talks to the Echo Show in her kitchen: "I just took my pink pill", "I'm feeling a bit dizzy this morning and my knee hurts", "Can I take ibuprofen for my knee?". Her daughter Maya, in Seattle, asks her own Echo "How's Mom doing?" and hears what matters, with the evidence on screen and a next step.
+Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits between them on Alexa+:
 
-**How it works.** Nova is a self-hosted MCP server (official Python SDK, Streamable HTTP, MCP 2026-07-28 with 2025-11-25 compatibility), the open standard Alexa+ uses for integrations. Each Echo connects with a bearer token for one person, so the same tool answers differently for Rose and for Maya, and Rose controls what her family can see. A simulated Alexa+ (two Echo Show devices in the browser) runs an agent on Amazon Nova through the Amazon Bedrock Converse API. The agent calls Nova's 13 MCP tools and speaks the answers with Amazon Polly.
+- **It speaks first.** A care engine runs on the household clock. At 6 PM Rose's Echo says *"Time for your Metformin with your meal. That's the large white oblong pill."* At 6:30 it checks in gently. At 7:30, if she still hasn't taken it, Maya's Echo glows yellow: *"Mom hasn't taken her 6 PM Metformin. I reminded her at 6 and 6:30."* It also prompts the morning check-in, reminds about appointments (*"Leo is driving you"*), and runs a wellness check when the home has been quiet all morning, escalating to the family if Rose doesn't answer.
+- **It sees, with Amazon Nova multimodal.** Rose holds a pill bottle up to the Echo Show camera: *"That's atorvastatin, your bedtime pill. Put it back. Right now it's time for your lisinopril, the small pink one."* Maya photographs the after-visit summary. Nova reconciles it with the current plan (lisinopril 20 → 10 mg, with the doctor's reason) and waits for her approval. Then it tells Rose in plain words, and later catches the old 20 mg bottle.
+- **It connects the dots, with evidence.** *"How's Mom doing?"* gets a spoken briefing and an on-screen card: *dizziness began two days after her lisinopril dose was doubled; home BP averaged 152/91 before and 108/66 since; the home aide saw her unsteady; Dr. Patel's notes say to call about dizziness (614-555-0190).*
+- **It listens to the front door (Ring, simulated).** *"Grace arrived at Mom's at 10:02."* A front door opening at 2 AM triggers an urgent notification; a morning with no movement triggers a wellness check.
+- **It stays safe and respectful.** It has a double-dose guard. Answers about medications come only from the doctor's notes, with sources. Nothing changes in the plan without a person's approval. Rose is asked before her family hears about a symptom (MCP elicitation), and she controls what they can see. Emergencies skip all of that and alert everyone.
 
-**What makes it different**
-- **Connects the dots, with evidence.** Deterministic pattern rules find what no single data point shows. For example: *dizziness began two days after her lisinopril dose was doubled, mentioned four times, corroborated by the home aide's BP reading; Dr. Patel's notes say to call about dizziness (614-555-0190).* Amazon Nova turns the findings into a warm, 20-second spoken briefing.
-- **Safe by design.** A double-dose guard ("you already took it at 8:14, please don't take another"). Answers about medications come only from the doctors' own notes, with sources. No diagnosis. Emergencies alert everyone immediately.
-- **Dignity and consent.** Before telling the family about a symptom, Nova asks Rose (MCP elicitation). She can make any category private, and only she can change that.
-- **Visual responses on Echo Show.** Today's plan, the care briefing and the doctor-visit brief are MCP Apps (`ui://` views) that render on the device and can call tools back ("Mark taken", "Mark handled", "Share with circle").
-- **Doctor-visit prep.** A one-page brief with adherence, symptoms with first-seen dates, and the questions to ask.
+**How it works.** Nova is a self-hosted MCP server (official Python SDK 2.3, Streamable HTTP, MCP 2026-07-28 with 2025-11-25 compatibility), the open standard Alexa+ uses for integrations. It has 21 tools, 8 resources (including `nova://announcements`, the queue Nova uses to speak first), 2 prompts and 5 MCP Apps views that render on the Echo Show screens. Each Echo connects with a bearer token for one person, so the same tool answers differently for Rose and for Maya. A simulated Alexa+ (two Echo Shows and a Ring doorbell in the browser) runs an agent on Amazon Nova through the Bedrock Converse API, delivers Nova's announcements live, and speaks with Amazon Polly. A time-lapse clock plays a whole day in a minute. Deterministic rules find the patterns (so every insight is testable and cites evidence); Amazon Nova reads the images and writes the language. 29 tests and CI.
 
-**Built with:** Python, MCP Python SDK 2.3 (MCPServer, Streamable HTTP, MCP Apps extension, resolvers/elicitation, OAuth protected-resource metadata), Amazon Bedrock (Converse API, tool use) with Amazon Nova 2 Lite, Amazon Polly (generative voice), FastAPI, SQLite, vanilla JS (Web Speech API).
+**Built with:** Python, MCP Python SDK 2.3 (MCPServer, Streamable HTTP, MCP Apps extension, resolvers/elicitation, OAuth protected-resource metadata), Amazon Bedrock (Converse API, tool use, image input) with Amazon Nova 2 Lite, Amazon Polly (generative voice), FastAPI, SQLite, vanilla JS (Web Speech API, getUserMedia, WebAudio), Docker.
 
 ## AWS Builder: integrations
 - `simulator/agent.py`: the Alexa+ agent's tool-use loop on the **Amazon Bedrock Converse API** with **Amazon Nova** (`*.amazon.nova-2-lite-v1:0`, region-aware inference profile selection with fallbacks to Nova Lite and Micro).
+- `nova_server/vision.py` + `nova_server/llm.py` (`vision_json`): **Amazon Nova multimodal** reads pill-bottle labels and after-visit summaries (Converse image blocks); the medication reconciliation that follows is deterministic.
 - `nova_server/insights.py`: **Amazon Nova** writes the spoken caregiver briefing, extracts structured check-ins (mood, pain, sleep, symptoms) from free speech, answers questions grounded only in care notes, and drafts doctor-visit briefs.
-- `simulator/app.py`: **Amazon Polly** generative voice (`Ruth`) for spoken replies.
-- `nova_server/llm.py`: one model layer for all of the above.
+- `simulator/app.py`: **Amazon Polly** generative voice (`Ruth`) for replies and proactive announcements.
+- `tests/test_bedrock_shape.py`: Converse requests (tool use and plain) are validated against the botocore API model.
 
 ## Open Source: required fields
 - **Contribution URL:** https://github.com/Dakshhhhh-ops/mcp-apps-lite-host *(create this public repo and push the local folder before submitting)*

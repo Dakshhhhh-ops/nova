@@ -31,6 +31,10 @@ Nova is an MCP server for one older adult (the care recipient) and their care ci
 | "Order a refill", "I'm running low on metformin" | `request_refill` |
 | Family: "When did Mom last open the door?", "Has Grace been by?" | `recent_activity` |
 | "Approve the changes" (after a document scan) | `apply_care_changes` with the `change_set_id` |
+| "When is my doctor appointment?", "Who's coming this week?" | `list_appointments` |
+| "What's Mom's blood pressure?", "How has my BP been?" | `get_vitals` |
+| Aide or visiting family: "What should I do at Rose's today?" | `visit_checklist` |
+| "Say that again" | repeat your last answer word for word (no tool) |
 
 ## Nova speaks first
 Nova also starts conversations: medication reminders, follow-ups, family escalations, check-ins, wellness checks, appointment and refill reminders. They arrive through the `nova://announcements` resource (reading it delivers them once). Speak the `speech`, offer `replies` when `expects_reply` is true, and treat the person's answer ("I took it", "not yet") as a reply to that announcement.

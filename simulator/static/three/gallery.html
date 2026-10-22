@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova 3D gallery</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%233BD1FF' stroke-width='3' stroke-dasharray='15 2.3'/%3E%3Ccircle cx='16' cy='16' r='4.2' fill='%233BD1FF'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<style>
+  :root {
+    --ink: #0A0B10; --ink-2: #11131A; --ink-3: #191C26; --ivory: #F4EEE6; --mist: rgba(244,238,230,.62); --faint: rgba(244,238,230,.38);
+    --line: rgba(244,238,230,.10); --nova: #3BD1FF; --amber: #FFB547; --coral: #FF6B57; --sage: #9ED9B0;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--ink); color: var(--ivory); font: 14px/1.4 "Inter Tight", system-ui, sans-serif; overflow: hidden; }
+  #stage { position: fixed; top: 0; left: 0; bottom: 0; right: var(--side, 340px); }
+  html.ui-off { --side: 0px; }
+  html.ui-off #panel { display: none; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+  header { position: fixed; top: 34px; left: 40px; z-index: 3; pointer-events: none; }
+  header h1 { margin: 6px 0 0; font: 400 56px/0.9 "Instrument Serif", serif; letter-spacing: -0.02em; }
+  header h1 em { color: var(--nova); }
+  header .mono { color: var(--mist); }
+  #panel { position: fixed; z-index: 3; top: 0; right: 0; bottom: 0; width: var(--side, 340px); overflow: auto;
+    background: var(--ink-2); border-left: 1px solid var(--line); padding: 64px 22px 28px; display: flex; flex-direction: column; gap: 18px; }
+  #panel::before { content: "Controls · H to hide"; font: 500 10px "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+  @media (max-width: 760px) { :root { --side: 0px; } #panel { top: auto; left: 0; width: auto; height: 42vh; border-left: 0; border-top: 1px solid var(--line); padding-top: 18px; } #stage { bottom: 42vh; } }
+  .grp { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .grp > .mono { color: var(--faint); font-size: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 5px; }
+  button { font: 500 12px "Inter Tight", sans-serif; color: var(--ivory); background: var(--ink-3); border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+  button:hover { border-color: rgba(59,209,255,.45); }
+  button.on { background: rgba(59,209,255,.14); border-color: rgba(59,209,255,.6); color: #dff6ff; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--nova); outline-offset: 2px; }
+  input[type=range] { width: 100%; accent-color: var(--nova); }
+  #status { color: var(--mist); border-top: 1px solid var(--line); padding-top: 10px; min-height: 3em; line-height: 1.6; }
+  .fallback { position: fixed; inset: 0; display: none; place-items: center; text-align: center; color: var(--mist); }
+  html.no-webgl .fallback { display: grid; }
+
+  /* Rose's Echo Show 8 screen (1280 × 800 CSS px) */
+  .rose-ui { width: 1280px; height: 800px; position: relative; color: var(--ivory); font-family: "Inter Tight", sans-serif;
+    background: radial-gradient(120% 90% at 20% 0%, #1d2440 0%, #0d1020 55%, #07080d 100%); padding: 64px 80px; }
+  .rose-ui .mono { font-size: 18px; color: var(--mist); }
+  .rose-ui .clock { font: 400 210px/0.86 "Instrument Serif", serif; letter-spacing: -0.03em; margin-top: 34px; }
+  .rose-ui .clock em { font-size: 90px; color: var(--mist); font-style: normal; margin-left: 12px; }
+  .rose-ui p { font: 400 46px/1.12 "Instrument Serif", serif; margin: 36px 0 0; max-width: 900px; }
+  .rose-ui p em { color: var(--amber); }
+  .rose-ui .acts { position: absolute; left: 80px; right: 80px; bottom: 64px; display: flex; gap: 18px; align-items: center; }
+  .rose-ui button { font-size: 26px; padding: 18px 34px; border-radius: 999px; background: rgba(244,238,230,.08); border: 1px solid rgba(244,238,230,.2); }
+  .rose-ui button.primary { background: var(--ivory); color: var(--ink); }
+  .rose-ui input { font: 400 24px "Inter Tight", sans-serif; flex: 1; padding: 18px 24px; border-radius: 999px; border: 1px solid rgba(244,238,230,.2); background: rgba(0,0,0,.3); color: var(--ivory); }
+  .rose-ui .count { position: absolute; top: 64px; right: 80px; }
+
+  /* Maya's Echo Show 15 screen (1920 × 1080 CSS px) */
+  .maya-ui { width: 1920px; height: 1080px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; padding: 80px 96px; color: var(--ivory);
+    background: linear-gradient(160deg, #f4eee6 0%, #e8dfd2 100%); color: #14161d; font-family: "Inter Tight", sans-serif; }
+  .maya-ui h2 { font: 400 150px/0.88 "Instrument Serif", serif; margin: 26px 0 0; letter-spacing: -0.03em; }
+  .maya-ui h2 em { color: #b5651d; }
+  .maya-ui .mono { font-size: 22px; color: rgba(20,22,29,.55); }
+  .maya-ui .feed { overflow: auto; border-radius: 28px; background: #fff; box-shadow: 0 30px 80px rgba(20,22,29,.12); padding: 36px 40px; }
+  .maya-ui .item { padding: 22px 0; border-bottom: 1px solid rgba(20,22,29,.08); font-size: 30px; }
+  .maya-ui iframe { width: 100%; height: 300px; border: 0; border-radius: 22px; margin-top: 40px; background: #14161d; }
+</style>
+</head>
+<body>
+<div id="stage" aria-label="3D gallery"></div>
+<div class="fallback"><div><div class="mono">WebGL unavailable</div><p>The 3D gallery needs WebGL 2.</p></div></div>
+
+<header>
+  <div class="mono">Nova 3D · object library · three r170</div>
+  <h1>Things that <em>glow</em></h1>
+</header>
+
+<div id="panel" role="region" aria-label="Gallery controls">
+  <div class="grp"><span class="mono">View</span>
+    <div class="row" id="views">
+      <button data-view="devices" class="on">Devices</button><button data-view="objects">Objects</button><button data-view="logo">Logo</button><button data-view="carousel">Carousel</button>
+    </div>
+  </div>
+  <div class="grp"><span class="mono">Echo Show 8 · Rose</span><div class="row" data-ring="echo8"></div></div>
+  <div class="grp"><span class="mono">Echo Show 15 · Maya</span><div class="row" data-ring="echo15"></div></div>
+  <div class="grp"><span class="mono">Ring doorbell</span>
+    <div class="row"><button id="ding">Ding</button><button id="motion">Motion</button><button data-rs="idle">Idle</button><button data-rs="live">Live</button><button data-rs="off">Off</button></div>
+  </div>
+  <div class="grp"><span class="mono">Time of day · <span id="tod">20:30</span></span>
+    <input id="time" type="range" min="0" max="24" step="0.05" value="20.5" aria-label="Time of day">
+    <div class="row"><button id="play">Time-lapse</button><button data-t="6.8">Dawn</button><button data-t="12">Day</button><button data-t="17.8">Golden</button><button data-t="20">Dusk</button><button data-t="23">Night</button></div>
+  </div>
+  <div class="grp"><span class="mono">Logo finish</span>
+    <div class="row"><button data-fin="chrome">Chrome</button><button data-fin="glass">Glass</button><button data-fin="iridescent">Iridescent</button><button id="spin">Spin</button></div>
+  </div>
+  <div class="grp"><span class="mono">Drag targets</span>
+    <div class="row"><button id="show-pill">Show atorvastatin to Echo 8</button><button id="show-otc">Show ibuprofen</button><button id="show-paper">Show summary to Echo 15</button></div>
+  </div>
+  <div class="grp"><span class="mono">Rendering</span>
+    <div class="row"><button id="q-high" class="on">High</button><button id="q-low">Low</button><button id="bloom" class="on">Bloom</button><button id="frame" class="on">Frame</button><button id="screens" class="on">HTML screens</button></div>
+  </div>
+  <div id="status" class="mono" aria-live="polite">Drag a pill bottle onto Rose's Echo camera, or the summary onto Maya's.</div>
+</div>
+
+<template id="rose-tpl">
+  <div class="rose-ui">
+    <div class="mono">Kitchen · Echo Show 8 · Columbus</div>
+    <div class="count mono" id="rose-count">0 taps</div>
+    <div class="clock">6:00<em>PM</em></div>
+    <p>It's 6 PM, Rose. Time for your <em>Metformin</em>, with dinner.</p>
+    <div class="acts">
+      <button class="primary" id="rose-taken">I took it</button>
+      <button id="rose-later">In ten minutes</button>
+      <input id="rose-input" placeholder="Type to Nova…" aria-label="Type to Nova">
+    </div>
+  </div>
+</template>
+<template id="maya-tpl">
+  <div class="maya-ui">
+    <div>
+      <div class="mono">Seattle · Echo Show 15 · Maya</div>
+      <h2>Mom is <em>steady</em> today.</h2>
+      <iframe title="Embedded frame test" srcdoc="<body style='margin:0;font:28px/1.3 system-ui;color:#F4EEE6;background:#14161d;display:grid;place-items:center;height:100vh'><button onclick='this.textContent=&quot;iframe clicked&quot;' style='font:inherit;padding:18px 30px;border-radius:999px;border:0;background:#3BD1FF;color:#0A0B10'>Click inside the iframe</button></body>"></iframe>
+    </div>
+    <div class="feed" id="maya-feed">
+      <div class="mono">Today</div>
+      <div class="item">7:31 AM · Lisinopril 10 mg taken</div>
+      <div class="item">8:02 AM · Blood pressure 118/72</div>
+      <div class="item">12:15 PM · Grace visited (aide)</div>
+      <div class="item">2:40 PM · Front door: delivery</div>
+      <div class="item">6:04 PM · Metformin taken</div>
+      <div class="item">6:30 PM · Called Leo</div>
+      <div class="item">9:12 PM · Atorvastatin taken</div>
+      <div class="item">Scroll test · 1</div><div class="item">Scroll test · 2</div><div class="item">Scroll test · 3</div>
+    </div>
+  </div>
+</template>
+
+<script type="module">
+  import * as N from '/static/three/nova3d.js';
+
+  const $ = (s) => document.querySelector(s);
+  const status = (t) => { $('#status').textContent = t; };
+  const params = new URLSearchParams(location.search);
+  if (params.get('ui') === '0') document.documentElement.classList.add('ui-off');
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'h' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) document.documentElement.classList.toggle('ui-off');
+  });
+
+  let stage;
+  try {
+    stage = N.createStage($('#stage'), {
+      background: 'sky', timeOfDay: +(params.get('t') || 20.5), quality: params.get('q') || 'high',
+      camera: [0.05, 3.0, 13.4], target: [0.05, 0.95, 0.6],
+    });
+  } catch (err) {
+    document.documentElement.classList.add('no-webgl');
+    console.warn(err);
+    throw err;
+  }
+  const frame = params.get('frame') === '0' ? { setEnabled() {} } : N.screenFrame(document.body);
+
+  /* ---------------- devices */
+  const echo8 = stage.add(N.createEchoShow({ size: 8 }));
+  echo8.group.position.set(-2.9, 0, 0);
+  echo8.group.rotation.y = 0.18;
+  const echo15 = stage.add(N.createEchoShow({ size: 15, color: 'glacier' }));
+  echo15.group.position.set(1.35, 0, -0.4);
+  echo15.group.rotation.y = -0.08;
+  const ring = stage.add(N.createRingDoorbell({ finish: 'nickel' }));
+  ring.group.position.set(4.15, 0, 0.4);
+  ring.group.rotation.y = -0.3;
+
+  const roseEl = $('#rose-tpl').content.firstElementChild.cloneNode(true);
+  const mayaEl = $('#maya-tpl').content.firstElementChild.cloneNode(true);
+  if (params.get('screens') !== '0') { echo8.attachScreen(roseEl); echo15.attachScreen(mayaEl); }
+  let taps = 0;
+  roseEl.querySelector('#rose-taken').addEventListener('click', () => { taps++; roseEl.querySelector('#rose-count').textContent = taps + ' taps'; echo8.setRing('success'); status('HTML screen click received on Echo Show 8'); });
+  roseEl.querySelector('#rose-later').addEventListener('click', () => { echo8.setRing('notify'); status('Snoozed: amber pulse'); });
+
+  /* ---------------- objects */
+  const labels = ['atorvastatin', 'lisinopril', 'metformin', 'ibuprofen'];
+  const pills = labels.map((id, i) => {
+    const p = stage.add(N.createPillBottle({ label: `/samples/pill-${id}.png`, id, style: id === 'ibuprofen' ? 'otc' : 'rx' }));
+    p.group.position.set(-3.35 + i * 0.58, 0, 2.5);
+    p.group.rotation.y = 0.12 - i * 0.05;
+    return p;
+  });
+  const paper = stage.add(N.createPaper({ texture: '/samples/after-visit-summary.png', id: 'avs' }));
+  paper.group.scale.setScalar(0.42);
+  paper.group.position.set(-0.45, 0, 2.4);
+  paper.group.rotation.y = 0.25;
+
+  const drag = N.enableDrag(stage, [...pills, paper], {
+    targets: [
+      { object: echo8.cameraDot, radius: 130, holdMs: 1400,
+        onEnter: () => echo8.setRing('listening'), onLeave: () => echo8.setRing('idle'),
+        onDrop: (h) => { echo8.setRing('thinking'); status(`onDrop: ${h.id} → Echo Show 8 camera`); setTimeout(() => echo8.setRing('speaking'), 1500); setTimeout(() => echo8.setRing('idle'), 4200); } },
+      { object: echo15.cameraDot, radius: 160, holdMs: 1400,
+        onEnter: () => echo15.setRing('listening'), onLeave: () => echo15.setRing('idle'),
+        onDrop: (h) => { echo15.setRing('thinking'); status(`onDrop: ${h.id} → Echo Show 15 camera`); setTimeout(() => echo15.setRing('speaking'), 1500); setTimeout(() => echo15.setRing('idle'), 4200); } },
+    ],
+    onDragStart: (h) => status(`Dragging ${h.id}`),
+    onDragEnd: (h, t) => { if (!t) status(`Released ${h.id}`); },
+  });
+  const orbit = N.enableOrbit(stage, echo8, { maxYaw: 0.5 });
+  N.enableOrbit(stage, ring, { maxYaw: 0.6, hover: false });
+
+  /* ---------------- logos */
+  const finishes = ['chrome', 'glass', 'iridescent'];
+  const logos = finishes.map((finish, i) => {
+    const l = stage.add(N.createNovaLogo({ finish, size: 0.9 }));
+    l.group.position.set(17 + i * 3.1, 1.75, 0);
+    return l;
+  });
+  const wordLogo = stage.add(N.createNovaLogo({ finish: 'chrome', wordmark: 'right', size: 0.62, spin: 0.35 }));
+  wordLogo.group.position.set(18.2, -0.35, 0.5);
+  const dotLogo = stage.add(N.createNovaLogo({ finish: 'iridescent', core: 'dot', size: 0.5, glow: false }));
+  dotLogo.group.position.set(23.6, -0.35, 0.5);
+
+  /* ---------------- carousel */
+  const carPill = N.createPillBottle({ label: '/samples/pill-metformin.png', id: 'metformin-card' });
+  carPill.group.scale.setScalar(1.6);
+  const car = N.createArcCarousel(stage, [
+    { title: 'Good morning, Rose', subtitle: '7:30 AM · Lisinopril 10 mg', time: '7:30', color: N.COLORS.sage },
+    { title: 'Speaks first', subtitle: '6:00 PM · Metformin', time: '18:00', color: N.COLORS.amber, object: carPill },
+    { title: 'A visit, read aloud', subtitle: 'After-visit summary', time: '11:42', color: N.COLORS.nova, image: '/samples/after-visit-summary.png' },
+    { title: 'Someone at the door', subtitle: 'Ring · front door', time: '14:40', color: '#2F9BFF' },
+    { title: 'Maya, in Seattle', subtitle: 'Family notification', time: '18:20', color: N.COLORS.amber },
+    { title: 'Mom hasn’t taken it', subtitle: 'Urgent · 7:15 PM', time: '19:15', color: N.COLORS.coral },
+  ], {
+    position: [40, 1.75, 0], radius: 9,
+    onChange: (i, it) => status(`Carousel: ${String(i + 1).padStart(2, '0')} — ${it.title}`),
+    onSelect: (i, it) => status(`Carousel select: ${it.title}`),
+  });
+
+  /* ---------------- views */
+  const views = {
+    devices: { position: [0.05, 3.0, 13.4], target: [0.05, 0.95, 0.6] },
+    objects: { position: [-1.9, 1.55, 7.0], target: [-1.9, 0.6, 2.0] },
+    logo: { position: [20.3, 0.75, 11.8], target: [20.3, 0.7, 0] },
+    carousel: { position: [40, 2.0, 13.5], target: [40, 1.7, -2] },
+  };
+  function setView(v, instant) {
+    document.querySelectorAll('#views button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
+    instant ? stage.setCamera(views[v]) : stage.flyTo(views[v], { duration: 1.4 });
+    car.setEnabled(v === 'carousel');
+  }
+  $('#views').addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
+  setView(params.get('view') || 'devices', true);
+
+  /* ---------------- ring states */
+  for (const [key, dev] of [['echo8', echo8], ['echo15', echo15]]) {
+    const row = document.querySelector(`[data-ring="${key}"]`);
+    for (const s of N.RING_STATES) {
+      const b = document.createElement('button'); b.textContent = s; b.dataset.state = s;
+      if (s === 'idle') b.classList.add('on');
+      b.addEventListener('click', () => { dev.setRing(s); row.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); });
+      row.appendChild(b);
+    }
+  }
+  $('#ding').addEventListener('click', () => ring.flash('ding'));
+  $('#motion').addEventListener('click', () => ring.flash('motion'));
+  document.querySelectorAll('[data-rs]').forEach((b) => b.addEventListener('click', () => ring.setRing(b.dataset.rs)));
+
+  /* ---------------- time */
+  const fmt = (h) => { const hh = Math.floor(h) % 24, mm = Math.floor((h % 1) * 60); return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); };
+  const setT = (h) => { stage.setTimeOfDay(h); $('#time').value = h; $('#tod').textContent = fmt(h); };
+  $('#time').addEventListener('input', (e) => { playing = false; $('#play').classList.remove('on'); setT(+e.target.value); });
+  document.querySelectorAll('[data-t]').forEach((b) => b.addEventListener('click', () => { playing = false; $('#play').classList.remove('on'); setT(+b.dataset.t); }));
+  let playing = false;
+  $('#play').addEventListener('click', (e) => { playing = !playing; e.target.classList.toggle('on', playing); });
+  stage.onFrame((dt) => { if (playing) setT((stage.time + dt * 1.6) % 24); });
+  setT(stage.time);
+
+  /* ---------------- logo + rendering */
+  document.querySelectorAll('[data-fin]').forEach((b) => b.addEventListener('click', () => { logos.forEach((l) => l.setFinish(b.dataset.fin)); wordLogo.setFinish(b.dataset.fin); }));
+  let spinning = true;
+  $('#spin').addEventListener('click', () => { spinning = !spinning; [...logos, wordLogo, dotLogo].forEach((l) => l.spin(spinning ? 0.5 : 0)); });
+  const setQ = (q) => { stage.setQuality(q); $('#q-high').classList.toggle('on', q === 'high'); $('#q-low').classList.toggle('on', q === 'low'); };
+  $('#q-high').addEventListener('click', () => setQ('high'));
+  $('#q-low').addEventListener('click', () => setQ('low'));
+  stage.on('quality', ({ quality }) => { $('#q-high').classList.toggle('on', quality === 'high'); $('#q-low').classList.toggle('on', quality === 'low'); status('Quality: ' + quality); });
+  let bloomOn = true;
+  $('#bloom').addEventListener('click', (e) => { bloomOn = !bloomOn; e.target.classList.toggle('on', bloomOn); stage.setBloom?.(bloomOn); });
+  let frameOn = true;
+  $('#frame').addEventListener('click', (e) => { frameOn = !frameOn; e.target.classList.toggle('on', frameOn); frame.setEnabled(frameOn); });
+  let screensOn = true;
+  $('#screens').addEventListener('click', (e) => {
+    screensOn = !screensOn; e.target.classList.toggle('on', screensOn);
+    if (screensOn) { echo8.attachScreen(roseEl); echo15.attachScreen(mayaEl); }
+    else { echo8.detachScreen(); echo15.detachScreen(); }
+  });
+  $('#show-pill').addEventListener('click', () => drag.drop(pills[0], 0));
+  $('#show-otc').addEventListener('click', () => drag.drop(pills[3], 0));
+  $('#show-paper').addEventListener('click', () => drag.drop(paper, 1));
+
+  window.nova = { N, stage, echo8, echo15, ring, pills, paper, logos, wordLogo, car, drag, orbit, frame, setView, setT };
+</script>
+</body>
+</html>

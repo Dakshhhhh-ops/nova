@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova · Care that speaks first</title>
+<meta name="description" content="Nova turns Alexa+ into a proactive, multimodal care circle for an older adult who lives alone, and for the family who worry about her. An MCP server with Amazon Nova on Amazon Bedrock.">
+<meta name="theme-color" content="#0A0B10">
+<meta property="og:title" content="Nova · Care that speaks first">
+<meta property="og:description" content="A proactive, multimodal care circle for Alexa+, built on MCP and Amazon Nova.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230A0B10'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%233BD1FF' stroke-width='2.4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/site/site.css">
+<script>
+  (function () {
+    var d = document.documentElement;
+    d.classList.remove('no-js'); d.classList.add('js');
+    var reduced = false;
+    try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    if (reduced) d.classList.add('reduced');
+    // WebGL mode: wide screens, motion allowed, WebGL present, and not ?flat=1
+    try {
+      var flat = /[?&]flat=1/.test(location.search);
+      var wide = matchMedia('(min-width: 900px) and (min-height: 560px)').matches;
+      var c = document.createElement('canvas');
+      var webgl = !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
+      if (!flat && wide && !reduced && webgl) d.classList.add('gl');
+    } catch (e) {}
+    // Failsafe: if the enhancement layer never boots, show everything as plain content.
+    setTimeout(function () { if (!window.__novaBooted) { d.classList.remove('js'); d.classList.add('no-js'); } }, 3200);
+  })();
+</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/renderers/CSS3DRenderer.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/environments/RoomEnvironment.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/geometries/RoundedBoxGeometry.js" crossorigin>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/Draggable.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/InertiaPlugin.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js" defer></script>
+<script src="/static/site/site.js" defer></script>
+<script type="module">
+  // The WebGL layer. Modules download early (modulepreload) but the boot waits until the preloader and the
+  // hero intro have played, so WebGL setup never stalls them. If anything fails, every section keeps its DOM version.
+  if (document.documentElement.classList.contains('gl')) {
+    var started = false;
+    var fail = function (err) { console.warn('Nova WebGL layer unavailable:', err && err.message || err); if (window.__nova && window.__nova.flat) window.__nova.flat(); else document.documentElement.classList.remove('gl'); };
+    var start = function () { if (started) return; started = true; import('/static/site/site3d.js').then(function (m) { return m.boot(); }).catch(fail); };
+    var later = function () { setTimeout(start, 1500); };
+    if (window.__nova && window.__nova.introAt) later(); else document.addEventListener('nova:intro', later, { once: true });
+    setTimeout(start, 6000);
+  }
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ============ PRELOADER ============ -->
+<div class="preloader" aria-hidden="true">
+  <div class="pl-inner">
+    <svg class="pl-ring" viewBox="0 0 220 220">
+      <defs>
+        <filter id="plGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+      </defs>
+      <circle class="pl-track" cx="110" cy="110" r="86"/>
+      <circle class="pl-arc pl-arc-glow" cx="110" cy="110" r="86" filter="url(#plGlow)"/>
+      <circle class="pl-arc" cx="110" cy="110" r="86"/>
+    </svg>
+    <p class="pl-count"><span data-pl-count>000</span></p>
+  </div>
+  <p class="pl-meta pl-meta-l mono">Nova · a care circle for Alexa+</p>
+  <p class="pl-meta pl-meta-r mono">Columbus, Ohio · Thursday</p>
+</div>
+
+<!-- ============ CURSOR ============ -->
+<div class="cursor" aria-hidden="true"><div class="cursor-ring"><span class="cursor-label"></span></div><div class="cursor-dot"></div></div>
+<div class="grain" aria-hidden="true"></div>
+<div class="hud" aria-hidden="true">
+  <p class="hud-c hud-bl mono"><span class="hud-rec"></span>Source: Alexa+ <span class="sep">/</span> <span data-hud-ch>CH 00 · Kitchen</span></p>
+  <p class="hud-c hud-br mono">Nova v1 <span class="sep">/</span> TC <span data-hud-tc>00:00:00:00</span></p>
+</div>
+
+<!-- ============ NAV ============ -->
+<header class="nav" data-nav>
+  <a class="nav-logo" href="#top" aria-label="Nova, back to top">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/><circle class="nav-logo-arc" cx="16" cy="16" r="11" fill="none" stroke="#3BD1FF" stroke-width="2" stroke-linecap="round" stroke-dasharray="20 69.1"/></svg>
+    <span>Nova</span>
+  </a>
+  <p class="nav-meta mono" aria-label="Rose's local time"><span class="live-dot" aria-hidden="true"></span>Rose's kitchen <span class="sep">/</span> Columbus, OH <span class="sep">/</span> <time data-clock>--:--</time></p>
+  <nav class="nav-links mono" aria-label="Sections">
+    <a href="#day">A day</a>
+    <a href="#dots">The dots</a>
+    <a href="#sees">It sees</a>
+    <a href="#build">Build</a>
+  </nav>
+  <a class="btn btn-nav magnetic" href="/live" data-cursor="Live"><span class="btn-label">Live demo</span><span class="btn-arrow" aria-hidden="true">&#8599;</span></a>
+</header>
+
+<main id="main">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="top" data-theme="dark" aria-labelledby="hero-title">
+  <div class="gl-host gl-hero" aria-hidden="true"></div>
+  <div class="hero-scene" aria-hidden="true">
+    <div class="hero-vignette"></div>
+  </div>
+
+  <div class="hero-grid wrap">
+    <div class="hero-copy">
+      <p class="eyebrow mono reveal-up"><span class="ring-dot" aria-hidden="true"></span>Alexa+ <span class="sep">·</span> MCP <span class="sep">·</span> Amazon Nova</p>
+      <h1 class="hero-title display" id="hero-title">
+        <span class="line"><span class="line-in">Care that</span></span>
+        <span class="line"><span class="line-in">speaks <em>first</em>.</span></span>
+      </h1>
+      <p class="hero-lede reveal-up">Nova turns Alexa+ into a care circle for Rose, 81, who lives alone in Columbus, Ohio, and for the family who worry about her. It reminds her, follows up, notices what is changing, and only then tells her daughter.</p>
+      <div class="hero-ctas reveal-up">
+        <a class="btn btn-primary magnetic" href="/live" data-cursor="Enter"><span class="btn-fill" aria-hidden="true"></span><span class="btn-label">Enter the live demo</span><span class="btn-arrow" aria-hidden="true">&#8594;</span></a>
+        <a class="link-u mono" href="#day">See a day with Nova</a>
+      </div>
+    </div>
+
+    <figure class="hero-device" aria-label="Rose's Echo Show 8 on the kitchen counter, showing Nova's 6 PM reminder">
+      <div class="e3-stage" data-echo-hero data-cursor="Drag">
+        <div class="echo3d" data-state="idle">
+          <div class="e3-obj">
+            <div class="e3-face e3-front">
+              <span class="e3-cam" aria-hidden="true"><i></i></span>
+              <div class="e3-screen" data-hero-screen>
+                <div class="scr-wall" aria-hidden="true"></div>
+                <div class="scr-top"><span>Kitchen · Columbus</span><span data-echo-time>5:59 PM</span></div>
+                <div class="scr-stage">
+                  <div class="scr-scene is-on" data-scene="idle">
+                    <p class="scr-clock">5:59</p>
+                    <p class="scr-date">Thursday, October 22</p>
+                    <p class="scr-next"><span class="pip"></span>Next · Metformin at 6 PM</p>
+                  </div>
+                  <div class="scr-scene" data-scene="remind">
+                    <p class="scr-kicker">6 PM medicines</p>
+                    <p class="scr-say">It's 6 PM, Rose. Time for your Metformin with your meal. That's the large white oblong pill.</p>
+                    <div class="scr-chips"><span>I took it</span><span>Remind me in 10 minutes</span><span>I'll skip it tonight</span></div>
+                  </div>
+                  <div class="scr-scene" data-scene="listen">
+                    <div class="scr-orb"><i></i></div>
+                    <p class="scr-heard">&#8220;Remind me in 10 minutes.&#8221;</p>
+                  </div>
+                  <div class="scr-scene" data-scene="think">
+                    <div class="scr-orb is-think"><i></i></div>
+                    <p class="scr-tool">tools/call · snooze_reminder</p>
+                  </div>
+                  <div class="scr-scene" data-scene="reply">
+                    <p class="scr-kicker">Snoozed until 6:10 PM</p>
+                    <p class="scr-say scr-say-xl">Okay, I'll remind you in 10 minutes.</p>
+                  </div>
+                  <div class="scr-scene" data-scene="message">
+                    <p class="scr-kicker scr-kicker-amber">Message from Maya</p>
+                    <p class="scr-say">Hi Mom! Lily's piano recital video is in the family album. Call you Sunday. Love you!</p>
+                    <div class="scr-chips"><span>Play it</span><span>Reply</span></div>
+                  </div>
+                </div>
+                <div class="e3-lightbar" aria-hidden="true"><i></i></div>
+                <div class="e3-spec" aria-hidden="true"></div>
+              </div>
+            </div>
+            <div class="e3-face e3-back" aria-hidden="true"></div>
+            <div class="e3-face e3-left" aria-hidden="true"></div>
+            <div class="e3-face e3-right" aria-hidden="true"></div>
+            <div class="e3-face e3-top" aria-hidden="true"></div>
+            <div class="e3-face e3-bottom" aria-hidden="true"></div>
+          </div>
+          <div class="counter" aria-hidden="true"><i class="ct-top"></i><i class="ct-edge"></i><i class="ct-front"></i></div>
+          <div class="e3-shadow" aria-hidden="true"></div>
+          <div class="e3-spill" aria-hidden="true"></div>
+        </div>
+      </div>
+      <figcaption class="hero-states mono">
+        <span class="hs-label">Echo Show 8 · Rose's kitchen</span>
+        <span class="hs-list" aria-hidden="true"><b data-s="idle">Idle</b><b data-s="speaking">Speaking</b><b data-s="listening">Listening</b><b data-s="thinking">Thinking</b><b data-s="notify">Notification</b></span>
+        <span class="drag-hint" aria-hidden="true"><svg viewBox="0 0 24 12"><path d="M1 6h22M5 2 1 6l4 4M19 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>Drag to turn</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="hero-foot wrap mono" aria-hidden="true">
+    <span>(00)</span>
+    <span class="scroll-cue"><span>Scroll</span><i></i></span>
+    <span>Build, Ship, Shape · Alexa+ track</span>
+  </div>
+</section>
+
+<!-- ============ MARQUEE ============ -->
+<section class="marquee" aria-label="Things Nova says">
+  <ul class="sr-only">
+    <li>It's 6 PM, Rose. Time for your Metformin with your meal. That's the large white oblong pill.</li>
+    <li>Just checking, Rose: have you taken your 6 PM Metformin yet?</li>
+    <li>Mom hasn't taken her 6 PM Metformin. I reminded her at 6 PM and 6:30 PM.</li>
+    <li>You already took Lisinopril at 8:14 AM, so please don't take another one.</li>
+    <li>Would you like me to let Maya and Leo know you're feeling dizzy?</li>
+    <li>Please don't take ibuprofen, Rose. Your knee discharge instructions say to avoid it because of blood pressure and kidney function.</li>
+    <li>That's atorvastatin, your bedtime pill. Put it back.</li>
+    <li>Careful, Rose. This bottle is Lisinopril 20 mg, but your plan now says 10 mg.</li>
+    <li>Grace arrived at Mom's at 10:02.</li>
+    <li>Dizziness began after her lisinopril change.</li>
+    <li>The Metformin refill is ready at Elm Street Pharmacy.</li>
+    <li>Got it, 118 over 72. That's within the range Dr. Patel set.</li>
+  </ul>
+  <div class="mq-row mq-a" aria-hidden="true">
+    <div class="mq-track">
+      <span class="mq-item"><q>It's 6 PM, Rose. Time for your Metformin with your meal.</q><small>To Rose · 6:00 PM</small></span>
+      <span class="mq-item"><q>Just checking, Rose: have you taken your 6 PM Metformin yet?</q><small>To Rose · 6:30 PM</small></span>
+      <span class="mq-item mq-amber"><q>Mom hasn't taken her 6 PM Metformin. I reminded her at 6 PM and 6:30 PM.</q><small>To Maya · 7:30 PM</small></span>
+      <span class="mq-item"><q>You already took Lisinopril at 8:14 AM, so please don't take another one.</q><small>To Rose · 8:40 AM</small></span>
+      <span class="mq-item"><q>Would you like me to let Maya and Leo know you're feeling dizzy?</q><small>To Rose · 9:00 AM</small></span>
+    </div>
+  </div>
+  <div class="mq-row mq-b" aria-hidden="true">
+    <div class="mq-track">
+      <span class="mq-item mq-coral"><q>Please don't take ibuprofen, Rose.</q><small>From her knee discharge notes</small></span>
+      <span class="mq-item"><q>That's atorvastatin, your bedtime pill. Put it back.</q><small>Amazon Nova vision</small></span>
+      <span class="mq-item mq-coral"><q>Careful, Rose. This bottle is Lisinopril 20 mg, but your plan now says 10 mg.</q><small>Dose guard</small></span>
+      <span class="mq-item mq-amber"><q>Grace arrived at Mom's at 10:02.</q><small>Ring · front door</small></span>
+      <span class="mq-item"><q>Dizziness began after her lisinopril change.</q><small>Insight · with evidence</small></span>
+      <span class="mq-item"><q>The Metformin refill is ready at Elm Street Pharmacy.</q><small>Refills · 12:00 PM</small></span>
+      <span class="mq-item"><q>Got it, 118 over 72. That's within the range Dr. Patel set.</q><small>Blood pressure by voice</small></span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 01 PROBLEM ============ -->
+<section class="problem theme-light" id="why" data-theme="light" aria-labelledby="why-title">
+  <div class="wrap">
+    <div class="sec-head r3d"><span class="idx mono">01</span><span class="hair"></span><span class="mono">Why it matters</span></div>
+    <h2 class="display sec-title" id="why-title">
+      <span class="line"><span class="line-in">The signs are small,</span></span>
+      <span class="line"><span class="line-in">and <em>scattered</em>.</span></span>
+    </h2>
+
+    <div class="stats">
+      <div class="stat stat-a r3d">
+        <p class="stat-num" aria-label="53 million"><span data-count="53">53</span><span class="stat-unit">M</span></p>
+        <p class="stat-cap">Americans are unpaid family caregivers. Many of them, like Maya, live hours away from the person they care for.</p>
+        <p class="stat-src mono">AARP · Caregiving in the U.S., 2020</p>
+      </div>
+      <div class="stat stat-b r3d">
+        <p class="stat-num" aria-label="1 in 4"><span data-count="1">1</span><em class="stat-in">in</em><span data-count="4">4</span></p>
+        <div class="stat-people" aria-hidden="true"><i></i><i></i><i></i><i class="is-hit"></i></div>
+        <p class="stat-cap">adults over 65 falls each year. Dizziness when standing is one of the quiet warnings.</p>
+        <p class="stat-src mono">CDC</p>
+      </div>
+    </div>
+
+    <div class="scatter" aria-label="Signals from Rose's last two weeks">
+      <p class="sig" data-speed="1.4" style="--x:4%;--y:6%;--r:-4deg"><q>Felt a bit woozy when I got out of bed.</q><small class="mono">Rose · Oct 15</small></p>
+      <p class="sig sig-dark" data-speed="0.7" style="--x:58%;--y:0%;--r:3deg"><b>Lisinopril 10 &#8594; 20 mg</b><small class="mono">Dr. Patel · Oct 13</small></p>
+      <p class="sig" data-speed="1.1" style="--x:34%;--y:30%;--r:2deg"><q>Dizzy again getting up from the couch. Skipped my walk.</q><small class="mono">Rose · Oct 17</small></p>
+      <p class="sig sig-amber" data-speed="1.8" style="--x:76%;--y:30%;--r:-3deg"><b>Evening Metformin · missed</b><small class="mono">Oct 18</small></p>
+      <p class="sig" data-speed="0.9" style="--x:10%;--y:58%;--r:3deg"><q>Sitting BP 104/62. She says it passes after a minute.</q><small class="mono">Grace · Oct 19</small></p>
+      <p class="sig" data-speed="1.5" style="--x:62%;--y:62%;--r:-2deg"><q>Didn't go to garden club.</q><small class="mono">Rose · Oct 21</small></p>
+    </div>
+
+    <div class="problem-kicker">
+      <p class="pk-text r3d">No single signal is alarming. Together, they're worth a call. But Maya is two thousand miles away, Grace visits twice a week, and Dr. Patel sees Rose every few months. <span class="pk-em">Nobody sees them together.</span></p>
+      <p class="pk-big display r3d">Nova <em>does</em>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 A DAY WITH NOVA ============ -->
+<section class="day" id="day" data-theme="dark" aria-labelledby="day-title">
+  <div class="day-pin">
+    <div class="gl-host gl-day" aria-hidden="true"></div>
+    <div class="gl-day-hud wrap mono" aria-hidden="true">
+      <span class="gdh-l"><span class="idx">02</span> A day with Nova</span>
+      <span class="gdh-clock" data-gl-clock>7:55 AM</span>
+      <span class="gdh-r"><span class="gdh-hint">Scroll, drag or use the arrow keys</span></span>
+    </div>
+    <button type="button" class="gl-sun" aria-label="Drag to change the time of day" data-cursor="Drag"><span class="mono">Drag the sun</span></button>
+    <div class="day-sky" aria-hidden="true">
+      <div class="sky sky-dawn"></div>
+      <div class="sky sky-day"></div>
+      <div class="sky sky-golden"></div>
+      <div class="sky sky-dusk"></div>
+      <div class="sky sky-night"></div>
+      <div class="stars"><i class="st-a"></i><i class="st-b"></i></div>
+      <svg class="sky-arc" viewBox="0 0 1000 400" preserveAspectRatio="none"><path d="M40 360 Q500 -60 960 360"/></svg>
+      <svg class="skyline" viewBox="0 0 1600 220" preserveAspectRatio="xMidYMax slice">
+        <path class="sl-far" d="M0 150 C 140 128 260 140 380 132 S 640 118 760 130 S 1040 140 1180 126 S 1460 120 1600 134 V220 H0Z"/>
+        <g class="sl-near">
+          <path d="M0 190 H90 V150 L130 122 L170 150 V190 H210 V162 H240 V140 L280 112 L320 140 V190 H360 C 380 150 420 150 440 190 H500 V156 L548 120 L596 156 V190 H640 V150 H700 V190 H760 C 778 158 812 158 830 190 H880 V146 L930 108 L980 146 V190 H1040 V160 L1070 140 L1100 160 V190 H1150 C 1170 148 1214 148 1234 190 H1290 V150 L1340 116 L1390 150 V190 H1440 V164 H1480 V140 L1520 112 L1560 140 V190 H1600 V220 H0Z"/>
+        </g>
+        <g class="sl-win">
+          <rect x="140" y="160" width="12" height="12"/><rect x="292" y="152" width="12" height="12"/><rect x="530" y="160" width="12" height="14"/><rect x="566" y="160" width="12" height="14"/><rect x="668" y="164" width="10" height="10"/>
+          <rect x="1065" y="166" width="10" height="10"/><rect x="1306" y="160" width="12" height="12"/><rect x="1500" y="152" width="12" height="12"/>
+        </g>
+        <rect class="sl-rose" x="914" y="152" width="18" height="16"/>
+        <g class="sl-lamp"><line x1="1210" y1="190" x2="1210" y2="134"/><circle cx="1210" cy="132" r="4"/></g>
+      </svg>
+    </div>
+
+    <div class="day-handle" aria-hidden="true" data-cursor="Drag">
+      <div class="dh-body"><span class="dh-sun"></span><span class="dh-moon"></span></div>
+      <span class="dh-tip mono">Drag the sun</span>
+    </div>
+
+    <div class="day-hud wrap mono" aria-hidden="true">
+      <span class="hud-l"><span class="idx">02</span> A day with Nova</span>
+      <span class="hud-clock"><span data-day-clock>7:55 AM</span></span>
+      <span class="hud-r">Thursday, October 22 · Columbus</span>
+    </div>
+
+    <div class="day-viewport">
+      <ol class="day-track" role="list">
+        <li class="moment moment-intro" data-hour="7.75">
+          <h2 class="display" id="day-title">From the first pill to the <em>last light</em>.</h2>
+          <p class="mi-copy">Nova runs on the household clock. It doesn't wait to be asked: it reminds, follows up, and only then tells the family. Scroll, drag the timeline, or drag the sun through Rose's Thursday.</p>
+          <p class="mi-hint mono"><svg viewBox="0 0 24 12" aria-hidden="true"><path d="M1 6h22M5 2 1 6l4 4M19 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>Drag</p>
+        </li>
+
+        <li class="moment" data-hour="8" data-tod="dawn" data-tone="nova">
+          <div class="m-time"><span class="m-hm">8:00</span><span class="m-ap mono">AM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Speaks first · Rose's Echo Show 8</p>
+          <blockquote class="m-quote">&#8220;It's 8 AM, Rose. Time for your Lisinopril, Metformin and Vitamin D3 with your meal.&#8221;</blockquote>
+          <div class="m-chips mono"><span>I took it</span><span>Remind me in 10 minutes</span></div>
+        </li>
+
+        <li class="moment" data-hour="8.1" data-tod="dawn" data-tone="amber">
+          <div class="m-time"><span class="m-hm">8:06</span><span class="m-ap mono">AM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>It sees · Amazon Nova vision</p>
+          <p class="m-context">Rose holds a bottle up to the camera.</p>
+          <blockquote class="m-quote">&#8220;That's atorvastatin, your bedtime pill. Put it back.&#8221;</blockquote>
+          <div class="m-bottle" aria-hidden="true"><span class="mb-cap"></span><span class="mb-body"><span class="mb-label">Atorvastatin<br>40 mg</span></span><span class="mb-scan"></span></div>
+        </li>
+
+        <li class="moment" data-hour="8.67" data-tod="day" data-tone="nova">
+          <div class="m-time"><span class="m-hm">8:40</span><span class="m-ap mono">AM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Double-dose guard</p>
+          <p class="m-context">&#8220;I just took my pink pill.&#8221;</p>
+          <blockquote class="m-quote">&#8220;You already took Lisinopril at 8:14 AM, so please don't take another one.&#8221;</blockquote>
+        </li>
+
+        <li class="moment" data-hour="9" data-tod="day" data-tone="nova">
+          <div class="m-time"><span class="m-hm">9:00</span><span class="m-ap mono">AM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Check-in · consent by MCP elicitation</p>
+          <p class="m-context">&#8220;Good morning, Rose! How are you feeling today?&#8221; &#8212; &#8220;A bit dizzy again.&#8221;</p>
+          <blockquote class="m-quote">&#8220;Would you like me to let Maya and Leo know you're feeling dizzy?&#8221;</blockquote>
+          <div class="m-consent"><button type="button" class="mc-yes" data-consent="yes">Yes, tell them</button><button type="button" data-consent="no">Not now</button><span class="mc-out mono" aria-live="polite"></span></div>
+        </li>
+
+        <li class="moment moment-wide" data-hour="10" data-tod="day" data-tone="nova">
+          <div class="m-time"><span class="m-hm">10:00</span><span class="m-ap mono">AM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Counts pills · refills</p>
+          <blockquote class="m-quote">&#8220;Rose, you have about 3 days of Metformin left. Want me to order a refill from Elm Street Pharmacy?&#8221;</blockquote>
+          <div class="m-chips mono"><span>Yes, order a refill</span><span>Not now</span></div>
+          <ul class="m-evidence mono">
+            <li><span>Nova</span>Done. I sent a refill request for Metformin to Elm Street Pharmacy.</li>
+            <li><span>12:00</span>The Metformin refill is ready at Elm Street Pharmacy.</li>
+          </ul>
+        </li>
+
+        <li class="moment" data-hour="10.03" data-tod="day" data-tone="amber">
+          <div class="m-time"><span class="m-hm">10:02</span><span class="m-ap mono">AM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Ring doorbell · Maya's Echo Show 15</p>
+          <div class="m-ring-cam" aria-hidden="true"><span class="rc-door"></span><span class="rc-fig"></span><span class="rc-label mono">Front door · Motion</span></div>
+          <blockquote class="m-quote">&#8220;Grace arrived at Mom's at 10:02.&#8221;</blockquote>
+        </li>
+
+        <li class="moment moment-wide" data-hour="13.25" data-tod="day" data-tone="amber">
+          <div class="m-time"><span class="m-hm">1:15</span><span class="m-ap mono">PM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Seattle, 10:15 AM · Maya asks</p>
+          <p class="m-context">&#8220;How's Mom doing?&#8221;</p>
+          <blockquote class="m-quote">&#8220;Dizziness began after her lisinopril change.&#8221;</blockquote>
+          <ul class="m-evidence mono">
+            <li><span>BP</span>152/91 before &#8594; 110/66 since</li>
+            <li><span>Said</span>Dizzy 4 times since Oct 15</li>
+            <li><span>Grace</span>Unsteady getting up, Oct 19</li>
+          </ul>
+        </li>
+
+        <li class="moment moment-wide" data-hour="16.2" data-tod="day" data-tone="nova">
+          <div class="m-time"><span class="m-hm">4:10</span><span class="m-ap mono">PM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Maya scans the after-visit summary</p>
+          <div class="m-recon">
+            <div class="mr-row"><span class="mr-tag mr-change mono">Change</span><span class="mr-name">Lisinopril</span><span class="mr-dose"><s>20 mg</s> &#8594; <b>10 mg</b></span></div>
+            <div class="mr-row"><span class="mr-tag mono">Continue</span><span class="mr-name">Metformin</span><span class="mr-dose">500 mg</span></div>
+            <div class="mr-row"><span class="mr-tag mono">Continue</span><span class="mr-name">Atorvastatin</span><span class="mr-dose">40 mg</span></div>
+          </div>
+          <div class="m-approve"><button type="button" class="btn-approve" data-approve>Approve</button><span class="mono">Nothing changes until a person approves.</span></div>
+        </li>
+
+        <li class="moment" data-hour="18" data-tod="golden" data-tone="nova">
+          <div class="m-time"><span class="m-hm">6:00</span><span class="m-ap mono">PM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Reminder · Rose</p>
+          <blockquote class="m-quote">&#8220;It's 6 PM, Rose. Time for your Metformin with your meal. That's the large white oblong pill.&#8221;</blockquote>
+          <p class="m-ladder mono"><b class="on">6:00</b><i></i><b>6:30</b><i></i><b>7:30</b></p>
+        </li>
+
+        <li class="moment" data-hour="18.5" data-tod="golden" data-tone="nova">
+          <div class="m-time"><span class="m-hm">6:30</span><span class="m-ap mono">PM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Follow-up after 30 minutes · Rose</p>
+          <blockquote class="m-quote">&#8220;Just checking, Rose: have you taken your 6 PM Metformin yet?&#8221;</blockquote>
+          <p class="m-ladder mono"><b class="done">6:00</b><i class="on"></i><b class="on">6:30</b><i></i><b>7:30</b></p>
+        </li>
+
+        <li class="moment moment-alert" data-hour="19.5" data-tod="dusk" data-tone="amber">
+          <div class="m-time"><span class="m-hm">7:30</span><span class="m-ap mono">PM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>After 90 minutes · Maya's Echo glows yellow</p>
+          <blockquote class="m-quote">&#8220;Mom hasn't taken her 6 PM Metformin. I reminded her at 6 PM and 6:30 PM.&#8221;</blockquote>
+          <p class="m-ladder mono"><b class="done">6:00</b><i class="on"></i><b class="done">6:30</b><i class="on"></i><b class="on amber">7:30</b></p>
+        </li>
+
+        <li class="moment moment-night" data-hour="21" data-tod="night" data-tone="nova">
+          <div class="m-time"><span class="m-hm">9:00</span><span class="m-ap mono">PM</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>Bedtime</p>
+          <blockquote class="m-quote">&#8220;It's 9 PM, Rose. Time for your Atorvastatin. That's the small white round pill.&#8221;</blockquote>
+          <p class="m-goodnight display">Goodnight, <em>Rose</em>.</p>
+        </li>
+
+        <li class="moment moment-next" data-hour="31.92" data-tod="dawn" data-tone="nova">
+          <div class="m-time"><span class="m-hm">7:55</span><span class="m-ap mono">AM · Friday</span></div>
+          <p class="m-tag mono"><span class="m-ring"></span>The next morning · blood pressure by voice</p>
+          <p class="m-context">&#8220;Good morning, Rose. Dr. Patel asked for a blood pressure reading every morning before your pills.&#8221; &#8212; &#8220;It's 118 over 72.&#8221;</p>
+          <blockquote class="m-quote">&#8220;Got it, 118 over 72. Last reading was 106 over 64. That's within the range Dr. Patel set.&#8221;</blockquote>
+          <p class="m-note mono">Out of range, and Maya and Leo hear about it.</p>
+        </li>
+      </ol>
+    </div>
+
+    <div class="day-progress" aria-hidden="true"><i></i></div>
+  </div>
+</section>
+
+<!-- ============ 03 CONNECTS THE DOTS ============ -->
+<section class="dots" id="dots" data-theme="dark" aria-labelledby="dots-title">
+  <div class="dots-pin">
+    <div class="wrap dots-head">
+      <div class="sec-head"><span class="idx mono">03</span><span class="hair"></span><span class="mono">It connects the dots</span></div>
+      <h2 class="display sec-title-s" id="dots-title">One signal is noise. Four is a <em>pattern</em>.</h2>
+    </div>
+
+    <div class="wrap dots-chart-wrap">
+      <figure class="dots-chart" aria-labelledby="chart-cap">
+        <div class="chart-scroll">
+        <svg class="chart" viewBox="0 0 1200 420" role="img" aria-labelledby="chart-cap">
+          <defs>
+            <linearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3BD1FF" stop-opacity=".22"/><stop offset="1" stop-color="#3BD1FF" stop-opacity=".02"/></linearGradient>
+            <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="4"/></filter>
+          </defs>
+          <g class="ch-axes">
+            <g class="ch-grid"><line x1="150" x2="1168" y1="230.9" y2="230.9"/><text x="136" y="234.9" text-anchor="end">60</text></g>
+            <g class="ch-grid"><line x1="150" x2="1168" y1="176.4" y2="176.4"/><text x="136" y="180.4" text-anchor="end">90</text></g>
+            <g class="ch-grid"><line x1="150" x2="1168" y1="121.8" y2="121.8"/><text x="136" y="125.8" text-anchor="end">120</text></g>
+            <g class="ch-grid"><line x1="150" x2="1168" y1="67.3" y2="67.3"/><text x="136" y="71.3" text-anchor="end">150</text></g>
+            <text class="ch-ylab" x="0" y="44">HOME BP</text>
+            <text class="ch-ylab ch-ylab-s" x="0" y="60">mmHg</text>
+            <g class="ch-lane"><line x1="150" x2="1168" y1="296" y2="296"/><text x="0" y="300">DIZZINESS</text></g>
+            <g class="ch-lane"><line x1="150" x2="1168" y1="330" y2="330"/><text x="0" y="334">WALKS, OUTINGS</text></g>
+            <g class="ch-lane"><line x1="150" x2="1168" y1="364" y2="364"/><text x="0" y="368">EVENING DOSES</text></g>
+            <g class="ch-ticks">
+              <g><line x1="150" x2="150" y1="386" y2="392"/><text x="150" y="410" text-anchor="middle">OCT 9</text></g>
+              <g><line x1="228.3" x2="228.3" y1="386" y2="392"/><text x="228.3" y="410" text-anchor="middle">10</text></g>
+              <g><line x1="306.6" x2="306.6" y1="386" y2="392"/><text x="306.6" y="410" text-anchor="middle">11</text></g>
+              <g><line x1="384.9" x2="384.9" y1="386" y2="392"/><text x="384.9" y="410" text-anchor="middle">12</text></g>
+              <g><line x1="463.2" x2="463.2" y1="386" y2="392"/><text x="463.2" y="410" text-anchor="middle">13</text></g>
+              <g><line x1="541.5" x2="541.5" y1="386" y2="392"/><text x="541.5" y="410" text-anchor="middle">14</text></g>
+              <g><line x1="619.8" x2="619.8" y1="386" y2="392"/><text x="619.8" y="410" text-anchor="middle">15</text></g>
+              <g><line x1="698.2" x2="698.2" y1="386" y2="392"/><text x="698.2" y="410" text-anchor="middle">16</text></g>
+              <g><line x1="776.5" x2="776.5" y1="386" y2="392"/><text x="776.5" y="410" text-anchor="middle">17</text></g>
+              <g><line x1="854.8" x2="854.8" y1="386" y2="392"/><text x="854.8" y="410" text-anchor="middle">18</text></g>
+              <g><line x1="933.1" x2="933.1" y1="386" y2="392"/><text x="933.1" y="410" text-anchor="middle">19</text></g>
+              <g><line x1="1011.4" x2="1011.4" y1="386" y2="392"/><text x="1011.4" y="410" text-anchor="middle">20</text></g>
+              <g><line x1="1089.7" x2="1089.7" y1="386" y2="392"/><text x="1089.7" y="410" text-anchor="middle">21</text></g>
+              <g><line x1="1168" x2="1168" y1="386" y2="392"/><text x="1168" y="410" text-anchor="end">TODAY</text></g>
+            </g>
+          </g>
+
+          <!-- Averages -->
+          <g class="ch-avg ch-avg-pre" data-step="1">
+            <line x1="150" x2="463.2" y1="63.6" y2="63.6"/>
+            <text x="156" y="30">BEFORE · AVG 152/91</text>
+          </g>
+          <g class="ch-avg ch-avg-post" data-step="3">
+            <line x1="463.2" x2="1168" y1="140" y2="140"/>
+            <text x="478" y="162">SINCE · AVG 110/66 · LOWEST 104/62</text>
+          </g>
+
+          <!-- BP band + lines -->
+          <path class="ch-band" d="M150,60 L306.6,67.3 L698.2,125.5 L854.8,136.4 L933.1,150.9 L1089.7,147.3 L1089.7,223.6 L933.1,227.3 L854.8,216.4 L698.2,209.1 L306.6,176.4 L150,172.7 Z"/>
+          <path class="ch-line ch-sys" d="M150,60 L306.6,67.3 L698.2,125.5 L854.8,136.4 L933.1,150.9 L1089.7,147.3"/>
+          <path class="ch-line ch-dia" d="M150,172.7 L306.6,176.4 L698.2,209.1 L854.8,216.4 L933.1,227.3 L1089.7,223.6"/>
+          <g class="ch-pts">
+            <g class="ch-pt" data-at="0"><circle cx="150" cy="60" r="5"/><circle class="ch-pt-d" cx="150" cy="172.7" r="3.5"/><title>Oct 9 · 154/92 · Grace</title></g>
+            <g class="ch-pt" data-at="0.12"><circle cx="306.6" cy="67.3" r="5"/><circle class="ch-pt-d" cx="306.6" cy="176.4" r="3.5"/><title>Oct 11 · 150/90 · Grace</title></g>
+            <g class="ch-pt" data-at="0.52"><circle cx="698.2" cy="125.5" r="5"/><circle class="ch-pt-d" cx="698.2" cy="209.1" r="3.5"/><title>Oct 16 · 118/72 · Grace</title></g>
+            <g class="ch-pt" data-at="0.67"><circle cx="854.8" cy="136.4" r="5"/><circle class="ch-pt-d" cx="854.8" cy="216.4" r="3.5"/><title>Oct 18 · 112/68 · Rose</title></g>
+            <g class="ch-pt ch-pt-low" data-at="0.76"><circle cx="933.1" cy="150.9" r="5"/><circle class="ch-pt-d" cx="933.1" cy="227.3" r="3.5"/><title>Oct 19 · 104/62 · Grace</title></g>
+            <g class="ch-pt" data-at="1"><circle cx="1089.7" cy="147.3" r="5"/><circle class="ch-pt-d" cx="1089.7" cy="223.6" r="3.5"/><title>Oct 21 · 106/64 · Rose</title></g>
+          </g>
+          <g class="ch-vals">
+            <text x="150" y="48" text-anchor="middle">154/92</text>
+            <text x="306.6" y="55" text-anchor="middle">150/90</text>
+            <text x="933.1" y="250" text-anchor="middle" class="ch-val-low">104/62</text>
+          </g>
+
+          <!-- Dose change marker -->
+          <g class="ch-dose" data-step="2">
+            <line class="ch-dose-line" x1="463.2" x2="463.2" y1="18" y2="372"/>
+            <rect x="469" y="8" width="266" height="22" rx="11"/>
+            <text x="480" y="23">LISINOPRIL 10 &#8594; 20 MG · DR. PATEL</text>
+          </g>
+
+          <!-- Walks: they stop -->
+          <g class="ch-walks" data-step="4">
+            <circle cx="384.9" cy="330" r="5"/><circle cx="463.2" cy="330" r="5"/><circle cx="541.5" cy="330" r="5"/>
+            <line class="ch-none" x1="580" x2="1168" y1="330" y2="330"/>
+            <text x="600" y="322">NONE SINCE OCT 14</text>
+          </g>
+
+          <!-- Evening doses: slipping -->
+          <g class="ch-eve" data-step="4">
+            <circle cx="150" cy="364" r="4"/><circle cx="228.3" cy="364" r="4"/><circle cx="306.6" cy="364" r="4"/><circle cx="384.9" cy="364" r="4"/><circle cx="463.2" cy="364" r="4"/><circle cx="541.5" cy="364" r="4"/><circle cx="619.8" cy="364" r="4"/><circle cx="698.2" cy="364" r="4"/><circle cx="776.5" cy="364" r="4"/>
+            <circle class="miss" cx="854.8" cy="364" r="5"/><circle class="miss" cx="933.1" cy="364" r="5"/><circle class="miss" cx="1011.4" cy="364" r="5"/><circle class="miss" cx="1089.7" cy="364" r="5"/>
+            <text x="1168" y="356" text-anchor="end">5 MISSED IN 4 DAYS</text>
+          </g>
+
+          <!-- Dizziness: the pattern -->
+          <g class="ch-dizz" data-step="3">
+            <path class="ch-dizz-link" d="M619.8,296 L776.5,296 L933.1,296 L1089.7,296"/>
+            <path class="ch-lag" d="M463.2,296 C 500,276 580,276 612,292"/>
+            <text class="ch-lag-t" x="541.5" y="272" text-anchor="middle">+2 DAYS</text>
+            <g class="ch-dz" data-at="0"><circle class="glow" cx="619.8" cy="296" r="9" filter="url(#dotGlow)"/><circle cx="619.8" cy="296" r="6"/><title>Oct 15 · "Felt a bit woozy when I got out of bed."</title></g>
+            <g class="ch-dz" data-at="0.33"><circle class="glow" cx="776.5" cy="296" r="9" filter="url(#dotGlow)"/><circle cx="776.5" cy="296" r="6"/><title>Oct 17 · "Dizzy again getting up from the couch."</title></g>
+            <g class="ch-dz" data-at="0.66"><circle class="glow" cx="933.1" cy="296" r="9" filter="url(#dotGlow)"/><circle cx="933.1" cy="296" r="6"/><title>Oct 19 · "Had to hold the counter when I stood up."</title></g>
+            <g class="ch-dz" data-at="1"><circle class="glow" cx="1089.7" cy="296" r="9" filter="url(#dotGlow)"/><circle cx="1089.7" cy="296" r="6"/><title>Oct 21 · "Dizzy in the morning again."</title></g>
+          </g>
+
+          <!-- Grace's note -->
+          <g class="ch-grace" data-step="5">
+            <line x1="933.1" y1="139" x2="933.1" y2="98"/>
+            <circle cx="933.1" cy="150.9" r="11"/>
+            <foreignObject x="770" y="0" width="398" height="98">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="grace-note">
+                <p class="mono">Grace · Oct 19, 3:00 PM</p>
+                <q>Rose was a little unsteady getting up from the couch today. Sitting BP 104/62.</q>
+              </div>
+            </foreignObject>
+          </g>
+        </svg>
+        </div>
+        <figcaption class="sr-only" id="chart-cap">Rose's last 14 days. Home blood pressure was 154/92 on Oct 9 and 150/90 on Oct 11. Dr. Patel doubled her lisinopril from 10 to 20 mg on Oct 13. Readings then fell to 118/72 on Oct 16, 112/68 on Oct 18, 104/62 on Oct 19 and 106/64 on Oct 21. Rose mentioned dizziness on Oct 15, 17, 19 and 21. Her walks and outings stopped after Oct 14, and she missed 5 evening doses between Oct 18 and Oct 21.</figcaption>
+      </figure>
+    </div>
+
+    <div class="gl-host gl-dots" aria-hidden="true"><div class="gl-labels"></div></div>
+    <svg class="dots-links" aria-hidden="true"></svg>
+
+    <div class="wrap dots-foot">
+      <ol class="dots-steps" aria-label="What Nova noticed">
+        <li class="ds is-on"><span class="ds-date mono">Oct 9 – 12 · Before</span><p>Home blood pressure runs high, around 152/91. Rose walks with her neighbor Ruth and goes to garden club.</p></li>
+        <li class="ds"><span class="ds-date mono">Oct 13 · The change</span><p>Dr. Patel doubles her lisinopril, from 10 to 20 mg.</p></li>
+        <li class="ds"><span class="ds-date mono">Oct 15 · Two days later</span><p>&#8220;Felt a bit woozy when I got out of bed.&#8221; She says it again on the 17th, 19th and 21st, while her pressure keeps falling.</p></li>
+        <li class="ds"><span class="ds-date mono">Oct 19 · Grace</span><p>&#8220;A little unsteady getting up from the couch.&#8221; Her walks have stopped. Her evening pills are slipping.</p></li>
+      </ol>
+
+      <article class="insight" aria-label="Nova's insight">
+        <p class="in-tag mono"><span class="in-dot"></span>Worth watching · Rose · this week</p>
+        <h3 class="in-title"><span class="line"><span class="line-in">Dizziness began after her</span></span> <span class="line"><span class="line-in">lisinopril change.</span></span></h3>
+        <ul class="in-ev">
+          <li><span class="mono">BP</span>Home BP averaged 152/91 before the change, 110/66 since (lowest 104/62)</li>
+          <li><span class="mono">Said</span>Mentioned dizziness 4 times since Oct 15, two days after the dose change</li>
+          <li><span class="mono">Aide</span>Grace saw her unsteady getting up, Oct 19</li>
+          <li><span class="mono">Notes</span>Dr. Patel's notes say to call about dizziness: 614-555-0190</li>
+        </ul>
+        <p class="in-foot mono">Deterministic rules find it. Amazon Nova writes the words. Nova never diagnoses.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SUNDAY DIGEST ============ -->
+<section class="digest" aria-labelledby="digest-title">
+  <div class="wrap digest-inner">
+    <div class="dg-copy r3d">
+      <p class="dg-tag mono"><span class="in-dot"></span>Every Sunday · 6 PM · To Maya and Leo</p>
+      <h2 class="dg-title display" id="digest-title">&#8220;Here's Rose's week. She took 83 percent of her doses: mornings 100 percent, evenings&nbsp;58.&#8221;</h2>
+      <p class="dg-more">&#8220;Blood pressure averaged 110 over 66. The main thing to watch: dizziness began after her lisinopril change&#8230;&#8221;</p>
+    </div>
+    <div class="dg-nums r3d" aria-label="Rose's week in numbers">
+      <div class="dg-row"><span class="mono">Doses taken</span><b data-count="83">83</b><i>%</i><span class="dg-bar"><span style="--v:.83"></span></span></div>
+      <div class="dg-row"><span class="mono">Mornings</span><b data-count="100">100</b><i>%</i><span class="dg-bar"><span style="--v:1"></span></span></div>
+      <div class="dg-row dg-warn"><span class="mono">Evenings</span><b data-count="58">58</b><i>%</i><span class="dg-bar"><span style="--v:.58"></span></span></div>
+      <div class="dg-row"><span class="mono">Home BP, avg</span><b>110/66</b><i></i><span class="dg-note mono">Dr. Patel's limits: 100/60 to 160/100</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 IT SEES ============ -->
+<section class="sees" id="sees" data-theme="light" aria-labelledby="sees-title">
+  <div class="wrap">
+    <div class="sees-head">
+      <div class="sec-head r3d"><span class="idx mono">04</span><span class="hair"></span><span class="mono">It sees · Amazon Nova multimodal</span></div>
+      <h2 class="display sec-title" id="sees-title">
+        <span class="line"><span class="line-in">It sees what's</span></span>
+        <span class="line"><span class="line-in">in her <em>hand</em>.</span></span>
+      </h2>
+      <p class="sees-lede r3d">Rose's knee hurts and she reaches for ibuprofen. She holds the bottle up to her Echo Show: Amazon Nova reads the label, and Nova checks it against her plan and her doctors' own notes.</p>
+    </div>
+
+    <div class="lab r3d">
+      <div class="gl-host gl-sees" aria-hidden="true"></div>
+      <div class="lab-shelf">
+        <p class="lab-hint mono"><span class="lh-drag">Drag a bottle to the camera</span><span class="lh-tap">Tap a bottle to show Alexa</span></p>
+        <div class="bottles" role="group" aria-label="Pill bottles">
+          <button type="button" class="bottle bottle-otc" data-bottle="ibuprofen" aria-label="Show Alexa the ibuprofen bottle" data-cursor="Drag">
+            <svg viewBox="0 0 120 176" aria-hidden="true"><use href="#otcBody"/><g class="b-label b-label-otc"><rect x="16" y="62" width="88" height="78" rx="2"/><text x="22" y="76" class="bl-ph">ELM STREET HEALTH</text><text x="22" y="96" class="bl-big">IBUPROFEN</text><text x="22" y="108" class="bl-pt">TABLETS, 200 MG</text><text x="22" y="120" class="bl-sm">PAIN RELIEVER (NSAID)</text><rect class="bl-band" x="16" y="128" width="88" height="12"/></g></svg>
+            <span class="b-name mono">Ibuprofen 200 mg</span>
+          </button>
+          <button type="button" class="bottle" data-bottle="atorvastatin" aria-label="Show Alexa the Atorvastatin 40 mg bottle" data-cursor="Drag">
+            <svg viewBox="0 0 120 176" aria-hidden="true"><use href="#bottleBody"/><g class="b-label"><rect x="18" y="66" width="84" height="80" rx="3"/><text x="24" y="80" class="bl-ph">ELM STREET PHARMACY</text><line x1="24" y1="85" x2="96" y2="85"/><text x="24" y="98" class="bl-pt">ROSE ALVAREZ</text><text x="24" y="112" class="bl-rx">ATORVASTATIN</text><text x="24" y="123" class="bl-rx">40 MG TABLET</text><text x="24" y="137" class="bl-sm">TAKE 1 AT BEDTIME</text></g></svg>
+            <span class="b-name mono">Atorvastatin 40 mg</span>
+          </button>
+          <button type="button" class="bottle" data-bottle="lisinopril" aria-label="Show Alexa the old Lisinopril 20 mg bottle" data-cursor="Drag">
+            <svg viewBox="0 0 120 176" aria-hidden="true"><use href="#bottleBody"/><g class="b-label"><rect x="18" y="66" width="84" height="80" rx="3"/><text x="24" y="80" class="bl-ph">ELM STREET PHARMACY</text><line x1="24" y1="85" x2="96" y2="85"/><text x="24" y="98" class="bl-pt">ROSE ALVAREZ</text><text x="24" y="112" class="bl-rx">LISINOPRIL</text><text x="24" y="123" class="bl-rx">20 MG TABLET</text><text x="24" y="137" class="bl-sm">TAKE 1 EVERY MORNING</text></g></svg>
+            <span class="b-name mono">Lisinopril 20 mg</span>
+          </button>
+          <button type="button" class="bottle" data-bottle="metformin" aria-label="Show Alexa the Metformin 500 mg bottle" data-cursor="Drag">
+            <svg viewBox="0 0 120 176" aria-hidden="true"><use href="#bottleBody"/><g class="b-label"><rect x="18" y="66" width="84" height="80" rx="3"/><text x="24" y="80" class="bl-ph">ELM STREET PHARMACY</text><line x1="24" y1="85" x2="96" y2="85"/><text x="24" y="98" class="bl-pt">ROSE ALVAREZ</text><text x="24" y="112" class="bl-rx">METFORMIN</text><text x="24" y="123" class="bl-rx">500 MG TABLET</text><text x="24" y="137" class="bl-sm">TWICE DAILY, MEALS</text></g></svg>
+            <span class="b-name mono">Metformin 500 mg</span>
+          </button>
+        </div>
+        <div class="lab-keys" role="group" aria-label="Show Alexa a bottle">
+          <span class="mono">Or tap</span>
+          <button type="button" data-bottle="ibuprofen">Ibuprofen</button>
+          <button type="button" data-bottle="atorvastatin">Atorvastatin 40 mg</button>
+          <button type="button" data-bottle="lisinopril">Lisinopril 20 mg</button>
+          <button type="button" data-bottle="metformin">Metformin 500 mg</button>
+        </div>
+        <p class="lab-context mono">It's 6:02 PM · Plan after Dr. Patel's visit: Lisinopril 10 mg</p>
+      </div>
+
+      <div class="lab-echo">
+        <div class="e3-stage e3-stage-sees">
+          <div class="echo3d echo3d-sees" data-state="idle">
+            <div class="e3-obj">
+              <div class="e3-face e3-front">
+                <span class="e3-cam" aria-hidden="true"><i></i></span>
+                <div class="e3-screen">
+                  <div class="scr-wall" aria-hidden="true"></div>
+                  <div class="scr-top"><span>Kitchen · Camera</span><span>6:02 PM</span></div>
+                  <div class="cam-view" data-cam>
+                    <div class="cv-idle"><span class="cv-target" aria-hidden="true"></span><p>Hold a bottle up to the camera</p></div>
+                    <div class="cv-label" aria-hidden="true">
+                      <p class="cvl-ph" data-f-ph>Elm Street Health</p>
+                      <p class="cvl-pt" data-f-pt>Over the counter</p>
+                      <p class="cvl-rx"><span class="box" data-f="name">Ibuprofen</span> <span class="box" data-f="strength">200 mg</span></p>
+                      <p class="cvl-sm"><span class="box" data-f="dir">Pain reliever (NSAID)</span></p>
+                      <span class="cv-scan"></span>
+                    </div>
+                    <div class="cv-verdict" role="status" aria-live="polite">
+                      <p class="cvv-tag mono"></p>
+                      <p class="cvv-say"></p>
+                      <p class="cvv-sub"></p>
+                      <p class="cvv-src mono"></p>
+                    </div>
+                  </div>
+                  <div class="e3-lightbar" aria-hidden="true"><i></i></div>
+                  <div class="e3-spec" aria-hidden="true"></div>
+                </div>
+              </div>
+              <div class="e3-face e3-back" aria-hidden="true"></div>
+              <div class="e3-face e3-left" aria-hidden="true"></div>
+              <div class="e3-face e3-right" aria-hidden="true"></div>
+              <div class="e3-face e3-top" aria-hidden="true"></div>
+              <div class="e3-face e3-bottom" aria-hidden="true"></div>
+            </div>
+            <div class="e3-shadow" aria-hidden="true"></div>
+            <div class="e3-spill" aria-hidden="true"></div>
+          </div>
+          <div class="drop-zone" aria-hidden="true"><span class="mono">Hold it here</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- After-visit summary -->
+    <div class="avs-block">
+      <div class="avs-copy r3d">
+        <h3 class="display avs-title">And the <em>fine print</em>.</h3>
+        <p>Maya photographs the after-visit summary. Amazon Nova reads it, and Nova reconciles it with Rose's plan as change, start, stop or continue, with the doctor's reasons. Nothing changes until a person taps Approve.</p>
+      </div>
+      <div class="avs-stage">
+        <div class="avs-paper" aria-hidden="true">
+          <div class="ap-head"><b>Ohio Heart Center</b><span>Cardiology · 3rd floor · (614) 555-0190</span></div>
+          <p class="ap-title">After visit summary</p>
+          <dl class="ap-meta"><dt>Patient</dt><dd>Rose Alvarez</dd><dt>Visit</dt><dd>Cardiology follow-up with Dr. Anika Patel</dd><dt>Date</dt><dd>10/24/2026</dd></dl>
+          <p class="ap-h">Your medication changes</p>
+          <p class="ap-row ap-hit"><span class="ap-tag ap-tag-c">Change</span><b>Lisinopril 10 mg tablet, once daily in the morning</b><small>Was 20 mg. Lowered because of dizziness when standing and low blood pressure.</small></p>
+          <p class="ap-row"><span class="ap-tag">Continue</span><b>Metformin 500 mg tablet, twice daily with meals</b></p>
+          <p class="ap-row"><span class="ap-tag">Continue</span><b>Atorvastatin 40 mg tablet, once daily at bedtime</b></p>
+          <p class="ap-row"><span class="ap-tag">Continue</span><b>Vitamin D3 2,000 IU, once daily with breakfast</b></p>
+          <span class="ap-scan"></span>
+        </div>
+        <div class="recon" aria-label="Nova's reconciliation proposal">
+          <p class="rc-tag mono">Proposed changes · Dr. Anika Patel · Oct 24</p>
+          <ul class="rc-rows">
+            <li class="rc-change"><span class="rc-k mono">Change</span><span class="rc-n">Lisinopril</span><span class="rc-d"><s>20 mg</s> &#8594; <b>10 mg</b></span><small>Lowered because of dizziness when standing and low blood pressure.</small></li>
+            <li><span class="rc-k mono">Continue</span><span class="rc-n">Metformin</span><span class="rc-d">500 mg</span></li>
+            <li><span class="rc-k mono">Continue</span><span class="rc-n">Atorvastatin</span><span class="rc-d">40 mg</span></li>
+            <li><span class="rc-k mono">Continue</span><span class="rc-n">Vitamin D3</span><span class="rc-d">2,000 IU</span></li>
+          </ul>
+          <div class="rc-actions">
+            <button type="button" class="btn-approve" data-approve>Approve</button>
+            <button type="button" class="btn-ghost" data-discard>Discard</button>
+          </div>
+          <p class="rc-after" aria-live="polite"><span class="mono">To Rose</span>&#8220;Dr. Patel changed your lisinopril from 20 mg to 10 mg.&#8221;</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="amberBody" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#9B4A0C"/><stop offset=".18" stop-color="#D97A22"/><stop offset=".32" stop-color="#F0A256"/><stop offset=".5" stop-color="#D2711C"/><stop offset="1" stop-color="#7E3A08"/>
+      </linearGradient>
+      <linearGradient id="capGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#C9C4BC"/><stop offset=".3" stop-color="#FBF8F3"/><stop offset=".7" stop-color="#E9E4DC"/><stop offset="1" stop-color="#A8A39B"/>
+      </linearGradient>
+      <linearGradient id="otcGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#C9C6C0"/><stop offset=".2" stop-color="#F7F6F2"/><stop offset=".35" stop-color="#FFFFFF"/><stop offset=".7" stop-color="#E9E7E2"/><stop offset="1" stop-color="#B9B6AF"/>
+      </linearGradient>
+      <linearGradient id="otcCap" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#14326E"/><stop offset=".35" stop-color="#2C55A8"/><stop offset=".7" stop-color="#1D4590"/><stop offset="1" stop-color="#0F275A"/>
+      </linearGradient>
+      <g id="otcBody">
+        <rect x="8" y="28" width="104" height="146" rx="20" fill="url(#otcGrad)"/>
+        <rect x="18" y="38" width="10" height="126" rx="5" fill="#fff" opacity=".7"/>
+        <rect x="20" y="2" width="80" height="30" rx="7" fill="url(#otcCap)"/>
+        <path d="M28 7v20M36 7v20M44 7v20M52 7v20M60 7v20M68 7v20M76 7v20M84 7v20M92 7v20" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>
+      </g>
+      <g id="bottleBody">
+        <rect x="10" y="30" width="100" height="144" rx="16" fill="url(#amberBody)"/>
+        <rect x="20" y="40" width="10" height="122" rx="5" fill="#FFD7A8" opacity=".35"/>
+        <rect x="6" y="2" width="108" height="34" rx="7" fill="url(#capGrad)"/>
+        <path d="M16 8v22M24 8v22M32 8v22M40 8v22M48 8v22M56 8v22M64 8v22M72 8v22M80 8v22M88 8v22M96 8v22M104 8v22" stroke="#000" stroke-opacity=".08" stroke-width="2"/>
+      </g>
+    </defs>
+  </svg>
+</section>
+
+<!-- ============ 05 UNDER THE HOOD ============ -->
+<section class="build" id="build" data-theme="dark" aria-labelledby="build-title">
+  <div class="build-pin">
+    <div class="gl-host gl-build" aria-hidden="true"></div>
+    <div class="wrap build-head">
+      <div class="sec-head"><span class="idx mono">05</span><span class="hair"></span><span class="mono">Under the hood</span></div>
+      <h2 class="display sec-title-s" id="build-title">Built on Alexa+'s <em>open standard</em>.</h2>
+      <p class="build-lede">Nova is a self-hosted MCP server, the integration path Alexa+ uses for third-party experiences, with OAuth 2.1 account linking for each person in the circle. The brain is Amazon Nova on Amazon Bedrock.</p>
+    </div>
+
+    <div class="xray" aria-hidden="true">
+      <div class="echo3d echo3d-xray" data-state="speaking">
+        <div class="e3-obj">
+          <div class="e3-face e3-front">
+            <span class="e3-cam"><i></i></span>
+            <div class="e3-screen">
+              <div class="scr-wall"></div>
+              <div class="scr-top"><span>Maya · Seattle</span><span>10:15 AM</span></div>
+              <div class="xr-card">
+                <p class="xr-k">Worth watching · Rose</p>
+                <p class="xr-t">Dizziness began after her lisinopril change.</p>
+                <p class="xr-e">BP 152/91 &#8594; 110/66 · dizzy 4&#215; since Oct 15</p>
+              </div>
+              <div class="e3-lightbar"><i></i></div>
+              <div class="e3-spec"></div>
+            </div>
+            <span class="xl-mark" data-mark="0"></span>
+          </div>
+          <div class="xl-plane" data-layer="1"><span class="xl-name">Alexa+ agent</span><span class="xl-sub">Amazon Nova · Converse tool use</span><span class="xl-mark" data-mark="1"></span></div>
+          <div class="xl-plane xl-mcp" data-layer="2"><span class="xl-name">MCP</span><span class="xl-sub">Streamable HTTP · OAuth 2.1</span><span class="xl-mark" data-mark="2"></span></div>
+          <div class="xl-plane" data-layer="3"><span class="xl-name">Nova server</span><span class="xl-sub">22 tools · care engine · insights · vision · Ring</span><span class="xl-mark" data-mark="3"></span></div>
+          <div class="xl-plane xl-nova" data-layer="4"><span class="xl-name">Amazon Nova</span><span class="xl-sub">Amazon Bedrock · language + vision</span><span class="xl-mark" data-mark="4"></span></div>
+          <span class="xl-packet"></span>
+          <div class="e3-face e3-back"></div>
+          <div class="e3-face e3-left"></div>
+          <div class="e3-face e3-right"></div>
+          <div class="e3-face e3-top"></div>
+          <div class="e3-face e3-bottom"></div>
+        </div>
+      </div>
+      </div>
+    <svg class="xray-lines" aria-hidden="true"></svg>
+
+    <ol class="layers wrap">
+      <li class="layer" data-layer="0"><span class="ly-i mono">L1</span><h3>The screen</h3><p><b class="mono">MCP Apps</b> Five <code>ui://</code> views render on the Echo Show: today, briefing, visit brief, pill check, reconciliation.</p></li>
+      <li class="layer" data-layer="1"><span class="ly-i mono">L2</span><h3>Alexa+</h3><p><b class="mono">Agent</b> Calls Nova's tools. In the simulator it runs on Amazon Nova 2 Lite with Bedrock Converse tool use, and Amazon Polly speaks.</p></li>
+      <li class="layer" data-layer="2"><span class="ly-i mono">L3</span><h3>MCP</h3><p><b class="mono">Streamable HTTP · OAuth 2.1</b> Account linking with dynamic client registration and PKCE gives each person a token, so the same tool answers Rose and Maya differently. Consent travels as an elicitation.</p></li>
+      <li class="layer" data-layer="3"><span class="ly-i mono">L4</span><h3>Nova server</h3><p><b class="mono">22 tools · 8 resources</b> A care engine on the household clock, an insight engine, vision, refills and a Ring webhook, over SQLite.</p></li>
+      <li class="layer" data-layer="4"><span class="ly-i mono">L5</span><h3>Amazon Nova</h3><p><b class="mono">Amazon Bedrock</b> Reads pill bottles and paperwork, writes the briefings. The rules underneath are deterministic and tested.</p></li>
+    </ol>
+  </div>
+
+  <div class="wrap build-after">
+    <div class="nums">
+      <div class="num r3d"><p class="num-v"><span data-count="22">22</span></p><p class="num-k mono">MCP tools</p><p class="num-d">Structured output on every tool, with a <code>speech</code> line written for voice.</p></div>
+      <div class="num r3d"><p class="num-v"><span data-count="8">8</span></p><p class="num-k mono">Resources</p><p class="num-d"><code>nova://announcements</code> is how Nova speaks first, alongside the circle and the timeline.</p></div>
+      <div class="num r3d"><p class="num-v"><span data-count="5">5</span></p><p class="num-k mono">MCP Apps views</p><p class="num-d">Rendered on the Echo Show screens, calling tools back through the host.</p></div>
+      <div class="num r3d"><p class="num-v"><span data-count="35">35</span></p><p class="num-k mono">Tests</p><p class="num-d">The escalation ladder, pill checks, refills, privacy, OAuth, Bedrock request shapes and a real Streamable HTTP round trip.</p></div>
+    </div>
+
+    <div class="trace r3d" aria-label="A sample of Nova's MCP traffic">
+      <div class="tr-bar mono"><span><i></i><i></i><i></i></span><span>MCP · streamable http · /mcp</span><span class="tr-live">live</span></div>
+      <ol class="tr-lines mono">
+        <li><b class="who">ROSE</b><span class="dir">&#8594;</span><span class="m">tools/call</span><span class="a">check_pill_photo</span><span class="v">{ image }</span></li>
+        <li><b class="who who-n">NOVA</b><span class="dir">&#8592;</span><span class="m">result</span><span class="a">wrong_time</span><span class="v">&#8220;That's atorvastatin, your bedtime pill. Put it back.&#8221;</span></li>
+        <li><b class="who">ROSE</b><span class="dir">&#8594;</span><span class="m">tools/call</span><span class="a">daily_checkin</span><span class="v">&#8220;A bit dizzy again.&#8221;</span></li>
+        <li><b class="who who-n">NOVA</b><span class="dir">&#8592;</span><span class="m">elicitation</span><span class="a">consent</span><span class="v">&#8220;Would you like me to let Maya and Leo know you're feeling dizzy?&#8221;</span></li>
+        <li><b class="who">RING</b><span class="dir">&#8594;</span><span class="m">webhook</span><span class="a">door_open</span><span class="v">grace · 10:02</span></li>
+        <li><b class="who who-n">NOVA</b><span class="dir">&#8592;</span><span class="m">announce</span><span class="a">maya</span><span class="v">&#8220;Grace arrived at Mom's at 10:02.&#8221;</span></li>
+        <li><b class="who">MAYA</b><span class="dir">&#8594;</span><span class="m">tools/call</span><span class="a">care_briefing</span><span class="v">{ "period": "week" }</span></li>
+        <li><b class="who who-n">NOVA</b><span class="dir">&#8592;</span><span class="m">ui://</span><span class="a">nova/briefing.html</span><span class="v">&#8220;Dizziness began after her lisinopril change.&#8221;</span></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 PRINCIPLES ============ -->
+<section class="principles theme-light" id="principles" data-theme="light" aria-labelledby="pr-title">
+  <div class="wrap">
+    <div class="sec-head r3d"><span class="idx mono">06</span><span class="hair"></span><span class="mono">Safe and respectful</span></div>
+    <h2 class="display sec-title" id="pr-title">
+      <span class="line"><span class="line-in">Careful by <em>design</em>.</span></span>
+    </h2>
+    <div class="pr-grid">
+      <article class="pr r3d">
+        <p class="pr-i mono">P.01</p>
+        <h3 class="pr-t">Never diagnoses.</h3>
+        <p class="pr-d">Nova notices and shows its evidence. Answers about medicine come only from the care team's own notes, with the source. Plan changes need a person's approval.</p>
+        <p class="pr-q">&#8220;Please don't take ibuprofen, Rose. Your knee discharge instructions say to avoid it because of blood pressure and kidney function.&#8221;</p>
+      </article>
+      <article class="pr r3d">
+        <p class="pr-i mono">P.02</p>
+        <h3 class="pr-t">Asks before it shares.</h3>
+        <p class="pr-d">When Rose mentions a symptom, she decides whether her family hears about it. Consent travels as an MCP elicitation.</p>
+        <p class="pr-q">&#8220;Would you like me to let Maya and Leo know you're feeling dizzy?&#8221;</p>
+      </article>
+      <article class="pr r3d">
+        <p class="pr-i mono">P.03</p>
+        <h3 class="pr-t">Rose is in charge.</h3>
+        <p class="pr-d">She chooses what the circle can see, one category at a time, and only she can change it. Identity comes from each person's token, never from what someone says.</p>
+        <p class="pr-q">&#8220;Okay. Your medications are now private from the circle.&#8221;</p>
+      </article>
+      <article class="pr r3d">
+        <p class="pr-i mono">P.04</p>
+        <h3 class="pr-t">Emergencies skip the line.</h3>
+        <p class="pr-d">Falls, chest pain, breathing trouble and stroke signs alert everyone at once and tell her to call 911. No question first.</p>
+        <p class="pr-q pr-q-coral">&#8220;I've alerted Maya, Leo and Grace. If this is an emergency, please call 911.&#8221;</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="cta" id="meet" data-theme="dark" aria-labelledby="cta-title">
+  <div class="gl-host gl-cta" aria-hidden="true"></div>
+  <div class="cta-ring" aria-hidden="true">
+    <svg viewBox="0 0 600 600"><defs><filter id="ctaGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="14"/></filter></defs>
+      <circle class="cr-glow" cx="300" cy="300" r="250" filter="url(#ctaGlow)"/>
+      <circle class="cr-line" cx="300" cy="300" r="250"/>
+      <circle class="cr-sweep" cx="300" cy="300" r="250"/>
+    </svg>
+  </div>
+  <div class="wrap cta-inner">
+    <p class="eyebrow mono"><span class="ring-dot" aria-hidden="true"></span>Two Echo Shows · a Ring doorbell · one MCP server</p>
+    <h2 class="display cta-title" id="cta-title"><span class="line"><span class="line-in">Meet <em>Nova</em>.</span></span></h2>
+    <p class="cta-lede">The whole household runs live in your browser. Reset the demo, jump the clock to 5:55 PM, and watch the reminder find its way to Maya.</p>
+    <div class="cta-actions">
+      <a class="btn btn-primary btn-xl magnetic" href="/live" data-cursor="Enter"><span class="btn-fill" aria-hidden="true"></span><span class="btn-label">Enter the live demo</span><span class="btn-arrow" aria-hidden="true">&#8594;</span></a>
+      <a class="btn btn-ghost-l magnetic" href="https://github.com/Dakshhhhh-ops/nova" target="_blank" rel="noopener" data-cursor="Code"><span class="btn-label">Read the code</span><span class="btn-arrow" aria-hidden="true">&#8599;</span></a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner mono">
+    <p>Built for the Amazon Developer Build, Ship, Shape hackathon · Alexa+ track · The household is fictional.</p>
+    <p>Amazon Nova · Amazon Bedrock · Amazon Polly · Model Context Protocol</p>
+    <a href="#top" class="foot-top">Back to top &#8593;</a>
+  </div>
+</footer>
+</body>
+</html>

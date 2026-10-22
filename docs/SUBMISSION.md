@@ -5,6 +5,7 @@ Copy each section into the matching Devpost field.
 ## Tracks
 - Primary track: **Alexa+** (self-hosted MCP server over Streamable HTTP, plus a simulated Alexa+ experience in a web app)
 - Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova models, Amazon Polly)
+- Mini challenge: **Open Source** (see below; enter only once the repo is public)
 
 ## Project description
 
@@ -28,6 +29,13 @@ Rose, 81, talks to the Echo Show in her kitchen: "I just took my pink pill", "I'
 - `nova_server/insights.py`: **Amazon Nova** writes the spoken caregiver briefing, extracts structured check-ins (mood, pain, sleep, symptoms) from free speech, answers questions grounded only in care notes, and drafts doctor-visit briefs.
 - `simulator/app.py`: **Amazon Polly** generative voice (`Ruth`) for spoken replies.
 - `nova_server/llm.py`: one model layer for all of the above.
+
+## Open Source: required fields
+- **Contribution URL:** https://github.com/Dakshhhhh-ops/mcp-apps-lite-host *(create this public repo and push the local folder before submitting)*
+- **Primary repo URL:** https://github.com/Dakshhhhh-ops/nova
+- **GitHub username:** Dakshhhhh-ops
+- **What it is:** `mcp-apps-lite-host` is a dependency-free ES module (MIT) that renders MCP Apps (`ui://`) views in any web page. It implements the View ↔ Host JSON-RPC protocol from the ext-apps spec (initialize handshake, tool-input/tool-result, size-changed, `tools/call` proxy, `ui/message`, teardown) in a sandboxed iframe.
+- **Why it matters:** The ext-apps repo ships view SDKs and a basic example host, but there was no small drop-in host for custom web apps, simulators or dashboards. Anyone building an Alexa+ simulation, an MCP inspector or a product UI can now show MCP Apps views in a few lines. It was extracted from Nova's Echo Show simulator.
 
 ## Product feedback
 

@@ -42,25 +42,6 @@
         b.parentNode.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
       });
     });
-    $$('[data-approve]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        b.classList.add('is-done');
-        b.textContent = 'Approved';
-        var rc = b.closest('.recon');
-        if (rc) { rc.classList.remove('is-discarded'); rc.classList.add('is-approved'); }
-        var hint = b.parentNode.querySelector('span.mono');
-        if (hint && !rc) hint.textContent = "Rose's plan is updated. She hears what changed.";
-      });
-    });
-    $$('[data-discard]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var rc = b.closest('.recon');
-        if (!rc || rc.classList.contains('is-approved')) return;
-        rc.classList.add('is-discarded');
-        var after = $('.rc-after', rc);
-        if (after) after.innerHTML = '<span class="mono">Nova</span>&#8220;Okay, I discarded those changes. The plan is unchanged.&#8221;';
-      });
-    });
   }
 
   startClock();
@@ -213,11 +194,8 @@
   initCursor();
   initMagnetic();
   initNav();
-  initMarquee();
   initHeroInteractions();
   initSees();
-  initAVS();
-  initTrace();
 
   var mm;
   function setupMM() {
@@ -230,7 +208,6 @@
       var cleanups = [];
       if (!c.reduce) {
         initReveals();
-        initProblem();
         if (c.big && !GL()) {
           cleanups.push(initDay());
           cleanups.push(initDots());
@@ -381,33 +358,6 @@
   }
 
   /* ---------- Marquee: drifts, speeds up with scroll velocity, flips with direction ---------- */
-  function initMarquee() {
-    var rows = $$('.mq-row');
-    if (!rows.length || REDUCED) return;
-    var dir = 1, boost = 0;
-    var items = rows.map(function (row, i) {
-      var track = $('.mq-track', row);
-      track.innerHTML += track.innerHTML; // seamless loop
-      return { track: track, x: 0, speed: i === 0 ? 0.55 : -0.42, set: gsap.quickSetter(track, 'x', 'px'), half: 0 };
-    });
-    function measure() { items.forEach(function (it) { it.half = it.track.scrollWidth / 2; }); }
-    measure();
-    addEventListener('resize', measure);
-    if (document.fonts) document.fonts.ready.then(measure);
-    var visible = true;
-    ST.create({ trigger: '.marquee', start: 'top bottom', end: 'bottom top', onToggle: function (s) { visible = s.isActive; },
-      onUpdate: function (s) { var v = s.getVelocity(); dir = v < 0 ? -1 : 1; boost = clamp(Math.abs(v) / 300, 0, 9); } });
-    gsap.ticker.add(function (t, dt) {
-      if (!visible) return;
-      boost *= 0.94;
-      var k = (dt / 16.67);
-      items.forEach(function (it) {
-        it.x -= it.speed * (1 + boost) * dir * k;
-        if (it.half) { if (it.x <= -it.half) it.x += it.half; if (it.x > 0) it.x -= it.half; }
-        it.set(it.x);
-      });
-    });
-  }
 
   /* =========================================================
      HERO: tilt toward the cursor, drag to orbit, scroll exit
@@ -435,9 +385,10 @@
       });
       lab.addEventListener('pointerleave', function () { seesEcho.tiltT.rx = 0; seesEcho.tiltT.ry = 0; });
     }
+    var heroSec = $('.hero'), labEl = $('.lab');
     gsap.ticker.add(function () {
-      if (inView) heroEcho.step();
-      if (seesEcho) seesEcho.step();
+      if (inView && !heroSec.classList.contains('is-gl-done')) heroEcho.step();
+      if (seesEcho && !labEl.classList.contains('is-gl')) seesEcho.step();
     });
 
     // drag to orbit, with inertia, settling back to the front
@@ -472,8 +423,8 @@
     }
 
     if (!REDUCED) {
-      gsap.to('.hero-copy', { yPercent: -22, opacity: 0.2, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
-      gsap.to('.hero-device', { y: -60, rotationX: 10, scale: 0.94, transformPerspective: 1400, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
+      gsap.to('.hero-copy', { yPercent: -22, opacity: 0.2, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 0.5 } });
+      gsap.to('.hero-device', { y: -60, rotationX: 10, scale: 0.94, transformPerspective: 1400, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 0.5 } });
     }
   }
 
@@ -482,7 +433,7 @@
      ========================================================= */
   function initReveals() {
     // section titles: masked line reveal
-    $$('.sec-title, .sec-title-s, .cta-title, .avs-title, .pk-big').forEach(function (t) {
+    $$('.sec-title, .sec-title-s, .cta-title').forEach(function (t) {
       var lines = $$('.line-in', t);
       if (lines.length) {
         gsap.from(lines, { yPercent: 115, duration: 1.2, ease: 'expo.out', stagger: 0.08, scrollTrigger: { trigger: t, start: 'top 88%' } });
@@ -496,7 +447,7 @@
       });
     });
     // whole sections tilt back as the next one arrives
-    [['.hero-grid', '.hero'], ['.problem > .wrap', '.problem'], ['.principles > .wrap', '.principles']].forEach(function (p) {
+    [['.hero-grid', '.hero']].forEach(function (p) {
       var el = $(p[0]);
       if (!el) return;
       gsap.to(el, { rotationX: -6, scale: 0.96, transformPerspective: 1600, transformOrigin: '50% 100%', ease: 'none',
@@ -504,36 +455,16 @@
     });
     // CTA ring blooms in
     gsap.from('.cta-ring', { scale: 0.6, opacity: 0, rotation: -40, ease: 'power2.out', scrollTrigger: { trigger: '.cta', start: 'top 85%', end: 'top 20%', scrub: 1 } });
-    gsap.from('.cta-lede, .cta-actions, .cta .eyebrow', { y: 40, opacity: 0, duration: 1, ease: 'expo.out', stagger: 0.1, scrollTrigger: { trigger: '.cta-title', start: 'top 80%' } });
-    // counters
-    $$('[data-count]').forEach(function (el) {
-      var end = +el.getAttribute('data-count');
-      if (end < 5) return;
-      var o = { v: 0 };
-      ST.create({ trigger: el, start: 'top 90%', once: true, onEnter: function () {
-        gsap.to(o, { v: end, duration: 2, ease: 'expo.out', onUpdate: function () { el.textContent = Math.round(o.v); } });
-      } });
-    });
+    gsap.from('.cta-lede, .cta-actions, .cta-principles li', { y: 40, opacity: 0, duration: 1, ease: 'expo.out', stagger: 0.1, scrollTrigger: { trigger: '.cta-title', start: 'top 80%' } });
   }
 
   function initReducedFades() {
-    $$('.r3d, .moment, .insight, .pr, .num').forEach(function (el) {
+    $$('.r3d, .moment, .insight').forEach(function (el) {
       gsap.from(el, { opacity: 0, duration: 0.8, ease: 'power1.out', scrollTrigger: { trigger: el, start: 'top 92%' } });
     });
   }
 
   /* ---------- 01 Problem ---------- */
-  function initProblem() {
-    var people = $$('.stat-people i');
-    if (people.length) {
-      gsap.from(people, { scale: 0, opacity: 0, duration: 0.8, ease: 'back.out(2)', stagger: 0.14, scrollTrigger: { trigger: '.stat-people', start: 'top 88%' } });
-    }
-    $$('.sig').forEach(function (s) {
-      var sp = parseFloat(s.getAttribute('data-speed') || '1');
-      gsap.fromTo(s, { y: 140 * sp, rotationY: (sp - 1) * 30 }, { y: -140 * sp, rotationY: 0, transformPerspective: 900, ease: 'none',
-        scrollTrigger: { trigger: '.scatter', start: 'top bottom', end: 'bottom top', scrub: true } });
-    });
-  }
 
   /* =========================================================
      02 A DAY WITH NOVA: pinned horizontal timeline + living sky
@@ -562,6 +493,13 @@
 
     var tween, st;
 
+    function clockLabel(p) {
+      var c = p * dist() + innerWidth / 2;
+      for (var i = 0; i < centers.length; i++) {
+        if (Math.abs(c - centers[i]) < 160) { var l = moments[i].getAttribute('data-clock-label'); if (l) return l; }
+      }
+      return '';
+    }
     function hourAt(p) {
       var c = p * dist() + innerWidth / 2;
       if (c <= centers[0]) return hours[0];
@@ -631,7 +569,8 @@
       var sun = 1 - clamp((sh - 18.4) / 0.9, 0, 1);
       handle.style.setProperty('--sun', sun.toFixed(3));
       handle.style.setProperty('--moon-shadow', f > 3.5 ? '#121833' : '#2B2850');
-      clockEl.textContent = fmt(h);
+      var lab = clockLabel(p);
+      clockEl.textContent = lab || fmt(h);
       bar.style.transform = 'scaleX(' + p.toFixed(4) + ')';
       var fg = (wrapT < 0 && f > 0.55 && f < 1.75) ? 'dark' : 'light';
       if (fg !== lastFg) { lastFg = fg; sec.setAttribute('data-fg', fg); if (st && st.isActive) syncNav(); }
@@ -648,7 +587,7 @@
     tween = gsap.to(track, {
       x: function () { return -dist(); }, ease: 'none',
       scrollTrigger: {
-        trigger: sec, start: 'top top', end: function () { return '+=' + dist(); },
+        trigger: sec, start: 'top top', end: function () { return '+=' + Math.round(dist() * 0.55); },
         pin: true, scrub: true, invalidateOnRefresh: true, anticipatePin: 1,
         onRefresh: function () { measure(); update(); },
         onUpdate: update,
@@ -678,7 +617,7 @@
         onPress: function () { gsap.set(proxy, { x: 0 }); this.update(); startY = scrollNow(); },
         onDrag: sync, onThrowUpdate: sync
       })[0]);
-      function sync() { scrollToY(clamp(startY - this.x * 1.15, st.start, st.end), true); }
+      function sync() { scrollToY(clamp(startY - this.x * 0.6, st.start, st.end), true); }
 
       // drag the sun: scrub the time of day
       var hp = document.createElement('div');
@@ -776,7 +715,7 @@
     var T = 10;
     var tl = gsap.timeline({
       defaults: { ease: 'none' },
-      scrollTrigger: { trigger: sec, start: 'top top', end: function () { return '+=' + Math.round(innerHeight * 3.4); }, pin: true, scrub: 0.7, invalidateOnRefresh: true, anticipatePin: 1 },
+      scrollTrigger: { trigger: sec, start: 'top top', end: function () { return '+=' + Math.round(innerHeight * 1.2); }, pin: true, scrub: 0.7, invalidateOnRefresh: true, anticipatePin: 1 },
       onUpdate: onTl
     });
     tl.addLabel('start', 0);
@@ -888,8 +827,8 @@
      ========================================================= */
   var BOTTLES = {
     ibuprofen: { name: 'Ibuprofen', strength: '200 mg', dir: 'Pain reliever (NSAID)', ph: 'Elm Street Health', pt: 'Over the counter', style: 'otc', glow: '255, 107, 87', vc: 'var(--coral)',
-      tag: 'Not for Rose · from her doctor\'s notes', say: "Please don't take ibuprofen, Rose. Your knee discharge instructions say to avoid it because of blood pressure and kidney function.",
-      sub: 'The same notes say: for pain, acetaminophen up to 3,000 mg a day.', src: 'Source: knee discharge instructions · Riverside Orthopedics' },
+      tag: 'Not for Rose · from her doctor\'s notes', say: "Please don't take ibuprofen, Rose…",
+      sub: 'Her knee discharge notes say to avoid it (blood pressure, kidneys). For pain: acetaminophen, up to 3,000 mg a day.', src: 'Source: knee discharge instructions · Riverside Orthopedics' },
     atorvastatin: { name: 'Atorvastatin', strength: '40 mg', dir: 'Take 1 tablet at bedtime', glow: '255, 181, 71', vc: 'var(--amber)',
       tag: 'Wrong time · put it back', say: "That's atorvastatin, your bedtime pill. Put it back.", sub: "Right now it's time for your Metformin, the large white oblong pill.", src: 'Plan: Atorvastatin 40 mg · 9 PM' },
     lisinopril: { name: 'Lisinopril', strength: '20 mg', dir: 'Take 1 tablet every morning', glow: '255, 107, 87', vc: 'var(--coral)',
@@ -1005,20 +944,6 @@
     });
   }
 
-  function initAVS() {
-    var stage = $('.avs-stage');
-    if (!stage || REDUCED) return;
-    var paper = $('.avs-paper', stage), recon = $('.recon', stage), scanEl = $('.ap-scan', stage), hit = $('.ap-hit', stage);
-    gsap.set(recon, { opacity: 0, x: 80, rotationY: -26, z: -120, transformPerspective: 1400 });
-    gsap.set($$('.rc-rows li', recon), { opacity: 0, x: 24 });
-    var tl = gsap.timeline({ scrollTrigger: { trigger: stage, start: 'top 72%' } });
-    tl.from(paper, { y: 120, rotationX: 28, rotation: -9, opacity: 0, transformPerspective: 1400, duration: 1.3, ease: 'expo.out' })
-      .fromTo(scanEl, { top: '0%', opacity: 1 }, { top: '100%', duration: 1.5, ease: 'power1.inOut' }, 0.6)
-      .set(scanEl, { opacity: 0 })
-      .to(hit, { '--hit': 1, duration: 0.4 }, 1.3)
-      .to(recon, { opacity: 1, x: 0, rotationY: 0, z: 0, duration: 1.2, ease: 'expo.out' }, 1.7)
-      .to($$('.rc-rows li', recon), { opacity: 1, x: 0, stagger: 0.12, duration: 0.7, ease: 'expo.out' }, 2.0);
-  }
 
   /* =========================================================
      05 UNDER THE HOOD: the Echo turns, and its layers come apart
@@ -1051,7 +976,7 @@
 
     var tl = gsap.timeline({
       defaults: { ease: 'power2.inOut' },
-      scrollTrigger: { trigger: sec, start: 'top top', end: function () { return '+=' + Math.round(innerHeight * 2.6); }, pin: '.build-pin', scrub: 0.8, invalidateOnRefresh: true, anticipatePin: 1 },
+      scrollTrigger: { trigger: sec, start: 'top top', end: function () { return '+=' + Math.round(innerHeight * 0.9); }, pin: '.build-pin', scrub: 0.8, invalidateOnRefresh: true, anticipatePin: 1 },
       onUpdate: draw
     });
     tl.fromTo(root, { y: 80, scale: 0.86, opacity: 0.4 }, { y: 0, scale: 1, opacity: 1, duration: 0.8, ease: 'power2.out' }, 0);
@@ -1105,18 +1030,4 @@
   }
 
   /* ---------- MCP trace: lines arrive one by one ---------- */
-  function initTrace() {
-    var list = $('.tr-lines');
-    if (!list || REDUCED) return;
-    var items = $$('li', list);
-    var i = 0, timer = null;
-    function tick() {
-      var li = items[i % items.length];
-      list.appendChild(li);
-      li.classList.remove('is-new'); void li.offsetWidth; li.classList.add('is-new');
-      i++;
-      timer = setTimeout(tick, 1900);
-    }
-    ST.create({ trigger: list, start: 'top bottom', end: 'bottom top', onToggle: function (s) { clearTimeout(timer); if (s.isActive) timer = setTimeout(tick, 900); } });
-  }
 })();

@@ -3,9 +3,7 @@
    library (/static/three/nova3d.js). The DOM versions stay in the page for accessibility and
    come back automatically (window.__nova.flat) if anything here fails. */
 import * as THREE from 'three';
-// Local build of the shared Nova 3D API (docs/THREE_API.md). To use the shared library instead:
-// import * as N from '/static/three/nova3d.js';
-import * as N from './nova3d-local.js';
+import * as N from '/static/three/nova3d.js';
 
 const doc = document.documentElement;
 const $ = (s, r = document) => r.querySelector(s);
@@ -39,6 +37,9 @@ export async function boot() {
       await build_(); mark(name);
       const st_ = stages[stages.length - 1];
       if (st_ && st_.compileAsync) { await st_.compileAsync(); mark(name + ' compile'); }
+      // first frame now (texture uploads, remaining programs), while nobody is scrolling
+      if (st_) { await idle(); warmTextures(st_); st_.render(); mark(name + ' warm'); }
+      await idle();
       ST.sort();
       ST.refresh(); mark('refresh');
     }
@@ -50,8 +51,18 @@ export async function boot() {
   }
 }
 
+let lastScroll = 0;
+addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive: true });
+addEventListener('wheel', () => { lastScroll = performance.now(); }, { passive: true });
 function idle() {
-  return new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 120 }) : setTimeout(r, 30)));
+  return new Promise((resolve) => {
+    const check = () => {
+      const quiet = performance.now() - lastScroll;
+      if (quiet < 300) { setTimeout(check, 320 - quiet); return; }
+      if (window.requestIdleCallback) requestIdleCallback(() => resolve(), { timeout: 200 }); else setTimeout(resolve, 30);
+    };
+    check();
+  });
 }
 
 function teardown() {
@@ -59,6 +70,8 @@ function teardown() {
   $$('.is-gl-live, .is-gl-done').forEach((el) => el.classList.remove('is-gl-live', 'is-gl-done'));
   triggers.forEach((t) => { try { t.kill(true); } catch (e) {} });
   cleanups.forEach((f) => { try { f(); } catch (e) {} });
+  loopEntries.forEach((e) => { e.on = false; });
+  loopEntries.length = 0;
   stages.forEach((s) => { try { s.dispose(); } catch (e) {} });
   $$('.is-gl').forEach((el) => el.classList.remove('is-gl', 'is-pinned', 'is-x'));
 }
@@ -70,17 +83,88 @@ function fontsReady() {
   return Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 2500))]);
 }
 
+/* ---------- one render loop for every stage ----------
+   A stage renders at most every other frame on a high-refresh display (about 60-72 a second) and
+   only one stage renders per animation frame, so two scenes meeting at a section boundary never
+   double the GPU work and the scroll never waits behind a queued frame. */
+const loopEntries = [];
+let loopRaf = 0, lastTick = 0;
+// Frame pacing: renders are spaced a whole number of vsyncs apart (2 on a high-refresh display,
+// 1 at 60 Hz). When frames start arriving late (a weak or throttled GPU), the spacing grows by a
+// vsync; after a calm stretch it comes back.
+const ivs = []; let vsync = 16.7, gap = 1, calm = 0;
+function pace(iv) {
+  ivs.push(iv);
+  if (ivs.length < 36) return;
+  const a = ivs.splice(0).sort((x, y) => x - y);
+  vsync = Math.max(4, a[Math.floor(a.length * 0.1)]);
+  const base = vsync < 10 ? 2 : 1;
+  const late = a.filter((x) => x > vsync * 1.6).length / a.length;
+  if (late > 0.12) { gap = Math.min(gap + 1, base + 1); calm = 0; }
+  else if (late < 0.04 && ++calm >= 3) { gap = Math.max(base, gap - 1); calm = 0; }
+  if (gap < base) gap = base;
+}
+function loopTick(now) {
+  loopRaf = 0;
+  if (lastTick && now - lastTick < 250) pace(now - lastTick);
+  lastTick = now;
+  const minGap = gap * vsync - vsync * 0.5;
+  let pick = null, any = false;
+  for (const e of loopEntries) {
+    if (!e.on || e.held) continue;
+    any = true;
+    if (now - e.last >= minGap && (!pick || e.last < pick.last)) pick = e;
+  }
+  if (!any || document.hidden) { lastTick = 0; return; }
+  loopRaf = requestAnimationFrame(loopTick);
+  if (!pick) return;
+  const dt = pick.last ? (now - pick.last) / 1000 : 1 / 60;
+  pick.last = now;
+  pick.stage.step(dt);
+  if (pick.auto) pick.auto(dt);
+}
+function loopKick() { if (!loopRaf) loopRaf = requestAnimationFrame(loopTick); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loopKick(); });
+
+// upload every texture in a scene now (cards and labels that are off camera would otherwise
+// upload the first time they turn into view, mid-scroll)
+function warmTextures(stage) {
+  const seen = new Set();
+  stage.scene.traverse((o) => {
+    const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    mats.forEach((m) => {
+      Object.keys(m).forEach((k) => { const t = m[k]; if (t && t.isTexture && !seen.has(t)) { seen.add(t); try { stage.renderer.initTexture(t); } catch (e) {} } });
+      if (m.uniforms) Object.values(m.uniforms).forEach((u) => { const t = u && u.value; if (t && t.isTexture && !seen.has(t)) { seen.add(t); try { stage.renderer.initTexture(t); } catch (e) {} } });
+    });
+  });
+}
+
 /* ---------- stage helpers ---------- */
 function makeStage(host, opts) {
-  const stage = N.createStage(host, Object.assign({ autoStart: false, quality: 'auto', pixelRatioCap: 1.75 }, opts));
+  const stage = N.createStage(host, Object.assign({ autoStart: false, quality: 'auto', pixelRatioCap: 1.5 }, opts));
   stages.push(stage);
+  const entry = { stage, on: false, last: 0, auto: null };
+  if ((opts.quality || 'auto') === 'auto') {
+    // the library's own check (it runs inside its loop, which the shared loop replaces):
+    // drop to low quality when the scene can't hold ~45 fps
+    let n = 0, sum = 0;
+    entry.auto = (dt) => {
+      n++; if (n > 40) sum += dt;
+      if (n === 160) { entry.auto = null; if (sum / 120 > 0.022 && stage.getQuality() === 'high') stage.setQuality('low'); }
+    };
+  }
+  loopEntries.push(entry);
+  stage.start = () => { if (!entry.on) { entry.on = true; entry.last = 0; } loopKick(); };
+  stage.stop = () => { entry.on = false; };
+  // hold: keep the last frame on screen and skip rendering, whatever the visibility
+  stage.hold = (v) => { v = !!v; if (v === !!entry.held) return; entry.held = v; if (!v) { entry.last = 0; loopKick(); } };
   let visible = false;
   const io = new IntersectionObserver((es) => {
     es.forEach((e) => {
       visible = e.isIntersecting;
       if (visible) stage.start(); else stage.stop();
     });
-  }, { rootMargin: '15% 0px 15% 0px' });
+  }, { rootMargin: '0px' });
   io.observe(host);
   cleanups.push(() => io.disconnect());
   stage.__visible = () => visible;
@@ -91,6 +175,23 @@ function addTrigger(vars) {
   const t = ST.create(vars);
   triggers.push(t);
   return t;
+}
+
+// Per-frame projection without touching the DOM (no forced layout): positions are relative to the
+// stage container, whose size is cached and kept current by the stage's resize event.
+const _pv = new THREE.Vector3();
+function sizeOf(stage) {
+  if (!stage.__size) {
+    const r = stage.container.getBoundingClientRect();
+    stage.__size = { w: r.width || 1, h: r.height || 1 };
+    stage.on('resize', (e) => { const b = stage.container.getBoundingClientRect(); stage.__size.w = (e && e.width) || b.width; stage.__size.h = (e && e.height) || b.height; });
+  }
+  return stage.__size;
+}
+function projLocal(stage, v) {
+  const z = sizeOf(stage);
+  _pv.copy(v).project(stage.camera);
+  return { x: ((_pv.x + 1) / 2) * z.w, y: ((1 - _pv.y) / 2) * z.h, visible: _pv.z > -1 && _pv.z < 1 };
 }
 
 // world point on the plane z = planeZ under a client pixel
@@ -112,29 +213,50 @@ function unitsPerPx(stage, planeZ = 0) {
   return a.distanceTo(b) / 100;
 }
 
-// HTML labels that follow 3D points
+// HTML labels that follow 3D points. They stay inside the frame (48px margin), clear of the chin,
+// and are pushed apart when they would overlap. Higher prio is placed first.
 function labelSet(stage, layer, minX) {
   const items = [];
   const v = new THREE.Vector3();
   function add(html, pos, cls = '', opts = {}) {
     const el = document.createElement('div');
     el.className = 'gl-label ' + cls;
-    el.innerHTML = html;
+    el.innerHTML = '<span class="gl-lt">' + html + '</span>';
     layer.appendChild(el);
-    const it = { el, pos: pos.clone ? pos.clone() : new THREE.Vector3(...pos), obj: opts.obj || null, dx: opts.dx || 0, dy: opts.dy || 0, align: opts.align || 'left', op: 0, show: opts.show !== false };
+    const it = { el, inner: el.firstChild, eo: -1, io: -1, pos: pos.clone ? pos.clone() : new THREE.Vector3(...pos), obj: opts.obj || null, dx: opts.dx || 0, dy: opts.dy || 0, align: opts.align || 'left', op: 0, show: opts.show !== false, prio: opts.prio || 1, w: 0, h: 0 };
     items.push(it);
+    items.sort((p, q) => q.prio - p.prio);
     return it;
   }
+  let sized = false;
   function update() {
-    const base = stage.container.getBoundingClientRect();
+    if (!sized) { items.forEach((it) => { it.w = it.el.offsetWidth; it.h = it.el.offsetHeight; }); sized = true; }
+    const z = sizeOf(stage);
+    stage.camera.updateMatrixWorld();
+    const left = minX ? minX() : 8, right = z.w - 48, top = 24, bottom = z.h - 40 - 32;
+    const placed = [];
     items.forEach((it) => {
       if (it.obj) it.obj.getWorldPosition(v); else v.copy(it.pos);
-      const p = stage.project(v);
-      const vis = p.visible && it.show && it.op > 0.01 && (!minX || p.x > minX());
-      it.el.style.opacity = vis ? it.op : 0;
+      const p = projLocal(stage, v);
+      let x = p.x, y = p.y + it.dy;
+      let vis = p.visible && it.show && it.op > 0.01 && x >= left;
+      if (vis) {
+        x += it.dx - (it.align === 'left' ? 0 : it.w * (it.align === 'center' ? 0.5 : 1));
+        x = Math.min(Math.max(x, left), right - it.w);
+        for (const q of placed) {
+          if (x < q.x + q.w + 8 && x + it.w + 8 > q.x && y < q.y + q.h + 6 && y + it.h + 6 > q.y) y = q.y + q.h + 6;
+        }
+        vis = y >= top && y + it.h <= bottom && x + it.w <= right + 1;
+      }
+      // the pill reaches full opacity early (so the evidence curves always pass behind it);
+      // the text carries the rest of the fade
+      const eo = vis ? Math.min(1, it.op * 3) : 0;
+      if (Math.abs(eo - it.eo) > 0.004) { it.eo = eo; it.el.style.opacity = eo.toFixed(3); }
       if (!vis) return;
-      const w = it.align === 'left' ? 0 : it.el.offsetWidth * (it.align === 'center' ? 0.5 : 1);
-      it.el.style.transform = `translate3d(${(p.x - base.left + it.dx - w).toFixed(1)}px, ${(p.y - base.top + it.dy).toFixed(1)}px, 0)`;
+      const io = Math.min(1, it.op / eo);
+      if (Math.abs(io - it.io) > 0.004) { it.io = io; it.inner.style.opacity = io.toFixed(3); }
+      placed.push({ x, y, w: it.w, h: it.h });
+      it.el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
     });
   }
   return { add, update, items };
@@ -207,8 +329,8 @@ function frameHud() {
   };
   gsap.ticker.add(tick);
   cleanups.push(() => gsap.ticker.remove(tick));
-  const CH = [['.hero', 'CH 00 · Kitchen'], ['#why', 'CH 01 · Why'], ['#day', 'CH 02 · A day'], ['#dots', 'CH 03 · The dots'], ['.digest', 'CH 03 · Sunday digest'], ['#sees', 'CH 04 · It sees'],
-    ['#build', 'CH 05 · Under the hood'], ['#principles', 'CH 06 · Principles'], ['#meet', 'CH 07 · Meet Nova']].map(([sel, label]) => [$(sel), label]).filter((x) => x[0]);
+  const CH = [['.hero', 'CH 00 · Kitchen'], ['#day', 'CH 01 · A day'], ['#dots', 'CH 02 · The dots'], ['#sees', 'CH 03 · It sees'],
+    ['#build', 'CH 04 · Under the hood'], ['#meet', 'CH 05 · Meet Nova']].map(([sel, label]) => [$(sel), label]).filter((x) => x[0]);
   let lastCh = 0, curCh = '';
   const chTick = () => {
     const now = performance.now();
@@ -234,7 +356,7 @@ async function hero() {
   const stage = makeStage(host, {
     background: 'transparent', bloom: true, css3d: true, fov: 30,
     camera: [0, 1.5, 9], target: [0, 0.9, 0], timeOfDay: 18.3,
-    fx: { grain: 0, vignette: 0.12, scanlines: 0, aberration: 0 },
+    fx: { grain: 0, vignette: 0, scanlines: 0, aberration: 0 },
   });
   const REST = { position: [0, 1.5, 9], target: [0, 0.9, 0] };
   let sp = 0, introDone = false;
@@ -270,6 +392,8 @@ async function hero() {
   function layout() {
     stage.setCamera(REST);
     const r = anchor.getBoundingClientRect();
+    const hr = host.getBoundingClientRect();
+    origin = `${Math.round(r.left + r.width / 2 - hr.left)}px ${Math.round(r.top + r.height / 2 - hr.top)}px`;
     const upp = unitsPerPx(stage, 0);
     S = (r.width * upp) / 2.0;
     base = worldAt(stage, r.left + r.width / 2, r.bottom, 0);
@@ -345,16 +469,23 @@ async function hero() {
     finalState();
   }
 
-  // scrolling away: the camera rises and pulls back a little
+  // scrolling away: the view sinks and pulls back a little. That is a compositor transform on the
+  // rendered layers, and the scene itself holds its last frame, so leaving the hero costs no GPU frames
+  // (re-rendering the hero while the next scene comes in was the worst jank on integrated GPUs).
+  const layers = [stage.canvas, stage.cssLayer].filter(Boolean);
+  let origin = '70% 60%';
   function applyScroll() {
+    stage.hold(sp > 0.015);
     const k = smooth(sp);
-    stage.setCamera({ position: [REST.position[0], REST.position[1] + k * 1.4, REST.position[2] + k * 2.2], target: [REST.target[0], REST.target[1] + k * 0.5, 0] });
+    const t = k > 0.0005 ? `translate3d(0, ${(k * 12).toFixed(2)}%, 0) scale(${(1 - k * 0.05).toFixed(4)})` : '';
+    layers.forEach((el) => { el.style.transformOrigin = origin; el.style.transform = t; });
   }
   addTrigger({ trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true, onUpdate: (s) => { sp = s.progress; applyScroll(); } });
 
   stage.on('resize', layout);
   layout();
   if (stage.compileAsync) await stage.compileAsync();
+  warmTextures(stage);
   stage.render();
 }
 
@@ -404,9 +535,9 @@ async function day() {
   if (!sec || !host) return;
   sec.classList.add('is-gl');
   const stage = makeStage(host, {
-    background: 'sky', bloom: true, css3d: false, fov: 34, environment: false,
+    quality: 'low', background: 'sky', bloom: false, css3d: false, fov: 34, environment: false, pixelRatioCap: 1.25,
     camera: [0, 1.75, 10.5], target: [0, 1.65, 0], timeOfDay: 7.9,
-    fx: { grain: 0.03, vignette: 0.24, scanlines: 0, aberration: 0 },
+    fx: { grain: 0, vignette: 0, scanlines: 0, aberration: 0 },
   });
   const moments = $$('.day-track .moment').filter((m) => !m.classList.contains('moment-intro'));
   const hours = moments.map((m) => parseFloat(m.getAttribute('data-hour')));
@@ -433,9 +564,10 @@ async function day() {
   const clock = $('[data-gl-clock]');
   const sun = $('.gl-sun');
   const n = items.length;
-  const FIRST = 0.06; // a little scroll before the first card turns
+  const FIRST = 0.1; // a little scroll before the first card turns
+  const clocks = moments.map((m) => m.getAttribute('data-clock-label'));
   const st = addTrigger({
-    trigger: sec, start: 'top top', end: () => '+=' + Math.round(innerHeight * n * 0.5),
+    trigger: sec, start: 'top top', end: () => '+=' + Math.round(innerHeight * 1.0),
     onToggle: () => {},
     pin: true, anticipatePin: 1, refreshPriority: 3,
     onUpdate: (s) => fromProgress(s.progress),
@@ -454,7 +586,8 @@ async function day() {
     if (i !== car.index) { fromScroll = true; target = i; car.select(i); fromScroll = false; }
     const h = hourAt(p);
     stage.setTimeOfDay(h);
-    if (clock) clock.textContent = hourLabel(h, true);
+    const fi = idxAt(p), ci = Math.round(fi);
+    if (clock) clock.textContent = (p >= FIRST && Math.abs(fi - ci) < 0.3 && clocks[ci]) ? clocks[ci] : hourLabel(h, true);
     const hh = h % 24; sec.setAttribute('data-fg', hh > 6.6 && hh < 18.9 ? 'dark' : 'light');
     sec.classList.toggle('is-past-intro', p > FIRST * 1.6);
     car.group.position.x = lerp(3.1, 0, smooth(clamp(p / (FIRST * 1.6), 0, 1)));
@@ -468,27 +601,46 @@ async function day() {
   // the sun handle sits on the sky's sun; dragging it scrubs the time of day
   const tmp = new THREE.Vector3();
   stage.onFrame(() => {
-    if (!sun || !stage.sky || !stage.sky.sunDirection) return;
-    const useMoon = stage.sky.sun < 0.05 && stage.sky.moonDirection;
-    tmp.copy(useMoon ? stage.sky.moonDirection : stage.sky.sunDirection).normalize().multiplyScalar(60).add(stage.camera.position);
-    sun.classList.toggle('is-moon', !!useMoon);
-    const p = stage.project(tmp);
-    const r = host.getBoundingClientRect();
-    const on = p.visible && p.y < r.bottom - 120 && p.y > r.top + 40 && p.x > r.left && p.x < r.right;
-    sun.classList.toggle('is-on', on);
-    if (on) sun.style.transform = `translate3d(${(p.x - r.left).toFixed(1)}px, ${(p.y - r.top).toFixed(1)}px, 0)`;
+    const sky = stage.sky;
+    if (!sun || !sky) return;
+    const z = sizeOf(stage);
+    let x, y, on, useMoon;
+    const U = sky.uniforms;
+    if (U && U.uSun) {
+      useMoon = (U.uSunVis ? U.uSunVis.value : 1) < 0.05;
+      const q = useMoon ? U.uMoon.value : U.uSun.value;
+      x = (0.5 + q.x * 0.5) * z.w; y = (0.5 - q.y * 0.5) * z.h;
+      on = (useMoon ? (U.uMoonVis ? U.uMoonVis.value : 0) : U.uSunVis.value) > 0.05;
+    } else {
+      useMoon = sky.sun < 0.05 && !!sky.moonDirection;
+      stage.camera.updateMatrixWorld();
+      tmp.copy(useMoon ? sky.moonDirection : sky.sunDirection).normalize().multiplyScalar(60).add(stage.camera.position);
+      const p = projLocal(stage, tmp); x = p.x; y = p.y; on = p.visible;
+    }
+    // only where it's clear of the cards (the sun passes behind them for most of the day)
+    tmp.set(0, 1.75 + 3.75 * 0.53 + 0.08, 0);
+    const bandTop = projLocal(stage, tmp).y;
+    on = on && y + 50 < bandTop && y > 40 && x > 40 && x < z.w - 160;
+    if (on !== sun.__on) { sun.__on = on; sun.classList.toggle('is-on', on); }
+    if (useMoon !== sun.__moon) { sun.__moon = useMoon; sun.classList.toggle('is-moon', useMoon); }
+    if (on) sun.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
   });
-  if (sun) {
+  // drag the sun or the clock: scrub the time of day
+  function scrubber(el) {
     let sx = 0, sh = 0, dragging = false;
     const span = 21 - 7.75;
-    sun.addEventListener('pointerdown', (e) => { dragging = true; sx = e.clientX; sh = hourAt(st.progress); sun.setPointerCapture(e.pointerId); e.preventDefault(); e.stopPropagation(); });
-    sun.addEventListener('pointermove', (e) => {
+    el.addEventListener('pointerdown', (e) => { dragging = true; sx = e.clientX; sh = hourAt(st.progress); el.setPointerCapture(e.pointerId); e.preventDefault(); e.stopPropagation(); });
+    el.addEventListener('pointermove', (e) => {
       if (!dragging) return;
       const h = clamp(sh + ((e.clientX - sx) / (innerWidth * 0.75)) * span, 7.75, 21);
       NOVA.scrollToY(st.start + progressForHour(h) * (st.end - st.start), true);
     });
     const end = () => { dragging = false; };
-    sun.addEventListener('pointerup', end); sun.addEventListener('pointercancel', end);
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  }
+  if (clock) { scrubber(clock); clock.setAttribute('data-cursor', 'Drag'); }
+  if (sun) {
+    scrubber(sun);
     sun.addEventListener('keydown', (e) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       e.preventDefault();
@@ -503,6 +655,8 @@ async function day() {
   }
   cleanups.push(() => car.dispose && car.dispose());
   dragLabel(stage, host, null);
+  // the faces are drawn after the web fonts loaded (boot waits for them), so they upload once, in the warm-up
+  if (car.redraw) car.redraw();
 }
 
 function hourLabel(h, withMinutes) {
@@ -610,8 +764,9 @@ function drawMoment(ctx, w, h, m) {
       ctx.font = `500 ${2.8 * u}px "JetBrains Mono"`; ctx.fillStyle = tone;
       spaced(ctx, k.toUpperCase(), pad, y + 5.4 * u, 0.25 * u);
       ctx.font = `400 ${3.4 * u}px "Inter Tight"`; ctx.fillStyle = mist;
-      ctx.fillText(rest.replace(/\s+/g, ' '), pad + 18 * u, y + 5.4 * u);
-      y += 8 * u;
+      const ls = wrapText(ctx, rest.replace(/\s+/g, ' '), w - pad * 2 - 18 * u).slice(0, 2);
+      ls.forEach((l, k) => ctx.fillText(l, pad + 18 * u, y + 5.4 * u + k * 4.8 * u));
+      y += 8 * u + (ls.length - 1) * 4.8 * u;
     });
   }
   const gn = m.querySelector('.m-goodnight');
@@ -627,9 +782,9 @@ async function dots() {
   if (!sec || !host) return;
   sec.classList.add('is-gl', 'is-pinned');
   const stage = makeStage(host, {
-    background: 'transparent', bloom: true, css3d: false, fov: 34, environment: false,
+    quality: 'low', background: 'transparent', bloom: false, css3d: false, fov: 34, environment: false, pixelRatioCap: 1.25,
     camera: [-12, 3, 8], target: [-8, 1.8, 1], timeOfDay: 22,
-    fx: { grain: 0.03, vignette: 0.3, scanlines: 0, aberration: 0 },
+    fx: { grain: 0, vignette: 0, scanlines: 0, aberration: 0 },
   });
   const scene = stage.scene;
   scene.fog = new THREE.Fog(0x0a0b10, 14, 46);
@@ -640,7 +795,7 @@ async function dots() {
     const r = host.getBoundingClientRect();
     const colEnd = headEl.getBoundingClientRect().right - r.left;
     region.left = colEnd + 150;
-    region.right = r.width - Math.max(24, (r.width - 1440) / 2 + 40);
+    region.right = r.width - Math.max(48, (r.width - 1440) / 2 + 48);
     region.width = Math.max(200, region.right - region.left);
     region.frac = region.width / r.width;
     region.k = clamp(980 / region.width, 1, 1.55);
@@ -746,22 +901,29 @@ async function dots() {
   graceRing.position.set(X(10), Y(104), 0); graceRing.scale.setScalar(0.001); scene.add(graceRing);
 
   // labels
-  const L = labelSet(stage, $('.gl-labels', host), () => host.getBoundingClientRect().left + region.left - 30);
+  const L = labelSet(stage, $('.gl-labels', host), () => region.left - 30);
   const days = ['Oct 9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', 'Today'];
-  days.forEach((d, i) => { const it = L.add(d, [X(i), 0, LANE.eve + 0.8], '', { align: 'center' }); it.op = 1; });
+  const dayLabels = days.map((d, i) => { const it = L.add(d, [X(i), 0, LANE.eve + 0.8], '', { align: 'center' }); it.op = 1; return it; });
   const lanes = [['Home BP', [X(0) - 1.6, Y(130), 0]], ['Dizziness', [X(0) - 1.6, 0.35, LANE.dizz]], ['Walks, outings', [X(0) - 1.6, 0.2, LANE.walk]], ['Evening doses', [X(0) - 1.6, 0.12, LANE.eve]]]
-    .map(([t, p]) => { const it = L.add(t, p, 'is-strong', { align: 'right' }); it.op = 1; return it; });
-  const vals = BP.map(([i, s, d, who]) => L.add(`${s}/${d}`, [X(i), Y(s) + 0.42, 0], i === 10 ? 'is-amber' : 'is-strong', { align: 'center' }));
-  const doseTag = L.add('Oct 13 · Lisinopril 10 &#8594; 20 mg · Dr. Patel', [X(4), 4.55, 1.6], 'is-tag', { align: 'center' });
+    .map(([t, p]) => { const it = L.add(t, p, 'is-strong', { align: 'right', prio: 3 }); it.op = 1; return it; });
+  const vals = BP.map(([i, s, d, who]) => L.add(`${s}/${d}`, [X(i), Y(s) + 0.42, 0], i === 10 ? 'is-amber' : 'is-strong', { align: 'center', prio: 2 }));
+  const doseTag = L.add('Oct 13 · Lisinopril 10 &#8594; 20 mg', [X(4), 4.55, 1.6], 'is-tag', { align: 'center', prio: 4 });
   const lagTag = L.add('+2 days', [X(5), 1.35, LANE.dizz], 'is-strong', { align: 'center' });
   const preTag = L.add('Before · avg 152/91', [X(0) - 0.4, Y(152) + 0.32, 0], '', {});
   const postTag = L.add('Since · avg 110/66 · lowest 104/62', [X(13) + 0.4, Y(110) - 0.36, 0], 'is-strong', { align: 'right' });
   const noneTag = L.add('None since Oct 14', [X(8), 0.2, LANE.walk], 'is-sage', { align: 'center', dy: -22 });
   const missTag = L.add('5 missed in 4 days', [X(12), 0.12, LANE.eve], 'is-coral', { align: 'center', dy: -26 });
-  const note = L.add('<b>Grace · Oct 19, 3:00 PM</b>&#8220;Rose was a little unsteady getting up from the couch today. Sitting BP 104/62.&#8221;', [X(10) + 0.5, Y(104) + 0.5, 0], 'is-note', { align: 'left', dx: 18, dy: -10 });
+  const note = L.add('<b>Grace · Oct 19, 3:00 PM</b>&#8220;Rose was a little unsteady getting up from the couch today. Sitting BP 104/62.&#8221;', [X(10) + 0.5, Y(104) + 0.5, 0], 'is-note', { align: 'left', dx: 18, dy: -10, prio: 5 });
 
   // DOM overlays: steps and the insight card
   const steps = $$('.ds', sec), insight = $('.insight', sec), links = $('.dots-links', sec);
+  host.insertBefore(links, $('.gl-labels', host)); // evidence curves run behind the labels
+  function placeColumn() {
+    const pr = $('.dots-pin', sec).getBoundingClientRect(), hr = headEl.getBoundingClientRect();
+    sec.style.setProperty('--dots-below', Math.round(hr.bottom - pr.top + 32) + 'px');
+  }
+  placeColumn();
+  stage.on('resize', placeColumn);
   gsap.set(insight, { opacity: 0, y: 40, rotationY: 12, transformPerspective: 1100, transformOrigin: '0% 50%' });
   gsap.set($$('.in-title .line-in, .in-ev li, .in-foot', insight), { opacity: 0, y: 16 });
   const insightTl = gsap.timeline({ paused: true })
@@ -784,7 +946,7 @@ async function dots() {
   const camPos = new THREE.Vector3(), camTgt = new THREE.Vector3();
   function fitOverview() {
     const asp = stage.camera.aspect || 1.6, tn = Math.tan((34 * Math.PI) / 360);
-    const d = 23.5 / (region.frac * 0.9 * 2 * tn * asp);
+    const d = 23.5 / (region.frac * 0.82 * 2 * tn * asp);
     KEYS[5].pos = [0.6, d * 0.36, d * 0.93]; KEYS[5].tgt = [0.3, 1.3, 1.6];
     KEYS[6].pos = [0.4, d * 0.36, d * 0.9]; KEYS[6].tgt = [0.3, 1.4, 1.6];
   }
@@ -832,9 +994,10 @@ async function dots() {
     vals.forEach((it, k) => { it.op = ease(it.op, X(BP[k][0]) <= front ? 1 : 0); });
     doseTag.op = ease(doseTag.op, gateOn); lagTag.op = ease(lagTag.op, front > X(6) ? 1 : 0);
     preTag.op = ease(preTag.op, front > X(3) ? 1 : 0); postTag.op = ease(postTag.op, front > X(12) ? 1 : 0);
-    noneTag.op = ease(noneTag.op, front > X(8) ? 1 : 0); missTag.op = ease(missTag.op, front > X(12) ? 1 : 0);
+    noneTag.op = ease(noneTag.op, front > X(8) && p < 0.72 ? 1 : 0); missTag.op = ease(missTag.op, front > X(12) && p < 0.72 ? 1 : 0);
     note.op = ease(note.op, graceOn && p < 0.74 ? 1 : 0);
     lanes.forEach((it) => { it.op = ease(it.op, p < 0.72 ? 1 : 0); });
+    dayLabels.forEach((it, i) => { it.op = ease(it.op, p < 0.72 || i === 0 || i === 13 ? 1 : 0); });
     L.update();
     // overlays
     let k = 0; stepAt.forEach((s, j) => { if (p >= s - 0.01) k = j; });
@@ -850,19 +1013,25 @@ async function dots() {
   const targets = [bars[4].userData.top, dzMeshes[0], graceRing, gateEdges];
   const linkEls = rows.map(() => { const g = document.createElementNS(NS, 'g'); const pth = document.createElementNS(NS, 'path'); const c = document.createElementNS(NS, 'circle'); c.setAttribute('r', '3.5'); g.append(pth, c); links.appendChild(g); return { g, pth, c }; });
   const wv = new THREE.Vector3();
+  let rowsRel = null;
+  stage.on('resize', () => { rowsRel = null; });
   function drawLinks() {
-    const base = links.getBoundingClientRect();
     const t0 = insightTl.time();
+    if (!insightOn && t0 <= 0) { if (rowsRel !== false) { linkEls.forEach((L2) => { L2.g.style.opacity = 0; }); rowsRel = false; } return; }
+    if (!rowsRel || insightTl.isActive()) {
+      const hb = host.getBoundingClientRect();
+      rowsRel = rows.map((row) => { const a = row.getBoundingClientRect(); return { x: a.right - hb.left + 10, y: a.top - hb.top + a.height / 2 }; });
+    }
+    stage.camera.updateMatrixWorld();
     rows.forEach((row, i) => {
       const L2 = linkEls[i];
       const t = clamp((t0 - (0.75 + i * 0.22)) / 0.45, 0, 1) * (insightOn ? 1 : 0);
       if (t <= 0) { L2.g.style.opacity = 0; return; }
       targets[i].getWorldPosition(wv);
       if (i === 3) wv.y = 4.2;
-      const p = stage.project(wv);
-      const a = row.getBoundingClientRect();
-      const x1 = a.right - base.left + 10, y1 = a.top - base.top + a.height / 2;
-      const x2 = p.x - base.left, y2 = p.y - base.top;
+      const p = projLocal(stage, wv);
+      const x1 = rowsRel[i].x, y1 = rowsRel[i].y;
+      const x2 = p.x, y2 = p.y;
       const mx = (x1 + x2) / 2;
       L2.pth.setAttribute('d', `M${x1.toFixed(1)},${y1.toFixed(1)} C${mx.toFixed(1)},${y1.toFixed(1)} ${mx.toFixed(1)},${y2.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`);
       const len = L2.pth.getTotalLength();
@@ -874,8 +1043,9 @@ async function dots() {
     });
   }
 
+  const pinST = addTrigger({ trigger: sec, start: 'top top', end: () => '+=' + Math.round(innerHeight * 0.25), pin: true, anticipatePin: 1, invalidateOnRefresh: true, refreshPriority: 2 });
   const tl = gsap.timeline({
-    scrollTrigger: { trigger: sec, start: 'top top', end: () => '+=' + Math.round(innerHeight * 3.6), pin: true, scrub: 1, anticipatePin: 1, invalidateOnRefresh: true, refreshPriority: 2 },
+    scrollTrigger: { trigger: sec, start: 'top 85%', end: () => pinST.end, scrub: 0.8, invalidateOnRefresh: true, refreshPriority: 1 },
   });
   tl.to(cam, { p: 1, ease: 'none', duration: 1 });
   triggers.push(tl.scrollTrigger);
@@ -894,10 +1064,11 @@ async function sees() {
   gsap.set(lab, { clearProps: 'transform,opacity' });
   lab.classList.remove('r3d');
   lab.classList.add('is-gl');
+  $('#sees').classList.add('is-gl');
   const stage = makeStage(host, {
-    background: 'transparent', bloom: true, css3d: true, fov: 28,
+    quality: 'low', background: 'transparent', bloom: true, css3d: true, fov: 28,
     camera: [0, 1.4, 9], target: [0, 0.75, 0], timeOfDay: 18.1,
-    fx: { grain: 0, vignette: 0.16, scanlines: 0, aberration: 0 },
+    fx: { grain: 0, vignette: 0, scanlines: 0, aberration: 0 },
   });
   const echo = N.createEchoShow({ size: 8, color: 'charcoal', shadow: true });
   stage.add(echo);
@@ -922,14 +1093,14 @@ async function sees() {
   function layout() {
     const r = host.getBoundingClientRect();
     const upp = unitsPerPx(stage, 0);
-    const S = clamp((r.width * 0.34 * upp) / 2.0, 0.6, 3);
-    const eb = worldAt(stage, r.left + r.width * 0.7, r.top + r.height * 0.72, 0);
+    const S = clamp(Math.min((r.width * 0.34 * upp) / 2.0, (r.height * 0.62 * upp) / 1.36), 0.4, 3);
+    const eb = worldAt(stage, r.left + r.width * 0.7, r.top + r.height * 0.84, 0);
     echo.group.scale.setScalar(S);
     echo.group.position.copy(eb);
     echo.group.rotation.y = -0.22;
     counter.position.set(0, eb.y, 0);
     pills.forEach((p, k) => {
-      const pb = worldAt(stage, r.left + r.width * (0.1 + k * 0.095), r.top + r.height * 0.72, 0);
+      const pb = worldAt(stage, r.left + r.width * (0.1 + k * 0.095), r.top + r.height * 0.84, 0);
       p.group.scale.setScalar(S * 0.95);
       p.group.position.copy(pb);
       p.group.position.z = 0.6;
@@ -996,9 +1167,9 @@ async function build() {
   if (!sec || !host) return;
   sec.classList.add('is-gl', 'is-x');
   const stage = makeStage(host, {
-    background: 'transparent', bloom: true, css3d: true, fov: 30,
+    quality: 'low', background: 'transparent', bloom: false, css3d: true, fov: 30, pixelRatioCap: 1.25,
     camera: [0, 1.0, 11], target: [0, 0.75, 0], timeOfDay: 22,
-    fx: { grain: 0.02, vignette: 0.25, scanlines: 0, aberration: 0 },
+    fx: { grain: 0, vignette: 0, scanlines: 0, aberration: 0 },
   });
   const echo = N.createEchoShow({ size: 8, color: 'charcoal', shadow: true });
   stage.add(echo);
@@ -1014,7 +1185,7 @@ async function build() {
   const DEF = [
     { name: 'Alexa+ agent', sub: 'Amazon Nova · Converse tool use', color: COL.nova, motif: 'ring' },
     { name: 'MCP', sub: 'Streamable HTTP · bearer token', color: COL.nova, motif: 'lines' },
-    { name: 'Nova server', sub: '24 tools · care engine · insights · vision · Ring', color: COL.nova, motif: 'grid' },
+    { name: 'Nova server', sub: '25 tools · care engine · insights · vision · Ring', color: COL.nova, motif: 'grid' },
     { name: 'Amazon Nova', sub: 'Amazon Bedrock · language + vision', color: COL.amber, motif: 'orb' },
   ];
   const stack = new THREE.Group();
@@ -1039,60 +1210,98 @@ async function build() {
   gsap.set(labels, { opacity: 0, x: 30 });
 
   const st = { p: 0 };
-  const GAP = innerWidth < 1700 ? 0.72 : 0.85;
+  const GAP = 0.85;
   const v = new THREE.Vector3();
-  function layout() {
-    const r = host.getBoundingClientRect();
-    stage.setCamera({ position: [0, 1.0, 11], target: [0, 0.75, 0] });
-    const upp = unitsPerPx(stage, 0);
-    const S = clamp((Math.min(r.width * (r.width < 1700 ? 0.25 : 0.3), 560) * upp) / 2.0, 0.6, 3);
-    echo.group.scale.setScalar(S);
-    const c = worldAt(stage, r.left + r.width * (r.width < 1700 ? 0.22 : 0.25), r.top + r.height * 0.82, 0);
-    echo.group.position.copy(c);
-    build.S = S; build.c = c.clone();
-  }
-  stage.onFrame((dt, el) => {
-    const p = st.p;
+  let C = new THREE.Vector3(), SC = 1, labelRel = [];
+  // one pose for a progress value: the camera swings from the front to the side, the layers come apart
+  function pose(p) {
     const turn = smooth(clamp(p / 0.35, 0, 1));
     const spread = smooth(clamp((p - 0.25) / 0.4, 0, 1));
-    const c = build.c || new THREE.Vector3();
-    const S = build.S || 1;
-    // camera swings from the front to the side
     const ang = lerp(0, 0.88, turn), dist = lerp(11, 12.8, turn);
-    const tz = c.z - 2.2 * S * spread;
-    stage.setCamera({ position: [c.x + Math.sin(ang) * dist, lerp(1.0, 3.4, turn), tz + Math.cos(ang) * dist], target: [c.x - 0.6 * S * turn, c.y + 0.7 * S, tz] });
+    const tz = C.z - 2.2 * SC * spread;
+    stage.setCamera({ position: [C.x + Math.sin(ang) * dist, C.y + lerp(1.0, 3.4, turn), tz + Math.cos(ang) * dist], target: [C.x - 0.6 * SC * turn, C.y + 0.7 * SC, tz] });
     planes.forEach((m, k) => {
       m.position.z = -(0.2 + (k + 1) * GAP * spread);
       m.material.opacity = clamp(spread * 1.6 - k * 0.12, 0, 1) * 0.95;
     });
+    return spread;
+  }
+  // the 3D lives between the text column and the labels, 48px clear of both
+  const head = $('.build-head', sec);
+  const corners = [];
+  const box = new THREE.Box3();
+  function bounds() {
+    stage.scene.updateMatrixWorld(true);
+    corners.length = 0;
+    box.setFromObject(echo.group);
+    for (let i = 0; i < 8; i++) corners.push(new THREE.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
+    planes.forEach((m) => {
+      const g = m.geometry.parameters;
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => corners.push(m.localToWorld(new THREE.Vector3(sx * g.width / 2, sy * g.height / 2, 0))));
+    });
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    corners.forEach((p) => { const q = stage.project(p); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); });
+    return { x0, y0, x1, y1 };
+  }
+  function layout() {
+    const r = host.getBoundingClientRect();
+    const textRight = Math.max(...$$('.sec-head, h2, .build-lede, .build-nums', head).map((el) => el.getBoundingClientRect().right));
+    const labelLeft = Math.min(...labels.map((l) => l.getBoundingClientRect().left - (+gsap.getProperty(l, 'x') || 0)));
+    labelRel = labels.map((l) => { const b = l.getBoundingClientRect(); return { x: b.left - r.left - (+gsap.getProperty(l, 'x') || 0), y: b.top - r.top }; });
+    const reg = { x0: textRight + 48, x1: labelLeft - 48, y0: r.top + 96, y1: r.bottom - 40 - 48 };
+    stage.camera.clearViewOffset();
+    stage.setCamera({ position: [0, 1.0, 11], target: [0, 0.75, 0] });
+    C = worldAt(stage, r.left + r.width * 0.5, r.top + r.height * 0.6, 0);
+    SC = 1;
+    echo.group.position.copy(C);
+    for (let k = 0; k < 3; k++) {
+      echo.group.scale.setScalar(SC);
+      pose(1);
+      const bb = bounds();
+      const f = Math.min((reg.x1 - reg.x0) / (bb.x1 - bb.x0), (reg.y1 - reg.y0) / (bb.y1 - bb.y0)) * 0.96;
+      SC = clamp(SC * f, 0.2, 4);
+    }
+    echo.group.scale.setScalar(SC);
+    pose(1);
+    const bb = bounds();
+    const dx = (reg.x0 + reg.x1) / 2 - (bb.x0 + bb.x1) / 2, dy = (reg.y0 + reg.y1) / 2 - (bb.y0 + bb.y1) / 2;
+    stage.camera.setViewOffset(r.width, r.height, -dx, -dy, r.width, r.height);
+    stage.camera.updateProjectionMatrix();
+    pose(st.p);
+  }
+  stage.onFrame((dt, el) => {
+    const spread = pose(st.p);
     // a request travels through the stack and back
     if (spread > 0.95) {
       packet.visible = true;
       const t = (el * 0.45) % 2, f = t < 1 ? t : 2 - t;
       packet.position.set(0, 0, -(0.2 + 4 * GAP) * smooth(f));
     } else packet.visible = false;
-    // leader lines to the labels
-    const base = lines.getBoundingClientRect();
+    // leader lines run right, to the labels only
+    stage.camera.updateMatrixWorld();
     labels.forEach((l, i) => {
       const op = +gsap.getProperty(l, 'opacity');
-      if (op < 0.02) { paths[i].style.opacity = 0; dots[i].style.opacity = 0; return; }
+      if (op < 0.02 || !labelRel[i]) { if (paths[i].__op !== 0) { paths[i].style.opacity = 0; dots[i].style.opacity = 0; paths[i].__op = 0; } return; }
+      paths[i].__op = op;
       (i === 0 ? screenEdge : planes[i - 1].userData.edge).getWorldPosition(v);
-      const a = stage.project(v), b = l.getBoundingClientRect();
-      const x1 = a.x - base.left, y1 = a.y - base.top, x2 = b.left - base.left - 14, y2 = b.top - base.top + 26;
-      const kx = x1 + Math.max(24, (x2 - x1) * 0.35);
+      const a = projLocal(stage, v);
+      const x1 = a.x, y1 = a.y, x2 = labelRel[i].x + (+gsap.getProperty(l, 'x') || 0) - 14, y2 = labelRel[i].y + 26;
+      const kx = x2 - Math.max(24, (x2 - x1) * 0.3);
       paths[i].setAttribute('d', `M${x1.toFixed(1)},${y1.toFixed(1)} L${kx.toFixed(1)},${y2.toFixed(1)} L${x2.toFixed(1)},${y2.toFixed(1)}`);
       paths[i].style.opacity = op; dots[i].setAttribute('cx', x1.toFixed(1)); dots[i].setAttribute('cy', y1.toFixed(1)); dots[i].style.opacity = op;
     });
   });
 
+  const pinST = addTrigger({ trigger: sec, start: 'top top', end: () => '+=' + Math.round(innerHeight * 0.15), pin: '.build-pin', anticipatePin: 1, invalidateOnRefresh: true, refreshPriority: 1 });
   const tl = gsap.timeline({
-    scrollTrigger: { trigger: sec, start: 'top top', end: () => '+=' + Math.round(innerHeight * 2.6), pin: '.build-pin', scrub: 0.8, anticipatePin: 1, invalidateOnRefresh: true, refreshPriority: 1 },
+    scrollTrigger: { trigger: sec, start: 'top 75%', end: () => pinST.end, scrub: 0.8, invalidateOnRefresh: true, refreshPriority: 0 },
   });
   tl.to(st, { p: 1, duration: 1, ease: 'none' }, 0);
   labels.forEach((l, i) => tl.to(l, { opacity: 1, x: 0, duration: 0.08, ease: 'power2.out' }, 0.5 + i * 0.06));
   triggers.push(tl.scrollTrigger);
   stage.on('resize', layout);
   layout();
+  if (document.fonts) document.fonts.ready.then(layout);
 }
 
 function drawLayer(ctx, w, h, d) {
@@ -1130,9 +1339,9 @@ async function cta() {
   if (!host) return;
   $('.cta').classList.add('is-gl');
   const stage = makeStage(host, {
-    background: 'transparent', bloom: true, css3d: false, fov: 30,
+    quality: 'low', background: 'transparent', bloom: false, css3d: false, fov: 30, pixelRatioCap: 1.25,
     camera: [0, 0, 12], target: [0, 0, 0], timeOfDay: 22,
-    fx: { grain: 0.02, vignette: 0.2, scanlines: 0, aberration: 0 },
+    fx: { grain: 0, vignette: 0, scanlines: 0, aberration: 0 },
   });
   const logo = N.createNovaLogo({ finish: 'iridescent', core: 'star', size: 0.85, spin: 0.5, glow: true });
   stage.scene.environmentIntensity = 1.25;
@@ -1144,7 +1353,7 @@ async function cta() {
   const s = { k: 0.55 };
   const apply = () => logo.group.scale.setScalar(s.k);
   apply();
-  const tl = gsap.timeline({ scrollTrigger: { trigger: '.cta', start: 'top bottom', end: 'center center', scrub: 1 } });
+  const tl = gsap.timeline({ scrollTrigger: { trigger: '.cta', start: 'top bottom', end: 'top top', scrub: 1 } });
   tl.to(s, { k: 1, ease: 'none', onUpdate: apply });
   triggers.push(tl.scrollTrigger);
 }

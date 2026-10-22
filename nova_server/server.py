@@ -725,8 +725,10 @@ def briefing_facts(me: dict[str, Any], elder: dict[str, Any], period: str) -> di
         {"title": a["title"], "when_label": ins.when_label(parse(a["at"]), t), "provider": a["provider"], "location": a["location"]}
         for a in store.appointments(elder["id"], t, t + timedelta(days=7))
     ] if sharing.get("appointments", True) else []
+    bp_days = [{"date": ins.short_date(parse(b["at"])), "systolic": b["systolic"], "diastolic": b["diastolic"]}
+               for b in store.bp(elder["id"], t - timedelta(days=14))] if sharing.get("wellbeing", True) else []
     return {
-        "insights": found, "adherence": adh, "wellbeing": {"days": wb_days, "trend": trend},
+        "insights": found, "adherence": adh, "wellbeing": {"days": wb_days, "trend": trend, "bp": bp_days},
         "alerts": [{"id": a["id"], "severity": a["severity"], "kind": a["kind"], "message": a["message"], "at": a["at"]} for a in alerts],
         "messages": msgs, "upcoming": upcoming,
     }
@@ -891,6 +893,54 @@ def caregiver_briefing_prompt(period: str = "week") -> list[UserMessage]:
         f"Use care_briefing for the {period}. Tell me the overall picture in one sentence, then the single most "
         "important thing and the suggested next step. Offer to prepare a visit brief if an appointment is coming up."
     )]
+
+
+# ---------------------------------------------------------------------------
+# Vitals
+# ---------------------------------------------------------------------------
+@mcp.tool(
+    name="log_vitals",
+    title="Log blood pressure",
+    description=("Record a blood pressure reading: 'my blood pressure is 118 over 72, pulse 70'. Nova compares it with "
+                 "the limits the doctor wrote in the care notes and tells the family if it's out of range."),
+    annotations=WRITE,
+)
+def log_vitals(
+    systolic: Annotated[int, Field(description="Top number", ge=50, le=260)],
+    diastolic: Annotated[int, Field(description="Bottom number", ge=30, le=160)],
+    pulse: Annotated[int | None, Field(description="Pulse, if said")] = None,
+    position: Annotated[Literal["sitting", "standing"] | None, Field(description="If said")] = None,
+) -> dict[str, Any]:
+    me = caller()
+    elder = care_recipient(me)
+    store.add_bp(elder["id"], systolic, diastolic, pulse, position, me["id"])
+    (hi_s, hi_d), (lo_s, lo_d), note = ins.bp_limits(store, elder["id"])
+    recent = store.bp(elder["id"], now() - timedelta(days=7))
+    prev = recent[-2] if len(recent) >= 2 else None
+    reading = f"{systolic} over {diastolic}"
+    who = "your" if me["id"] == elder["id"] else f"{elder['short_name']}'s"
+    out_of_range = systolic > hi_s or diastolic > hi_d or systolic < lo_s or diastolic < lo_d
+    trend = f" Last reading was {prev['systolic']} over {prev['diastolic']}." if prev else ""
+    alert_id = None
+    if out_of_range:
+        direction = "high" if systolic > hi_s or diastolic > hi_d else "low"
+        alert_id = store.add_alert(elder["id"], "watch", f"bp-{direction}",
+                                   f"{elder['short_name']}'s blood pressure was {systolic}/{diastolic} ({direction}).")
+        for p in store.caregivers():
+            if p["id"] != me["id"] and not (p.get("relation") or "").startswith("home aide"):
+                store.announce(p["id"], "caregiver_escalation", f"Mom's blood pressure is {direction}",
+                               f"Mom's blood pressure just read {systolic} over {diastolic}, which is {direction}er than "
+                               f"Dr. Patel's limit. Her notes say to call the office.",
+                               severity="watch", expects_reply=True, replies=["Call Mom", "Ask Grace to stop by"])
+        speech = (f"I've logged {who} blood pressure, {reading}. That's {direction}er than the limit in Dr. Patel's notes, "
+                  f"so I've let the family know. If you feel faint, sit down, and call the office." if me["id"] == elder["id"]
+                  else f"Logged {reading}. That's out of range, so I've opened an alert.")
+    else:
+        speech = f"Got it, {reading}.{trend} That's within the range Dr. Patel set."
+    return {"speech": speech, "reading": {"systolic": systolic, "diastolic": diastolic, "pulse": pulse},
+            "limits": {"high": f"{hi_s}/{hi_d}", "low": f"{lo_s}/{lo_d}", "source": note["source"] if note else None},
+            "out_of_range": out_of_range, "alert_id": alert_id,
+            "recent": [{"at": b["at"], "bp": f"{b['systolic']}/{b['diastolic']}"} for b in recent[-7:]]}
 
 
 # ---------------------------------------------------------------------------

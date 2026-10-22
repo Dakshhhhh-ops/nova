@@ -107,6 +107,16 @@ CREATE TABLE IF NOT EXISTS announcements (
     related TEXT DEFAULT '{}',
     dedupe TEXT UNIQUE
 );
+CREATE TABLE IF NOT EXISTS vitals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id TEXT NOT NULL,
+    at TEXT NOT NULL,
+    systolic INTEGER NOT NULL,
+    diastolic INTEGER NOT NULL,
+    pulse INTEGER,
+    position TEXT,                 -- sitting | standing
+    logged_by TEXT
+);
 CREATE TABLE IF NOT EXISTS signals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     person_id TEXT NOT NULL,
@@ -230,7 +240,7 @@ class Store:
         with self._lock:
             for table in (
                 "people", "sharing", "medications", "dose_events", "checkins",
-                "messages", "appointments", "care_notes", "alerts", "announcements", "signals", "change_sets",
+                "messages", "appointments", "care_notes", "alerts", "announcements", "signals", "change_sets", "vitals",
             ):
                 self._db.execute(f"DELETE FROM {table}")
             self._db.execute("DELETE FROM sqlite_sequence")
@@ -503,6 +513,17 @@ class Store:
             f"AND kind IN ({','.join('?' * len(kinds))})",
             (to_id, iso(now()), *kinds),
         )
+
+    # -- vitals ------------------------------------------------------------------
+    def add_bp(self, person_id: str, systolic: int, diastolic: int, pulse: int | None = None,
+               position: str | None = None, by: str | None = None, at: datetime | None = None) -> int:
+        return self.x(
+            "INSERT INTO vitals (person_id, at, systolic, diastolic, pulse, position, logged_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (person_id, iso(at or now()), systolic, diastolic, pulse, position, by),
+        )
+
+    def bp(self, person_id: str, since: datetime) -> list[dict[str, Any]]:
+        return self.q("SELECT * FROM vitals WHERE person_id = ? AND at >= ? ORDER BY at", (person_id, iso(since)))
 
     # -- signals (Ring and other ambient sensors) ------------------------------
     def add_signal(self, person_id: str, source: str, kind: str, who: str | None, text: str, at: datetime | None = None) -> int:

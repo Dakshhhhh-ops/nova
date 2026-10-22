@@ -81,6 +81,7 @@ class CareEngine:
         for elder in self.store.elders():
             fired += self._doses(elder, last, t)
             fired += self._checkin(elder, last, t)
+            fired += self._bp_prompt(elder, last, t)
             fired += self._appointments(elder, last, t)
             fired += self._wellness(elder, last, t)
         self.fired += fired
@@ -169,6 +170,21 @@ class CareEngine:
             f"checkin:{t.date()}", elder["id"], "checkin_prompt", "Good morning",
             f"Good morning, {elder['short_name']}! How are you feeling today?",
             expects_reply=True, replies=["I feel good today", "A bit dizzy again", "My knee hurts"],
+        )
+
+    # -- morning blood pressure (when the doctor asked for it) ------------------
+    def _bp_prompt(self, elder: dict[str, Any], last: datetime, t: datetime) -> list[str]:
+        at = t.replace(hour=7, minute=45, second=0)
+        if not self._crossed(at, last, t):
+            return []
+        asked = any("blood pressure every morning" in n["text"].lower() for n in self.store.care_notes(elder["id"]))
+        if not asked or self.store.bp(elder["id"], t.replace(hour=0, minute=0, second=0)):
+            return []
+        return self._fire(
+            f"bp:{t.date()}", elder["id"], "checkin_prompt", "Blood pressure",
+            f"Good morning, {elder['short_name']}. Dr. Patel asked for a blood pressure reading every morning before "
+            "your pills. Tell me the numbers when you're ready.",
+            due_at=at, expects_reply=True, replies=["It's 118 over 72", "Remind me in 10 minutes"],
         )
 
     # -- appointments ---------------------------------------------------------

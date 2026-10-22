@@ -172,3 +172,27 @@ async def test_recent_activity_reports_ring():
 def _unfreeze():
     yield
     store_mod.freeze(None)
+
+
+# -- vitals -----------------------------------------------------------------
+async def test_bp_evidence_and_limits_from_notes():
+    freeze_and_seed(at(12, 0))
+    out = await call("care_briefing", {}, as_person="maya")
+    top = out["insights"][0]
+    assert top["evidence"][0].startswith("Home BP averaged 152/91 before the change")
+    assert out["wellbeing"]["bp"]
+    low = await call("log_vitals", {"systolic": 96, "diastolic": 58})
+    assert low["out_of_range"] and low["alert_id"]
+    assert any(a["kind"] == "caregiver_escalation" and "96 over 58" in a["speech"] for a in server.store.announcements("maya"))
+    ok = await call("log_vitals", {"systolic": 118, "diastolic": 72})
+    assert not ok["out_of_range"] and "within the range" in ok["speech"]
+
+
+def test_bp_prompt_only_after_doctor_asks():
+    eng = freeze_and_seed(at(7, 40))
+    assert not any(k.startswith("bp:") for k in run(eng, at(7, 45), at(7, 50)))
+    server.store.add_care_note("rose", "After Visit Summary · Dr. Anika Patel", "Check blood pressure every morning before pills.")
+    eng2 = CareEngine(server.store)
+    store_mod.freeze(at(7, 40))
+    eng2.tick(at(7, 40))
+    assert any(k.startswith("bp:") for k in run(eng2, at(7, 45), at(7, 50)))

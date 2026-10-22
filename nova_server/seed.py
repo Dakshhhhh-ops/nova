@@ -104,6 +104,14 @@ def seed(store: Store, *, rng_seed: int = 7) -> None:
                 who = "rose" if rng.random() > 0.15 else "grace"
                 store.log_dose(m["id"], at, "taken", who, at=taken_at)
 
+    # Home blood pressure: high before the dose change, dropping (and low on standing) after it.
+    for days_ago, sys_, dia, pulse, pos, who in (
+        (13, 154, 92, 74, "sitting", "grace"), (11, 150, 90, 72, "sitting", "grace"),
+        (6, 118, 72, 70, "sitting", "grace"), (4, 112, 68, 68, "sitting", "rose"),
+        (3, 104, 62, 76, "sitting", "grace"), (1, 106, 64, 78, "sitting", "rose"),
+    ):
+        store.add_bp("rose", sys_, dia, pulse, pos, who, at=(today - timedelta(days=days_ago)).replace(hour=10, minute=15))
+
     # Ten days of voice check-ins.
     checkins = [
         (10, 4, 2, 7.5, [], ["walk with neighbor Ruth"], "Slept fine. Walked to the corner store with Ruth."),

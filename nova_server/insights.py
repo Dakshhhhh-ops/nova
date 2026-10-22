@@ -261,6 +261,15 @@ def detect_insights(store: Store, person_id: str, t: datetime | None = None) -> 
             ]
             for m in corroboration[:2]:
                 evidence.append(f"{short_date(parse(m['at']))} · {m['from_short']}: “{m['body']}”")
+            bps = store.bp(person_id, changed - timedelta(days=21))
+            pre = [b for b in bps if parse(b["at"]) < changed]
+            post = [b for b in bps if parse(b["at"]) >= changed]
+            if pre and post:
+                def mean(rows: list[dict[str, Any]], k: str) -> int:
+                    return round(sum(r[k] for r in rows) / len(rows))
+                evidence.insert(0, f"Home BP averaged {mean(pre, 'systolic')}/{mean(pre, 'diastolic')} before the change, "
+                                   f"{mean(post, 'systolic')}/{mean(post, 'diastolic')} since "
+                                   f"(lowest {min(b['systolic'] for b in post)}/{min(b['diastolic'] for b in post)})")
             note = _note_mentioning(store, person_id, fam[:5])
             phone = _phone_in(note["text"]) if note else None
             suggestion = (
@@ -399,6 +408,17 @@ def sync_alerts(store: Store, person_id: str, insights: list[dict[str, Any]]) ->
                 )
                 if not handled_recently:
                     store.add_alert(person_id, ins["severity"], ins["id"], ins["title"] + ". " + ins["detail"])
+
+
+def bp_limits(store: Store, person_id: str) -> tuple[tuple[int, int], tuple[int, int], dict[str, Any] | None]:
+    """Call-the-doctor thresholds as written in the care notes ('above 160/100 or below 100/60')."""
+    for n in store.care_notes(person_id):
+        hi = re.search(r"above (\d{2,3})/(\d{2,3})", n["text"])
+        lo = re.search(r"below (\d{2,3})/(\d{2,3})", n["text"])
+        if hi or lo:
+            return ((int(hi.group(1)), int(hi.group(2))) if hi else (160, 100),
+                    (int(lo.group(1)), int(lo.group(2))) if lo else (90, 60), n)
+    return (160, 100), (90, 60), None
 
 
 def overall_status(insights: list[dict[str, Any]], alerts: list[dict[str, Any]]) -> str:

@@ -37,6 +37,13 @@ def _med_phrase(text: str) -> str:
 
 def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     t = text.lower().strip()
+    m = re.search(r"(\d{2,3})\s*(?:over|/)\s*(\d{2,3})", t)
+    if m:
+        p = re.search(r"pulse (?:is |of )?(\d{2,3})", t)
+        args = {"systolic": int(m.group(1)), "diastolic": int(m.group(2))}
+        if p:
+            args["pulse"] = int(p.group(1))
+        return _call("log_vitals", **args)
     m = re.search(r"remind me (?:again )?in (\d+)", t)
     if m or re.search(r"remind me later|snooze", t):
         return _call("snooze_reminder", minutes=int(m.group(1)) if m else 10)

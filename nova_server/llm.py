@@ -106,10 +106,14 @@ class Bedrock(Backend):
         try:
             import boto3
 
+            from botocore.config import Config
+
             session = boto3.Session()
             region = self.region or session.region_name or "us-east-1"
             self.region = region
-            self._client = session.client("bedrock-runtime", region_name=region)
+            # Fail fast: a throttled call should fall back to the offline router, not stall a voice turn.
+            self._client = session.client("bedrock-runtime", region_name=region, config=Config(
+                retries={"max_attempts": 2, "mode": "standard"}, connect_timeout=5, read_timeout=60))
             last = None
             for model_id in self._candidates(region):
                 try:
@@ -127,6 +131,8 @@ class Bedrock(Backend):
                     msg = str(exc)
                     if "security token" in msg or "credentials" in msg.lower() or "ExpiredToken" in msg:
                         break
+                    if "tokens per day" in msg:
+                        log.warning("Bedrock daily token quota reached for %s; request a quota increase", model_id)
             self.error = str(last)[:300] if last else "no model"
         except Exception as exc:
             self.error = str(exc)[:300]

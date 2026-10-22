@@ -47,26 +47,49 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 
 ## Product feedback
 
-**MCP (spec + Python SDK 2.3).** Used for the whole Alexa+ integration: MCPServer, Streamable HTTP, structured output, tool annotations, icons, resources, prompts, the MCP Apps extension, elicitation through resolvers, and the bearer-token resource server with RFC 9728 metadata.
-- *Worked well:* The protocol does a lot out of the box: structured output from type hints, Protected Resource Metadata from one `AuthSettings`, and an in-process `Client(server)` that made tests trivial. The migration error for `mcp.server.fastmcp` points straight to the guide.
-- *Needs work:* Two silent or surprising behaviors cost real time (see friction log): Apps tools registered after the server is built simply don't appear, and `ctx.elicit()` fails on 2026-07-28 connections with an error that doesn't mention resolvers.
+Each tool we used, answered the same way: what we used it for, what worked, what needs work, how onboarding felt, and whether we'd build with it again.
+
+**MCP (spec + Python SDK 2.3)**
+- *Used for:* the whole Alexa+ integration: MCPServer, Streamable HTTP, structured output, tool annotations, icons, resources, prompts, MCP Apps, elicitation through resolvers, and an OAuth 2.1 authorization server (dynamic registration, PKCE, RFC 9728 metadata).
+- *Worked well:* A lot comes out of the box: structured output from type hints, protected-resource and authorization-server metadata from one `AuthSettings`, a DNS-rebinding guard, and an in-process `Client(server)` that made 45 tests easy to write. The migration error for `mcp.server.fastmcp` points straight to the guide.
+- *Needs work:* Three behaviors cost real time (see the friction log): Apps tools registered after the server is built silently don't appear; `ctx.elicit()` fails on 2026-07-28 connections with an error that doesn't mention resolvers; and a resolver that elicits throws for clients without the elicitation capability unless you check `client_capabilities` yourself.
+- *Onboarding:* Good once you find the v2 docs. The rename from FastMCP to MCPServer and the new resolver model needed source reading.
 - *Would build with it again:* Yes.
 
-**MCP Apps (`io.modelcontextprotocol/ui`).** Used for visual responses on the simulated Echo Show screens.
-- *Worked well:* A clean model. `_meta.ui.resourceUri` plus a `ui://` resource, with JSON-RPC over postMessage. Views calling tools back through the host made the cards interactive with very little code.
-- *Needs work:* There's no small reference host to copy, so we wrote the host side (handshake, tool-input/tool-result, size-changed, tools/call proxy) from the spec. Guidance on how Alexa+ / Echo Show will render these views (sizes, theme variables, voice + screen pairing) would help builders design for it now.
-
-**Alexa+ (simulated).** We used the simulated path because we don't have Alexa+ Preview access.
-- *Worked well:* Choosing MCP as the integration standard means the same server works with Alexa+, Kiro, Claude and the MCP Inspector.
-- *Needs work:* There's no way for non-Preview developers to point a real (or sandboxed) Alexa+ at a self-hosted MCP URL, or to test account linking end to end. We had to guess how Alexa+ handles elicitation, `speech`-style results and visual responses.
-- *Onboarding:* The Resources page was clear about the two paths (MCP server or simulated). An official Alexa+ MCP test console would change everything.
-
-**Amazon Bedrock + Amazon Nova.** Used for the agent loop (Converse tool use) and for narration, extraction, grounded Q&A and visit briefs.
-- *Worked well:* The Converse API's tool-use shape maps one-to-one onto MCP tools (`inputSchema.json` = MCP `inputSchema`). Nova Lite-class models are fast enough for voice turns.
-- *Needs work:* **New-account quotas blocked us.** On a fresh account, every Amazon Nova model (Nova 2 Lite, Nova Lite, Micro, Pro) in us-east-1, us-west-2 and eu-north-1 returned `ThrottlingException: Too many tokens per day` after a handful of 5-token test calls. Other regions returned `AccessDeniedException` pointing at account verification. eu-central-1 answered once and then throttled too. Nothing in the console or the error says what the quota is, how much is left, or when it resets. Picking the right model identifier per region (`us.` / `eu.` / `apac.` / `global.` inference profiles, Nova vs Nova 2) also needed a probe-and-fallback loop in code.
+**MCP Apps (`io.modelcontextprotocol/ui`)**
+- *Used for:* five visual responses on the Echo Show screens (today, briefing, visit brief, pill check, reconciliation), including buttons that call tools back through the host.
+- *Worked well:* A clean model: `_meta.ui.resourceUri` plus a `ui://` resource, JSON-RPC over postMessage, and `visibility: ["app"]` to keep camera-only tools away from the model.
+- *Needs work:* No small reference host to copy, so we wrote the host side from the spec (we've extracted it as `mcp-apps-lite-host`). Alexa+ guidance for these views is missing: Echo Show sizes, viewing distance, theme variables, and how a view pairs with the spoken reply.
+- *Onboarding:* The spec is thorough; examples for a non-chat host (a device screen) would help.
 - *Would build with it again:* Yes.
 
-**Amazon Polly.** Used for spoken replies and proactive announcements (generative voice "Ruth"). It worked first time on the new account, and generative voices sound natural for an older listener. We kept a browser speech fallback for machines without AWS.
+**Alexa+ (simulated experience)**
+- *Used for:* the target platform. We built the MCP integration and a simulated Alexa+ (two Echo Shows, a Ring doorbell, an agent loop) because we don't have Alexa+ Preview access.
+- *Worked well:* MCP as the integration standard means the same server works with Alexa+, the MCP Inspector, Claude and Kiro without changes.
+- *Needs work:* Non-Preview developers can't point a real or sandboxed Alexa+ at a self-hosted MCP URL, or test account linking end to end. We had to guess how Alexa+ handles elicitation, short spoken results versus screen detail, proactive notifications and MCP Apps.
+- *Onboarding:* The Resources page was clear about the two paths (an MCP server or a simulated experience). An official Alexa+ MCP test console would change everything.
+- *Would build with it again:* Yes, and we'd move to the real device the day Preview access allows it.
+
+**Amazon Bedrock + Amazon Nova**
+- *Used for:* the agent's tool-use loop (Converse API), image understanding (pill-bottle labels, after-visit summaries), the spoken caregiver briefing, check-in extraction, answers grounded in care notes, and visit briefs.
+- *Worked well:* The Converse API's tool-use shape maps one-to-one onto MCP tools (`inputSchema.json` is the MCP `inputSchema`), and image blocks in the same API made vision a few lines. A real Nova Lite call in eu-central-1 answered quickly.
+- *Needs work:* **New-account quotas blocked us.** Every Amazon Nova model in us-east-1, us-west-2 and eu-north-1 returned `ThrottlingException: Too many tokens per day` after fewer than 50 tokens in total, other regions returned `AccessDeniedException` (account verification), and nothing says what the quota is or when it resets. Picking the right model ID per region (`us.` / `eu.` / `apac.` / `global.` inference profiles, Nova versus Nova 2) needed a probe-and-fallback loop.
+- *Onboarding:* The API and SDK were smooth; the account side was the hard part (IAM user, then quotas we couldn't see because `AmazonBedrockFullAccess` doesn't include Service Quotas read access).
+- *Would build with it again:* Yes. We kept the integration in, validated request shapes against the botocore model in tests, and fall back gracefully until the quota is raised.
+
+**Amazon Polly**
+- *Used for:* every spoken reply and proactive announcement (generative voice "Ruth"), plus the narrator voice in our demo-video recorder.
+- *Worked well:* It worked first time on the new account, the generative voices sound natural for an older listener, and latency was fine for conversation.
+- *Needs work:* We'd like SSML or prosody controls for the generative engine (a slightly slower rate for older listeners) and a list of which voices support which engine in each region, in one API call.
+- *Onboarding:* Easy: one managed policy and a single `synthesize_speech` call.
+- *Would build with it again:* Yes.
+
+**AWS account setup (IAM, App Runner)**
+- *Used for:* an IAM user for Bedrock and Polly, and an attempt to deploy on AWS App Runner.
+- *Worked well:* IAM managed policies made the permissions clear, and `aws sts get-caller-identity` made it easy to confirm the key.
+- *Needs work:* App Runner returned `SubscriptionRequiredException` ("needs a subscription for the service") on a new account with no hint about what to do, so we deployed elsewhere for now. A single "account activation status" page listing which services are still pending would save hours.
+- *Onboarding:* The slowest part of the whole build.
+- *Would build with it again:* Yes, once the account is fully activated.
 
 ## Friction log
 
@@ -78,6 +101,8 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 | 4 | Choose an Amazon Nova model ID for Bedrock Converse | Started from a regional default profile | One stable identifier per model | IDs differ by geography prefix and generation; the right one depends on the region and what is enabled | Low | Probe a candidate list at startup and fall back | An API or SDK helper that resolves "best inference profile for model X in region Y" |
 | 5 | Run the simulator without AWS | Machine's local AWS credentials were invalid (`InvalidClientTokenId`) | A clear path to keep building | Every Bedrock and Polly call failed | Medium | Built fallbacks: local Ollama model, then a rules router; browser speech instead of Polly | A free, rate-limited Bedrock sandbox key for hackathons (the AWS credit codes ran out on Oct 7) |
 | 6 | Call Amazon Nova from a brand-new AWS account | Created an IAM user with `AmazonBedrockFullAccess`, configured the CLI, called Converse on `us.amazon.nova-2-lite-v1:0`, then every other Nova model and region | A few thousand tokens to build and record a demo | `ThrottlingException: Too many tokens per day` after under 50 tokens in total, in every US/EU region; `AccessDeniedException` (account verification) in others; the IAM user can't even read Service Quotas (`servicequotas:ListServiceQuotas` isn't in `AmazonBedrockFullAccess`) | Critical | Made throttling fail fast and fall back per turn (offline router, local model) so the demo never stalls; Polly still worked; filed a quota increase | Show the daily token quota, the amount used and the reset time in the Bedrock console and in the throttling error; give new accounts a usable default for Nova Lite/Micro; add `servicequotas:Get*`/`List*` for Bedrock to `AmazonBedrockFullAccess`; offer hackathon participants a fast-track quota |
+| 7 | Ask for consent in a tool on a client without elicitation support | A resolver returned `Elicit(...)` and an MCP client that doesn't declare the elicitation capability called the tool | The question is skipped, or the SDK falls back | `MCPError: Client did not declare the form elicitation capability required by resolver…`, so the whole tool call failed | High | Check `ctx.client_capabilities.elicitation` in the resolver and skip the question (keeping the symptom private) | Let a resolver declare an optional elicitation with a default outcome, or document the capability check next to `Elicit` |
+| 8 | Deploy the MCP server on AWS App Runner | IAM user with App Runner, ECR and IAM permissions; `aws apprunner list-services` | A list (or an empty list) | `SubscriptionRequiredException: The AWS Access Key Id needs a subscription for the service` on a new account | High | Deployed the same Docker image on another host for the live link | Say in the error that the account is still being activated, and link to the account status |
 
 ## Feature requests
 1. **Alexa+ MCP test console** for non-Preview developers: point Alexa+ at a public MCP URL, sandboxed account linking, see the tool calls. *Critical.*

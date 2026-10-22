@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -24,7 +25,9 @@ from mcp.server.apps import Apps
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings
-from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.elicitation import AcceptedElicitation, ElicitationResult
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.resolve import Elicit, Resolve
 from mcp.server.mcpserver.prompts.base import UserMessage
 from mcp.server.mcpserver.resources import Resource
 from mcp_types import Icon, ToolAnnotations
@@ -296,7 +299,9 @@ def match_doses(elder: dict[str, Any], medication: str, time_of_day: str, t) -> 
             return at.hour >= 17
         if "after" in tod or "lunch" in tod or "noon" in tod:
             return 12 <= at.hour < 17
-        return tod.replace(" ", "") in d["time_label"].lower().replace(" ", "")
+        if re.search(r"\d", tod):
+            return tod.replace(" ", "") in d["time_label"].lower().replace(" ", "")
+        return True  # "today", "now", etc.
 
     cands = [d for d in doses if med_matches(d) and time_matches(d)]
     if not tod and cands:
@@ -426,6 +431,35 @@ class NotifyConsent(BaseModel):
     notify: bool = Field(description="Let your care circle know?")
 
 
+CONCERNING = ("dizziness", "swelling", "confusion", "shortness of breath")
+
+
+def primary_caregiver() -> dict[str, Any] | None:
+    caregivers = store.caregivers()
+    return next((p for p in caregivers if p["relation"] == "daughter"), caregivers[0] if caregivers else None)
+
+
+def ask_before_sharing(how_are_you_feeling: str):
+    """Resolver: ask the elder before the circle hears about a concerning symptom.
+
+    Runs before the tool body. Returning `Elicit` makes the SDK ask the user: an
+    `InputRequiredResult` round trip on 2026-07-28 connections, or a standard
+    `elicitation/create` request on 2025-11-25 connections (Alexa+). It must be
+    deterministic, because it re-runs on every round.
+    """
+    me = caller()
+    if me["role"] != "elder" or ins.red_flags(how_are_you_feeling):
+        return None  # caregivers don't need consent; emergencies don't wait for it
+    fams = [f for f in (ins.symptom_family(how_are_you_feeling),) if f in CONCERNING]
+    if not fams or not store.sharing(me["id"]).get("wellbeing", True):
+        return None
+    names = [p["short_name"] for p in store.caregivers()][:2]
+    return Elicit(
+        f"Would you like me to let {speak_list(names) or 'your family'} know you're feeling {ins.feeling(fams[0])}?",
+        NotifyConsent,
+    )
+
+
 @mcp.tool(
     name="daily_checkin",
     title="Daily check-in",
@@ -438,57 +472,57 @@ class NotifyConsent(BaseModel):
 )
 async def daily_checkin(
     how_are_you_feeling: Annotated[str, Field(description="What the person said about how they feel, verbatim")],
-    ctx: Context,
+    consent: Annotated[ElicitationResult[NotifyConsent], Resolve(ask_before_sharing)],
 ) -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
     if me["id"] != elder["id"]:
         store.add_message(me["id"], "circle", f"Observation about {elder['short_name']}: {how_are_you_feeling}")
-        return {"speech": f"Thanks, I've shared that observation with the circle.", "checkin": None,
+        return {"speech": "Thanks, I've shared that observation with the circle.", "checkin": None,
                 "red_flags": [], "shared_with": [], "alert_id": None}
     data = await in_thread(ins.extract_checkin, how_are_you_feeling, elder["short_name"])
     data["utterance"] = how_are_you_feeling
     store.add_checkin(elder["id"], data)
     flags = ins.red_flags(how_are_you_feeling)
-    caregivers = [p for p in store.caregivers()]
-    names = [p["short_name"] for p in caregivers]
+    names = [p["short_name"] for p in store.caregivers()]
     alert_id = None
     shared_with: list[str] = []
     if flags:
         alert_id = store.add_alert(elder["id"], "urgent", "red-flag",
                                    f"{elder['short_name']} reported: “{how_are_you_feeling}” ({', '.join(flags)})")
         store.add_message(elder["id"], "circle", f"URGENT from Nova: {elder['short_name']} said “{how_are_you_feeling}”.", urgent=True)
-        shared_with = names
         speech = (f"That sounds serious, {elder['short_name']}. I've alerted {speak_list(names[:2])} right away. "
                   "If you're hurt or it's getting worse, please call 911.")
-        return {"speech": speech, "checkin": data, "red_flags": flags, "shared_with": shared_with, "alert_id": alert_id}
+        return {"speech": speech, "checkin": data, "red_flags": flags, "shared_with": names, "alert_id": alert_id}
 
-    speech = data.get("reply") or "Thank you, I've noted that."
-    concerning = [s for s in data.get("symptoms", []) if ins.symptom_family(s) in ("dizziness", "swelling", "confusion", "shortness of breath")]
-    if concerning and store.sharing(elder["id"]).get("wellbeing", True):
-        primary = next((p for p in caregivers if p["relation"] == "daughter"), caregivers[0] if caregivers else None)
-        consent = None
-        try:
-            res = await ctx.elicit(
-                message=f"Would you like me to let {primary['short_name'] if primary else 'your family'} know you're feeling {concerning[0]}?",
-                schema=NotifyConsent,
-            )
-            consent = res.action == "accept" and bool(getattr(res.data, "notify", False))
-        except Exception as exc:  # client can't elicit: keep it private by default
-            log.info("elicitation unavailable: %s", exc)
-        if consent:
-            store.add_message(elder["id"], "circle", f"Hi, it's Nova for {elder['short_name']}: she's feeling {concerning[0]} today and asked me to let you know.")
+    reply = _sentence(data.get("reply") or "Thank you, I've noted that.")
+    speech = reply
+    symptom = ins.symptom_family(how_are_you_feeling)
+    nothing_asked = isinstance(consent, AcceptedElicitation) and consent.data is None
+    if not nothing_asked:
+        yes = isinstance(consent, AcceptedElicitation) and bool(getattr(consent.data, "notify", False))
+        if yes:
+            store.add_message(elder["id"], "circle",
+                              f"Hi, it's Nova for {elder['short_name']}: she's feeling {ins.feeling(symptom)} today and asked me to let you know.")
             alert_id = store.add_alert(elder["id"], "watch", "checkin-symptom",
-                                       f"{elder['short_name']} reported {concerning[0]} and asked Nova to tell the circle.")
+                                       f"{elder['short_name']} reported {symptom} and asked Nova to tell the circle.")
             shared_with = names
-            speech = f"{data.get('reply') or 'I have noted that.'} I've let {speak_list(names[:2])} know. Remember to stand up slowly."
-        elif consent is False:
-            speech = f"{data.get('reply') or 'I have noted that.'} I'll keep it between us for now. Remember to stand up slowly."
-        # Doctor's instructions about this symptom, if any.
-        note = next((n for n in store.care_notes(elder["id"]) if concerning[0][:5] in n["text"].lower()), None)
-        if note and "call" in note["text"].lower():
-            speech += f" Dr. Patel asked to hear about {concerning[0]}, so it may be worth a call to the office."
+            speech = f"{reply} I've let {speak_list(names[:2])} know."
+        else:
+            speech = f"{reply} I'll keep it between us for now."
+    if symptom == "dizziness":
+        speech += " Please stand up slowly."
+    if symptom in CONCERNING:
+        note = next((n for n in store.care_notes(elder["id"]) if symptom[:5] in n["text"].lower() and "call" in n["text"].lower()), None)
+        if note:
+            doctor = note["source"].split("·")[-1].strip().replace("Dr. Anika ", "Dr. ")
+            speech += f" {doctor} asked to hear about {symptom}, so it's worth a call to the office."
     return {"speech": speech, "checkin": data, "red_flags": [], "shared_with": shared_with, "alert_id": alert_id}
+
+
+def _sentence(text: str) -> str:
+    text = text.strip()
+    return text[:1].upper() + text[1:] if text else text
 
 
 # ---------------------------------------------------------------------------

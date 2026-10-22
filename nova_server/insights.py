@@ -171,6 +171,17 @@ SYMPTOM_FAMILIES = {
     "low mood": r"lonely|sad|down in the dumps|depress|blue today",
 }
 
+SYMPTOM_FEELING = {
+    "dizziness": "dizzy", "swelling": "some swelling", "confusion": "confused",
+    "shortness of breath": "short of breath", "fatigue": "tired", "low mood": "low",
+}
+
+
+def feeling(family: str) -> str:
+    """'dizziness' -> 'dizzy', for 'you're feeling ...' sentences."""
+    return SYMPTOM_FEELING.get(family, family)
+
+
 RED_FLAGS = {
     "fall": r"\b(i|i've|have) (fell|fallen)|\bfell (down|over)|took a (fall|tumble)|on the floor",
     "chest pain": r"chest (pain|tight|pressure|hurts)",
@@ -452,11 +463,14 @@ def _template_briefing(ctx: dict[str, Any]) -> dict[str, str]:
             "speech": f"{name} is doing well. Medications are at {adh.get('pct', 100)} percent and nothing needs your attention.",
         }
     top = ins[0]
-    parts = [f"{name} is mostly okay, but there's something to watch." if top["severity"] != "info"
-             else f"{name} is doing okay overall."]
-    parts.append(top["title"] + ". " + top["detail"])
+    first = lambda text: re.split(r"(?<=[.!?])\s+", text.strip())[0]  # noqa: E731
+    opener = (f"{name} is mostly okay, but one thing needs your attention." if top["severity"] != "info"
+              else f"{name} is doing okay overall.")
+    parts = [opener, f"{top['title']}. {first(top['detail'])}"]
     if top.get("suggestion"):
-        parts.append(top["suggestion"])
+        parts.append(first(top["suggestion"]))
+    if len(ins) > 1:
+        parts.append(f"There {'is' if len(ins) == 2 else 'are'} {len(ins) - 1} more thing{'s' if len(ins) > 2 else ''} on screen.")
     return {"headline": top["title"], "speech": " ".join(parts)}
 
 

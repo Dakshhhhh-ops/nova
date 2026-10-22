@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visit brief</title>
+<style>
+  :root {
+    --bg: #0A1322;
+    --paper: #0F1A2C;
+    --surface-2: #15233A;
+    --line: rgba(255, 255, 255, .09);
+    --text: #F3F6FB;
+    --text-2: #BCC7D8;
+    --muted: #8291A8;
+    --accent: #00CAFF;
+    --accent-soft: rgba(0, 202, 255, .13);
+    --green: #3DDC97;
+    --amber: #FFB547;
+    --red: #FF7A7A;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--text); }
+  body {
+    margin: 0;
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px; line-height: 1.45; -webkit-font-smoothing: antialiased;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 8px; }
+  button { font: inherit; color: inherit; }
+  #app { padding: 18px 20px 20px; }
+
+  /* The "document" */
+  .sheet { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: 0 1px 0 rgba(255,255,255,.04) inset; }
+  .sheet-head { padding: 20px 24px 18px; background: linear-gradient(180deg, rgba(0,202,255,.10), rgba(0,202,255,0)); border-bottom: 1px solid var(--line); position: relative; }
+  .sheet-head::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--accent), rgba(0,202,255,.2)); }
+  .doc-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .eyebrow svg { width: 16px; height: 16px; }
+  h1 { margin: 6px 0 8px; font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -.01em; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--text-2); font-size: 15px; }
+  .meta span { display: inline-flex; align-items: center; gap: 7px; }
+  .meta svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+
+  .sec { padding: 18px 24px; border-bottom: 1px solid var(--line); }
+  .sec:last-child { border-bottom: 0; }
+  .sec-title { display: flex; align-items: center; gap: 10px; font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 0 0 12px; }
+  .sec-title .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.07); color: var(--text-2); font-size: 12px; letter-spacing: 0; }
+  .summary { font-size: 18.5px; line-height: 1.5; color: var(--text); margin: 0; max-width: 62ch; }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  .cols > .sec + .sec { border-left: 1px solid var(--line); }
+  @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } .cols > .sec + .sec { border-left: 0; } }
+
+  /* Questions */
+  .qs { list-style: none; margin: 0; padding: 0; counter-reset: q; display: grid; gap: 10px; }
+  .qs li { counter-increment: q; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; font-size: 16.5px; line-height: 1.4; }
+  .qs li::before { content: counter(q); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 14px; }
+
+  /* Symptoms */
+  .sym { padding: 10px 0; }
+  .sym + .sym { border-top: 1px solid var(--line); }
+  .sym-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .sym-name { font-size: 16.5px; font-weight: 600; }
+  .sym-count { font-size: 13.5px; font-weight: 700; color: var(--amber); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sym-sub { font-size: 13.5px; color: var(--muted); margin-top: 2px; }
+
+  /* Medications table */
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th { text-align: left; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 0 10px 8px 0; }
+  td { padding: 10px 10px 10px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td.name b { font-weight: 600; font-size: 16px; }
+  td.name span { color: var(--text-2); margin-left: 6px; }
+  td.note { color: var(--text-2); font-size: 14px; }
+  .adh { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+  .track { flex: 1; height: 7px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; max-width: 90px; }
+  .fill { height: 100%; border-radius: 4px; background: var(--green); }
+  .fill.mid { background: var(--amber); }
+  .fill.low { background: var(--red); }
+  .adh b { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 40px; }
+  .changed { display: inline-block; margin-top: 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--amber); }
+
+  /* Bring list */
+  .bring { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 18px; }
+  .bring li { display: flex; gap: 10px; align-items: flex-start; font-size: 15.5px; }
+  .box { width: 20px; height: 20px; border-radius: 6px; border: 2px solid rgba(255,255,255,.28); flex: none; margin-top: 1px; }
+
+  .btn { border: 0; cursor: pointer; border-radius: 999px; padding: 10px 18px; font-size: 15px; font-weight: 600; background: var(--accent); color: #00202B;
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; transition: transform .12s, filter .2s, background .3s; }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: scale(.97); }
+  .btn[disabled] { opacity: .7; cursor: default; }
+  .btn.sent { background: rgba(61,220,151,.16); color: var(--green); }
+  .btn svg { width: 17px; height: 17px; }
+  .spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12.5px; padding: 12px 6px 0; flex-wrap: wrap; }
+  footer svg { width: 14px; height: 14px; color: var(--accent); vertical-align: -2px; margin-right: 6px; }
+  .empty { color: var(--muted); font-size: 15px; }
+
+  .sk { background: linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.05) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .state { min-height: 220px; display: grid; place-items: center; text-align: center; padding: 30px; }
+  .state h2 { margin: 10px 0 6px; font-size: 21px; font-weight: 600; }
+  .state p { margin: 0; font-size: 15px; color: var(--muted); max-width: 440px; }
+  .state svg { color: var(--text-2); }
+
+  .toast { position: fixed; left: 50%; bottom: 14px; transform: translate(-50%, 20px); opacity: 0; background: rgba(20,34,56,.96); border: 1px solid rgba(255,255,255,.12);
+    padding: 9px 16px; border-radius: 999px; font-size: 14px; max-width: calc(100% - 40px); box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    transition: opacity .25s, transform .25s; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.error { border-color: rgba(255,122,122,.5); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app" aria-live="polite"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26), postMessage JSON-RPC ---------- */
+const bridge = (() => {
+  const handlers = {};
+  const pending = new Map();
+  let seq = 0;
+  const post = (msg) => { try { window.parent.postMessage(msg, "*"); } catch (_) { /* detached */ } };
+  window.addEventListener("message", (ev) => {
+    if (ev.source !== window.parent) return;
+    const m = ev.data;
+    if (!m || typeof m !== "object" || m.jsonrpc !== "2.0") return;
+    if (m.method === undefined && m.id !== undefined) {
+      const p = pending.get(m.id);
+      if (!p) return;
+      pending.delete(m.id);
+      if (m.error) p.reject(new Error(m.error.message || "Request failed"));
+      else p.resolve(m.result);
+      return;
+    }
+    if (m.id !== undefined && m.id !== null) {
+      if (m.method === "ping" || m.method === "ui/resource-teardown") post({ jsonrpc: "2.0", id: m.id, result: {} });
+      else post({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Method not found: " + m.method } });
+      return;
+    }
+    const h = handlers[m.method];
+    if (h) { try { h(m.params || {}); } catch (err) { showState("Something went wrong", String(err && err.message || err)); } }
+  });
+  return {
+    on(method, fn) { handlers[method] = fn; },
+    notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); },
+    request(method, params, timeoutMs = 30000) {
+      const id = ++seq;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { pending.delete(id); reject(new Error("The request timed out")); }, timeoutMs);
+        pending.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v); }, reject: (e) => { clearTimeout(timer); reject(e); } });
+        post({ jsonrpc: "2.0", id, method, params: params || {} });
+      });
+    },
+  };
+})();
+
+/* ---------- helpers ---------- */
+const $app = document.getElementById("app");
+const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const arr = (v) => (Array.isArray(v) ? v : []);
+const num = (v) => (typeof v === "number" && isFinite(v) ? v : (typeof v === "string" && v.trim() !== "" && isFinite(+v) ? +v : null));
+const cap = (s) => { s = String(s || ""); return s ? s[0].toUpperCase() + s.slice(1) : s; };
+function structuredFrom(r) {
+  if (!r || typeof r !== "object") return null;
+  if (r.structuredContent && typeof r.structuredContent === "object") return r.structuredContent;
+  for (const b of arr(r.content)) {
+    if (b && b.type === "text" && typeof b.text === "string") { try { const v = JSON.parse(b.text); if (v && typeof v === "object") return v; } catch (_) { /* not JSON */ } }
+  }
+  return null;
+}
+function textFrom(r) { const b = arr(r && r.content).find((c) => c && c.type === "text"); return b ? String(b.text || "") : ""; }
+let toastTimer = 0;
+function toast(msg, kind) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show" + (kind === "error" ? " error" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = "toast"; }, 3600);
+}
+
+const ICON = {
+  doc: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5h6.5L15 6v11.5H5z"/><path d="M11 2.5V6.5h4M7.5 10h5M7.5 13h5"/></svg>',
+  doctor: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="6.5" r="3.2"/><path d="M3.8 17c.7-3.2 3.2-5 6.2-5s5.5 1.8 6.2 5"/></svg>',
+  clock: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="10" r="7.2"/><path d="M10 6v4.3l2.8 1.7"/></svg>',
+  pin: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17.5s5.5-5 5.5-9.2a5.5 5.5 0 0 0-11 0c0 4.2 5.5 9.2 5.5 9.2z"/><circle cx="10" cy="8.3" r="2"/></svg>',
+  share: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l14-6.5-5 14-2.6-5.6z"/><path d="M9.4 11.9L17 3.5"/></svg>',
+  check: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3L13 4.5"/></svg>',
+  spark: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z"/></svg>',
+  big: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>',
+};
+
+/* ---------- state + rendering ---------- */
+let model = null;
+let share = "idle"; // idle | sending | sent
+let sharedWith = [];
+
+function shareButton() {
+  if (share === "sent") {
+    const names = sharedWith.length ? sharedWith.join(", ") : "the circle";
+    return `<button class="btn sent" disabled>${ICON.check}Shared with ${esc(names)}</button>`;
+  }
+  if (share === "sending") return '<button class="btn" disabled><span class="spinner"></span>Sharing</button>';
+  return `<button class="btn" data-share>${ICON.share}Share with circle</button>`;
+}
+
+function render() {
+  const d = model || {};
+  const ap = d.appointment || {};
+  const metaBits = [
+    ap.provider ? `<span>${ICON.doctor}${esc(ap.provider)}</span>` : "",
+    ap.when_label ? `<span>${ICON.clock}${esc(ap.when_label)}</span>` : "",
+    ap.location ? `<span>${ICON.pin}${esc(ap.location)}</span>` : "",
+  ].join("");
+
+  const questions = arr(d.questions).filter(Boolean);
+  const symptoms = arr(d.symptoms).filter((s) => s && typeof s === "object");
+  const meds = arr(d.medications).filter((m) => m && typeof m === "object");
+  const bring = arr(d.bring).filter(Boolean);
+
+  const qHtml = questions.length
+    ? `<ol class="qs">${questions.map((q) => `<li><span>${esc(q)}</span></li>`).join("")}</ol>`
+    : '<div class="empty">No questions yet.</div>';
+
+  const sHtml = symptoms.length
+    ? symptoms.map((s) => {
+        const count = num(s.count);
+        const sub = [s.first_label ? `First noted ${s.first_label}` : "", s.note || ""].filter(Boolean).join(" · ");
+        return `<div class="sym"><div class="sym-top"><span class="sym-name">${esc(cap(s.name || "Symptom"))}</span>
+          ${count !== null ? `<span class="sym-count">${count}×</span>` : ""}</div>
+          ${sub ? `<div class="sym-sub">${esc(sub)}</div>` : ""}</div>`;
+      }).join("")
+    : '<div class="empty">No symptoms reported.</div>';
+
+  const mHtml = meds.length
+    ? `<table><thead><tr><th>Medicine</th><th>Taken</th><th>Notes</th></tr></thead><tbody>
+      ${meds.map((m) => {
+        const p = num(m.adherence_pct);
+        const pct = p === null ? null : Math.max(0, Math.min(100, Math.round(p)));
+        const tone = pct === null ? "" : pct >= 90 ? "" : pct >= 75 ? " mid" : " low";
+        const changed = /increas|decreas|chang|new|start|doubl/i.test(String(m.note || ""));
+        return `<tr><td class="name"><b>${esc(m.name || "")}</b><span>${esc(m.dose || "")}</span></td>
+          <td>${pct === null ? '<span class="empty">n/a</span>' : `<div class="adh"><div class="track"><div class="fill${tone}" style="width:${pct}%"></div></div><b>${pct}%</b></div>`}</td>
+          <td class="note">${esc(m.note || "")}${changed ? '<div class="changed">Recent change</div>' : ""}</td></tr>`;
+      }).join("")}</tbody></table>`
+    : '<div class="empty">No medicines listed.</div>';
+
+  const bHtml = bring.length
+    ? `<ul class="bring">${bring.map((b) => `<li><span class="box"></span><span>${esc(b)}</span></li>`).join("")}</ul>`
+    : "";
+
+  $app.innerHTML = `
+    <article class="sheet">
+      <header class="sheet-head">
+        <div class="doc-row">
+          <div style="min-width:0">
+            <div class="eyebrow">${ICON.doc}Visit brief</div>
+            <h1>${esc(ap.title || "Upcoming appointment")}</h1>
+            ${metaBits ? `<div class="meta">${metaBits}</div>` : ""}
+          </div>
+          <div style="flex:none">${shareButton()}</div>
+        </div>
+      </header>
+      ${d.summary ? `<section class="sec"><div class="sec-title">Summary for the doctor</div><p class="summary">${esc(d.summary)}</p></section>` : ""}
+      <div class="cols">
+        <section class="sec"><div class="sec-title">Questions to ask</div>${qHtml}</section>
+        <section class="sec"><div class="sec-title">Symptoms</div>${sHtml}</section>
+      </div>
+      <section class="sec"><div class="sec-title">Medicines</div>${mHtml}</section>
+      ${bHtml ? `<section class="sec"><div class="sec-title">What to bring</div>${bHtml}</section>` : ""}
+    </article>
+    <footer><span>${d.generated_by ? `${ICON.spark}Generated by ${esc(d.generated_by)}` : ""}</span><span>Prepared by Nova for the care circle</span></footer>`;
+}
+
+function renderSkeleton() {
+  const line = (w) => `<div class="sk" style="height:14px;width:${w}%;margin-top:10px"></div>`;
+  $app.innerHTML = `<article class="sheet">
+    <header class="sheet-head"><div class="sk" style="height:12px;width:110px"></div><div class="sk" style="height:28px;width:55%;margin-top:12px"></div><div class="sk" style="height:14px;width:70%;margin-top:12px"></div></header>
+    <section class="sec"><div class="sk" style="height:12px;width:160px"></div>${line(95)}${line(88)}${line(60)}</section>
+    <div class="cols"><section class="sec">${line(90)}${line(80)}${line(85)}</section><section class="sec">${line(70)}${line(60)}</section></div>
+  </article>`;
+}
+
+function showState(title, detail) {
+  $app.innerHTML = `<div class="state"><div>${ICON.big}<h2>${esc(title)}</h2><p>${esc(detail || "")}</p></div></div>`;
+}
+
+/* ---------- actions ---------- */
+async function shareWithCircle() {
+  if (share !== "idle") return;
+  const ap = (model && model.appointment) || {};
+  const title = ap.title || "the upcoming appointment";
+  share = "sending"; render();
+  try {
+    const res = await bridge.request("tools/call", { name: "send_message", arguments: { to: "circle", message: `Visit brief for ${title} is ready on Nova.` } });
+    if (!res || res.isError) throw new Error(textFrom(res) || "Couldn't share the brief.");
+    const sc = structuredFrom(res) || {};
+    sharedWith = arr(sc.delivered_to).map(String).slice(0, 4);
+    share = "sent"; render();
+    toast(sc.speech || "Shared with the care circle");
+  } catch (err) {
+    share = "idle"; render();
+    toast(String(err && err.message || err), "error");
+  }
+}
+
+$app.addEventListener("click", (e) => { if (e.target.closest("[data-share]")) shareWithCircle(); });
+
+/* ---------- size reporting ---------- */
+let lastH = 0, lastW = 0, rafId = 0;
+function reportSize() {
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(() => {
+    const rect = $app.getBoundingClientRect();
+    const h = Math.ceil(rect.height), w = Math.ceil(rect.width);
+    if (h === lastH && w === lastW) return;
+    lastH = h; lastW = w;
+    bridge.notify("ui/notifications/size-changed", { width: w, height: h });
+  });
+}
+if ("ResizeObserver" in window) new ResizeObserver(reportSize).observe($app);
+
+/* ---------- lifecycle ---------- */
+bridge.on("ui/notifications/tool-input", () => {});
+bridge.on("ui/notifications/tool-result", (params) => {
+  if (params && params.isError) { showState("The visit brief isn't ready", textFrom(params) || "Please try again in a moment."); return; }
+  const data = structuredFrom(params);
+  if (!data) { showState("The visit brief isn't ready", "Nova didn't send any details this time."); return; }
+  model = data; share = "idle"; sharedWith = [];
+  render();
+});
+bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
+bridge.on("ui/notifications/host-context-changed", () => {});
+
+renderSkeleton();
+reportSize();
+if (window.parent === window) {
+  showState("Open this from Alexa", "Visit briefs appear on an Echo Show when you ask Alexa to prepare for an appointment.");
+} else {
+  bridge.request("ui/initialize", {
+    appCapabilities: { availableDisplayModes: ["inline"] },
+    clientInfo: { name: "nova-visit", version: "0.1.0" },
+    protocolVersion: "2026-01-26",
+  }, 10000).then(() => bridge.notify("ui/notifications/initialized", {}))
+    .catch(() => showState("Couldn't connect", "This view needs an MCP Apps host."));
+}
+</script>
+</body>
+</html>

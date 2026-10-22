@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 import uuid
 from contextlib import AsyncExitStack
@@ -60,6 +61,43 @@ def structured_of(result: Any) -> dict[str, Any]:
             except json.JSONDecodeError:
                 return {"speech": text}
     return {}
+
+
+MAX_SPOKEN_CHARS = 420
+
+
+def for_model(data: dict[str, Any], has_ui: bool) -> dict[str, Any]:
+    """What the model sees of a tool result.
+
+    UI-bound results (briefings, visit briefs) can be large; the screen shows the
+    detail, so the model only needs the spoken line and the headline. Other results
+    are passed through with long lists trimmed.
+    """
+    if has_ui:
+        keep = {k: data[k] for k in ("speech", "headline", "status", "summary") if k in data}
+        if isinstance(data.get("insights"), list):
+            keep["top_insights"] = [i.get("title") for i in data["insights"][:3]]
+        if isinstance(data.get("questions"), list):
+            keep["questions"] = data["questions"][:5]
+        keep["on_screen"] = "Full details are showing on the screen."
+        return keep
+    out: dict[str, Any] = {}
+    for k, v in data.items():
+        out[k] = v[:6] if isinstance(v, list) else v
+    return out
+
+
+def voice_guard(text: str, fallback: str) -> str:
+    """Keep replies speakable: no markdown, no essays. Fall back to the tool's speech line."""
+    clean = re.sub(r"[*#`>|]+", "", text or "")
+    clean = re.sub(r"^\s*[-•]\s+", "", clean, flags=re.M)
+    clean = re.sub(r"[🌀-🫿☀-➿]", "", clean)
+    clean = re.sub(r"\s+", " ", clean).strip()
+    if not clean:
+        return fallback
+    if len(clean) > MAX_SPOKEN_CHARS and fallback:
+        return fallback
+    return clean
 
 
 class Device:
@@ -190,7 +228,7 @@ class Agent:
             await push({"kind": "llm", "brain": brain.label, "latency_ms": step.latency_ms, "text": step.text,
                         "tool_calls": [{"name": c["name"], "args": c["args"]} for c in step.tool_calls]})
             if not step.tool_calls:
-                reply = step.text.strip()
+                reply = voice_guard(step.text, last_speech)
                 device.history.append({"role": "assistant", "text": reply})
                 break
             device.history.append({"role": "assistant", "text": step.text, "tool_calls": step.tool_calls})
@@ -215,7 +253,7 @@ class Agent:
                     cards.append({"tool": call["name"], "resource_uri": uri, "html": html,
                                   "input": call["args"], "result": result_json(result)})
                 device.history.append({"role": "tool", "id": call["id"], "name": call["name"],
-                                       "result": data if ok else {"error": data.get("error", "tool failed")},
+                                       "result": for_model(data, bool(uri)) if ok else {"error": data.get("error", "tool failed")},
                                        "error": not ok})
         if not reply:
             reply = last_speech or "Sorry, I couldn't finish that."

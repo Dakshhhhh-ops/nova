@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Today</title>
+<style>
+  :root {
+    --bg: #0A1322;
+    --surface: #101B2E;
+    --surface-2: #15233A;
+    --line: rgba(255, 255, 255, .08);
+    --text: #F3F6FB;
+    --text-2: #B9C5D8;
+    --muted: #8291A8;
+    --accent: #00CAFF;
+    --accent-soft: rgba(0, 202, 255, .13);
+    --green: #3DDC97;
+    --green-soft: rgba(61, 220, 151, .13);
+    --amber: #FFB547;
+    --amber-soft: rgba(255, 181, 71, .14);
+    --red: #FF7A7A;
+    --red-soft: rgba(255, 122, 122, .14);
+    --radius: 18px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--text); }
+  body {
+    margin: 0;
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 18px;
+    line-height: 1.35;
+    -webkit-font-smoothing: antialiased;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 8px; }
+  button { font: inherit; color: inherit; }
+
+  #app { padding: 22px 24px 26px; }
+
+  /* Header */
+  .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+  .eyebrow { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.12; font-weight: 600; letter-spacing: -.01em; }
+  .progress { min-width: 200px; text-align: right; }
+  .progress-label { font-size: 15px; color: var(--text-2); }
+  .progress-label b { color: var(--text); font-size: 22px; font-weight: 600; margin-right: 2px; }
+  .segs { display: flex; gap: 3px; margin-top: 8px; justify-content: flex-end; }
+  .seg { height: 8px; flex: 1; max-width: 46px; border-radius: 4px; background: rgba(255,255,255,.12); }
+  .seg.taken { background: var(--green); }
+  .seg.due { background: var(--accent); }
+  .seg.missed { background: var(--red); }
+  .seg.skipped { background: rgba(255,255,255,.32); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } .top { flex-direction: column; align-items: flex-start; } .progress { text-align: left; } .segs { justify-content: flex-start; } }
+
+  .section-title { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 10px 2px; }
+
+  /* Dose timeline */
+  .slot { margin-bottom: 14px; }
+  .slot-head { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--muted); margin: 0 0 8px 2px; }
+  .slot-head::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .slot-head.now { color: var(--accent); }
+  .slot-head .now-tag { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+
+  .dose {
+    display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 14px;
+    padding: 12px 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
+    margin-bottom: 8px; transition: background .3s, border-color .3s;
+  }
+  .dose.s-due { border-color: rgba(0, 202, 255, .45); background: linear-gradient(90deg, rgba(0,202,255,.10), var(--surface) 60%); }
+  .dose.s-missed { border-color: rgba(255, 122, 122, .32); }
+  .dose.s-taken .dose-name, .dose.s-skipped .dose-name { color: var(--text-2); }
+  .dose.flash { animation: flash 1.2s ease; }
+  @keyframes flash { 0% { background: rgba(61,220,151,.28); } 100% { background: var(--surface); } }
+
+  .pill-tile { width: 52px; height: 52px; border-radius: 14px; background: rgba(255,255,255,.05); display: grid; place-items: center; }
+  .pill-tile svg { width: 40px; height: 40px; }
+  .dose-name { font-size: 21px; font-weight: 600; line-height: 1.2; }
+  .dose-amt { font-weight: 400; color: var(--text-2); margin-left: 6px; font-size: 18px; }
+  .dose-sub { font-size: 15px; color: var(--muted); margin-top: 3px; }
+  .dose-sub span + span::before { content: "·"; margin: 0 6px; }
+  .dose-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .chip svg { width: 14px; height: 14px; }
+  .chip.taken { background: var(--green-soft); color: var(--green); }
+  .chip.missed { background: var(--red-soft); color: var(--red); }
+  .chip.due { background: var(--accent-soft); color: var(--accent); }
+  .chip.upcoming { background: rgba(255,255,255,.06); color: var(--text-2); font-weight: 500; }
+  .chip.skipped { background: rgba(255,255,255,.08); color: var(--text-2); }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
+  .chip-by { font-weight: 400; opacity: .8; }
+
+  .btn {
+    border: 0; cursor: pointer; border-radius: 999px; padding: 9px 18px; font-size: 16px; font-weight: 600;
+    background: var(--accent); color: #00202B; display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .12s ease, filter .2s, opacity .2s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:hover { filter: brightness(1.08); }
+  .btn.ghost { background: rgba(255,255,255,.08); color: var(--text); }
+  .btn[disabled] { opacity: .6; cursor: default; }
+  .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Side column */
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+  .next { background: linear-gradient(135deg, rgba(0,202,255,.16), rgba(0,202,255,.04)); border-color: rgba(0,202,255,.25); }
+  .next-label { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .next-value { font-size: 22px; font-weight: 600; margin-top: 4px; line-height: 1.2; }
+  .next-time { color: var(--text-2); font-weight: 400; }
+
+  .appt { display: grid; grid-template-columns: 50px minmax(0,1fr); gap: 12px; align-items: center; padding: 10px 0; }
+  .appt + .appt { border-top: 1px solid var(--line); }
+  .cal { width: 50px; height: 54px; border-radius: 12px; background: var(--surface-2); text-align: center; overflow: hidden; border: 1px solid var(--line); }
+  .cal-m { font-size: 11px; font-weight: 700; letter-spacing: .1em; background: rgba(255,122,122,.85); color: #fff; padding: 2px 0; }
+  .cal-d { font-size: 22px; font-weight: 600; line-height: 1.5; }
+  .appt-when { font-size: 15px; color: var(--accent); font-weight: 600; }
+  .appt-title { font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .appt-sub { font-size: 14px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .msgs { display: flex; align-items: center; gap: 14px; }
+  .msgs-ico { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); flex: none; position: relative; }
+  .msgs-ico svg { width: 24px; height: 24px; }
+  .msgs-ico .badge { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--accent); color: #00202B; font-size: 13px; font-weight: 700; display: grid; place-items: center; }
+  .msgs-text { flex: 1; min-width: 0; }
+  .msgs-title { font-size: 18px; font-weight: 600; }
+  .msgs-sub { font-size: 14px; color: var(--muted); }
+
+  .empty { color: var(--muted); font-size: 16px; padding: 6px 2px; }
+
+  /* Skeleton */
+  .sk { background: linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.05) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  .state { min-height: 220px; display: grid; place-items: center; text-align: center; color: var(--text-2); padding: 30px; }
+  .state h2 { margin: 10px 0 6px; font-size: 22px; color: var(--text); font-weight: 600; }
+  .state p { margin: 0; font-size: 16px; color: var(--muted); max-width: 440px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 16px; transform: translate(-50%, 20px); opacity: 0;
+    background: rgba(20, 34, 56, .96); border: 1px solid rgba(255,255,255,.12); color: var(--text);
+    padding: 10px 18px; border-radius: 999px; font-size: 15px; max-width: calc(100% - 40px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.4); transition: opacity .25s, transform .25s; pointer-events: none;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.error { border-color: rgba(255,122,122,.5); }
+
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app" aria-live="polite"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26), postMessage JSON-RPC ---------- */
+const bridge = (() => {
+  const handlers = {};
+  const pending = new Map();
+  let seq = 0;
+  const post = (msg) => { try { window.parent.postMessage(msg, "*"); } catch (_) { /* detached */ } };
+  window.addEventListener("message", (ev) => {
+    if (ev.source !== window.parent) return;
+    const m = ev.data;
+    if (!m || typeof m !== "object" || m.jsonrpc !== "2.0") return;
+    if (m.method === undefined && m.id !== undefined) {          // response to one of our requests
+      const p = pending.get(m.id);
+      if (!p) return;
+      pending.delete(m.id);
+      if (m.error) p.reject(new Error(m.error.message || "Request failed"));
+      else p.resolve(m.result);
+      return;
+    }
+    if (m.id !== undefined && m.id !== null) {                    // request from the host
+      if (m.method === "ping" || m.method === "ui/resource-teardown") post({ jsonrpc: "2.0", id: m.id, result: {} });
+      else post({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Method not found: " + m.method } });
+      return;
+    }
+    const h = handlers[m.method];                                  // notification from the host
+    if (h) { try { h(m.params || {}); } catch (err) { showState("Something went wrong", String(err && err.message || err)); } }
+  });
+  return {
+    on(method, fn) { handlers[method] = fn; },
+    notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); },
+    request(method, params, timeoutMs = 30000) {
+      const id = ++seq;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { pending.delete(id); reject(new Error("The request timed out")); }, timeoutMs);
+        pending.set(id, {
+          resolve: (v) => { clearTimeout(timer); resolve(v); },
+          reject: (e) => { clearTimeout(timer); reject(e); },
+        });
+        post({ jsonrpc: "2.0", id, method, params: params || {} });
+      });
+    },
+  };
+})();
+
+/* ---------- helpers ---------- */
+const $app = document.getElementById("app");
+const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const arr = (v) => (Array.isArray(v) ? v : []);
+const cap = (s) => { s = String(s || ""); return s ? s[0].toUpperCase() + s.slice(1) : s; };
+function parseDate(iso) { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d; }
+function fmtTime(iso) { const d = parseDate(iso); return d ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""; }
+function structuredFrom(r) {
+  if (!r || typeof r !== "object") return null;
+  if (r.structuredContent && typeof r.structuredContent === "object") return r.structuredContent;
+  for (const b of arr(r.content)) {
+    if (b && b.type === "text" && typeof b.text === "string") {
+      try { const v = JSON.parse(b.text); if (v && typeof v === "object") return v; } catch (_) { /* not JSON */ }
+    }
+  }
+  return null;
+}
+function textFrom(r) { const b = arr(r && r.content).find((c) => c && c.type === "text"); return b ? String(b.text || "") : ""; }
+
+let toastTimer = 0;
+function toast(msg, kind) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (kind === "error" ? " error" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = "toast" + (kind === "error" ? " error" : ""); }, 3600);
+}
+
+const ICON = {
+  check: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3L13 4.5"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M4 7l8 6 8-6"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>',
+  info: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>',
+};
+
+/* Pill glyph drawn from the plain-language appearance ("small pink oval pill"). */
+const PILL_COLORS = [["pink", "#F7A8C4"], ["yellow", "#F6CF52"], ["orange", "#F6A04D"], ["blue", "#7DB4FF"], ["red", "#F27C7C"],
+  ["green", "#8EDBA9"], ["purple", "#B9A2F5"], ["brown", "#C49A6C"], ["peach", "#F8C3A0"], ["gray", "#C2C8D2"], ["grey", "#C2C8D2"], ["white", "#ECEFF4"]];
+function pillSVG(appearance) {
+  const a = String(appearance || "").toLowerCase();
+  const hit = PILL_COLORS.find(([k]) => a.includes(k));
+  const c = hit ? hit[1] : "#DDE3EC";
+  const shadow = '<ellipse cx="22" cy="35" rx="13" ry="2.6" fill="rgba(0,0,0,.35)"/>';
+  let body;
+  if (/softgel|gel cap|gelcap/.test(a)) {
+    body = `<ellipse cx="22" cy="21" rx="15" ry="9.5" fill="${c}" opacity=".92"/><ellipse cx="17" cy="17.5" rx="6" ry="2.4" fill="#fff" opacity=".55"/>`;
+  } else if (/capsule/.test(a)) {
+    body = `<rect x="6" y="14" width="32" height="14" rx="7" fill="#ECEFF4"/><path d="M13 14h9v14h-9a7 7 0 0 1 0-14z" fill="${c}"/><rect x="10" y="16.5" width="10" height="2.4" rx="1.2" fill="#fff" opacity=".45"/>`;
+  } else if (/oblong|long|caplet/.test(a)) {
+    body = `<rect x="5" y="14" width="34" height="14" rx="7" fill="${c}"/><path d="M22 15.5v11" stroke="rgba(0,0,0,.18)" stroke-width="1.4"/><rect x="9" y="16.5" width="10" height="2.4" rx="1.2" fill="#fff" opacity=".5"/>`;
+  } else if (/round|circle/.test(a)) {
+    body = `<circle cx="22" cy="21" r="11" fill="${c}"/><path d="M13.5 21h17" stroke="rgba(0,0,0,.16)" stroke-width="1.4"/><ellipse cx="18" cy="16.5" rx="4" ry="2" fill="#fff" opacity=".5"/>`;
+  } else {
+    body = `<ellipse cx="22" cy="21" rx="14" ry="9.5" fill="${c}"/><ellipse cx="17.5" cy="17" rx="5" ry="2.2" fill="#fff" opacity=".5"/>`;
+  }
+  return `<svg viewBox="0 0 44 44" aria-hidden="true">${shadow}<g transform="rotate(-18 22 21)">${body}</g></svg>`;
+}
+
+/* ---------- state + rendering ---------- */
+let model = null;
+const busy = new Set();
+
+function normStatus(s) {
+  s = String(s || "").toLowerCase();
+  return ["taken", "skipped", "missed", "due", "upcoming"].includes(s) ? s : "upcoming";
+}
+
+function chipFor(d, personId) {
+  const st = normStatus(d.status);
+  if (st === "taken") {
+    const t = fmtTime(d.logged_at);
+    const by = d.logged_by && personId && d.logged_by !== personId ? ` <span class="chip-by">· by ${esc(cap(d.logged_by))}</span>` : "";
+    return `<span class="chip taken">${ICON.check}Taken${t ? " " + esc(t) : ""}${by}</span>`;
+  }
+  if (st === "missed") return '<span class="chip missed">Missed</span>';
+  if (st === "due") return '<span class="chip due"><span class="dot"></span>Due now</span>';
+  if (st === "skipped") return '<span class="chip skipped">Skipped</span>';
+  return `<span class="chip upcoming">${esc(d.time_label || "Later")}</span>`;
+}
+
+function render() {
+  const d = model || {};
+  const person = d.person || {};
+  const doses = arr(d.doses).map((x, i) => ({ ...x, _i: i, _st: normStatus(x.status) }));
+  const taken = doses.filter((x) => x._st === "taken").length;
+
+  // Group doses by time label, keeping schedule order.
+  const slots = [];
+  for (const x of doses.slice().sort((a, b) => String(a.scheduled_for || "").localeCompare(String(b.scheduled_for || "")))) {
+    const key = x.time_label || fmtTime(x.scheduled_for) || "Today";
+    let slot = slots.find((s) => s.key === key);
+    if (!slot) { slot = { key, items: [] }; slots.push(slot); }
+    slot.items.push(x);
+  }
+
+  const segs = doses.map((x) => `<span class="seg ${x._st}"></span>`).join("");
+  const progress = doses.length
+    ? `<div class="progress"><div class="progress-label"><b>${taken}</b> of ${doses.length} doses taken</div><div class="segs" aria-hidden="true">${segs}</div></div>`
+    : "";
+
+  const doseRow = (x) => {
+    const actionable = x._st === "due" || x._st === "missed";
+    const isBusy = busy.has(x._i);
+    const sub = [x.appearance, x.purpose].filter(Boolean).map((s) => `<span>${esc(cap(s))}</span>`).join("");
+    const btn = actionable
+      ? `<button class="btn${x._st === "missed" ? " ghost" : ""}" data-take="${x._i}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Logging' : "Mark taken"}</button>`
+      : "";
+    return `<div class="dose s-${x._st}" data-row="${x._i}">
+      <div class="pill-tile">${pillSVG(x.appearance)}</div>
+      <div><div class="dose-name">${esc(x.name || x.med_id || "Medicine")}<span class="dose-amt">${esc(x.dose || "")}</span></div>
+      ${sub ? `<div class="dose-sub">${sub}</div>` : ""}</div>
+      <div class="dose-side">${chipFor(x, person.id)}${btn}</div>
+    </div>`;
+  };
+
+  const slotHtml = slots.length
+    ? slots.map((s) => {
+        const now = s.items.some((x) => x._st === "due");
+        return `<div class="slot"><div class="slot-head${now ? " now" : ""}">${esc(s.key)}${now ? '<span class="now-tag">Now</span>' : ""}</div>${s.items.map(doseRow).join("")}</div>`;
+      }).join("")
+    : '<div class="tile empty">No medicines scheduled for today.</div>';
+
+  // Side column
+  const next = d.next_dose && (d.next_dose.name || d.next_dose.time_label)
+    ? `<div class="tile next"><div class="next-label">Next dose</div><div class="next-value">${esc(d.next_dose.name || "")} <span class="next-time">${d.next_dose.time_label ? "at " + esc(d.next_dose.time_label) : ""}</span></div></div>`
+    : "";
+
+  const appts = arr(d.appointments).slice(0, 3);
+  const apptHtml = appts.length
+    ? appts.map((a) => {
+        const dt = parseDate(a.at);
+        const cal = dt
+          ? `<div class="cal"><div class="cal-m">${esc(dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase())}</div><div class="cal-d">${dt.getDate()}</div></div>`
+          : `<div class="cal" style="display:grid;place-items:center">${ICON.cal}</div>`;
+        const sub = [a.provider, a.location].filter(Boolean).map(esc).join(" · ");
+        return `<div class="appt">${cal}<div style="min-width:0">${a.when_label ? `<div class="appt-when">${esc(a.when_label)}</div>` : ""}<div class="appt-title">${esc(a.title || "Appointment")}</div>${sub ? `<div class="appt-sub" title="${sub}">${sub}</div>` : ""}</div></div>`;
+      }).join("")
+    : '<div class="empty">Nothing on the calendar.</div>';
+
+  const unread = Number(d.unread_messages) || 0;
+  const msgs = `<div class="tile msgs">
+      <div class="msgs-ico">${ICON.mail}${unread ? `<span class="badge">${unread}</span>` : ""}</div>
+      <div class="msgs-text"><div class="msgs-title">${unread ? `${unread} new message${unread === 1 ? "" : "s"}` : "No new messages"}</div>
+      <div class="msgs-sub">${unread ? "From your care circle" : "You're all caught up"}</div></div>
+      ${unread ? '<button class="btn ghost" data-read>Read</button>' : ""}
+    </div>`;
+
+  const who = person.short_name || person.name || "";
+  $app.innerHTML = `
+    <header class="top">
+      <div><div class="eyebrow">Today${who ? " · " + esc(who) : ""}</div><h1>${esc(d.date_label || new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</h1></div>
+      ${progress}
+    </header>
+    <div class="grid">
+      <section aria-label="Medicines"><div class="section-title">Medicines</div>${slotHtml}</section>
+      <aside>
+        ${next}
+        <div class="section-title">Coming up</div>
+        <div class="tile" style="padding:6px 16px">${apptHtml}</div>
+        ${msgs}
+      </aside>
+    </div>`;
+}
+
+function renderSkeleton() {
+  const row = '<div class="dose"><div class="sk" style="width:52px;height:52px;border-radius:14px"></div><div><div class="sk" style="height:20px;width:60%"></div><div class="sk" style="height:14px;width:80%;margin-top:8px"></div></div><div class="sk" style="width:96px;height:28px;border-radius:999px"></div></div>';
+  $app.innerHTML = `
+    <header class="top"><div><div class="sk" style="height:13px;width:120px"></div><div class="sk" style="height:30px;width:300px;margin-top:10px"></div></div>
+    <div class="progress"><div class="sk" style="height:18px;width:180px;margin-left:auto"></div><div class="sk" style="height:8px;width:200px;margin-top:10px"></div></div></header>
+    <div class="grid"><section>${row}${row}${row}</section>
+    <aside><div class="tile"><div class="sk" style="height:14px;width:40%"></div><div class="sk" style="height:22px;width:80%;margin-top:10px"></div></div>
+    <div class="tile"><div class="sk" style="height:48px"></div><div class="sk" style="height:48px;margin-top:12px"></div></div></aside></div>`;
+}
+
+function showState(title, detail) {
+  $app.innerHTML = `<div class="state"><div>${ICON.info}<h2>${esc(title)}</h2><p>${esc(detail || "")}</p></div></div>`;
+}
+
+/* ---------- actions ---------- */
+function sameDose(row, logged) {
+  if (!logged || row.med_id !== logged.med_id) return false;
+  if (row.scheduled_for && logged.scheduled_for) return row.scheduled_for === logged.scheduled_for;
+  if (row.time_label && logged.time_label) return row.time_label === logged.time_label;
+  return false;
+}
+
+async function markTaken(i) {
+  const dose = arr(model && model.doses)[i];
+  if (!dose || busy.has(i)) return;
+  busy.add(i);
+  render();
+  try {
+    const res = await bridge.request("tools/call", { name: "log_medication", arguments: { medication: dose.med_id || dose.name, time_of_day: dose.time_label || "" } });
+    if (!res || res.isError) throw new Error(textFrom(res) || "Couldn't log that dose. Please try again.");
+    const sc = structuredFrom(res) || {};
+    const logged = arr(sc.logged).concat(arr(sc.already_taken));
+    let clickedHandled = false;
+    for (const l of logged) {
+      const row = model.doses.find((r) => sameDose(r, l)) || (l && l.med_id === dose.med_id ? dose : null);
+      if (!row) continue;
+      row.status = l.status === "skipped" ? "skipped" : "taken";
+      row.logged_at = l.logged_at || row.logged_at || new Date().toISOString();
+      row.logged_by = l.logged_by || row.logged_by || null;
+      if (row === dose) clickedHandled = true;
+    }
+    if (!clickedHandled && !logged.length) { dose.status = "taken"; dose.logged_at = new Date().toISOString(); }
+    busy.delete(i);
+    render();
+    const el = document.querySelector(`[data-row="${i}"]`);
+    if (el) el.classList.add("flash");
+    toast(sc.warning || sc.speech || `${dose.name || "Dose"} marked as taken`);
+  } catch (err) {
+    busy.delete(i);
+    render();
+    toast(String(err && err.message || err), "error");
+  }
+}
+
+$app.addEventListener("click", (e) => {
+  const take = e.target.closest("[data-take]");
+  if (take) { markTaken(Number(take.getAttribute("data-take"))); return; }
+  if (e.target.closest("[data-read]")) {
+    bridge.request("ui/message", { role: "user", content: { type: "text", text: "Read my messages" } }).catch(() => toast("Say “Alexa, read my messages”", "error"));
+  }
+});
+
+/* ---------- size reporting so the host can fit the card ---------- */
+let lastH = 0, lastW = 0, rafId = 0;
+function reportSize() {
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(() => {
+    const r = $app.getBoundingClientRect();
+    const h = Math.ceil(r.height), w = Math.ceil(r.width);
+    if (h === lastH && w === lastW) return;
+    lastH = h; lastW = w;
+    bridge.notify("ui/notifications/size-changed", { width: w, height: h });
+  });
+}
+if ("ResizeObserver" in window) new ResizeObserver(reportSize).observe($app);
+
+/* ---------- lifecycle ---------- */
+bridge.on("ui/notifications/tool-input", () => {});
+bridge.on("ui/notifications/tool-result", (params) => {
+  const data = structuredFrom(params);
+  if (params && params.isError) { showState("Today's plan isn't available", textFrom(params) || "Please try again in a moment."); return; }
+  if (!data) { showState("Today's plan isn't available", "Nova didn't send any details this time."); return; }
+  model = data;
+  render();
+});
+bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
+bridge.on("ui/notifications/host-context-changed", () => {});
+
+renderSkeleton();
+reportSize();
+if (window.parent === window) {
+  showState("Open this from Alexa", "This screen appears on an Echo Show when Nova shares today's plan.");
+} else {
+  bridge.request("ui/initialize", {
+    appCapabilities: { availableDisplayModes: ["inline"] },
+    clientInfo: { name: "nova-today", version: "0.1.0" },
+    protocolVersion: "2026-01-26",
+  }, 10000).then(() => {
+    bridge.notify("ui/notifications/initialized", {});
+  }).catch(() => showState("Couldn't connect", "This view needs an MCP Apps host."));
+}
+</script>
+</body>
+</html>

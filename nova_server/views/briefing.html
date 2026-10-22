@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Care briefing</title>
+<style>
+  :root {
+    --bg: #0A1322;
+    --surface: #101B2E;
+    --surface-2: #15233A;
+    --line: rgba(255, 255, 255, .08);
+    --text: #F3F6FB;
+    --text-2: #B9C5D8;
+    --muted: #8291A8;
+    --accent: #00CAFF;
+    --accent-soft: rgba(0, 202, 255, .13);
+    --green: #3DDC97;
+    --green-soft: rgba(61, 220, 151, .13);
+    --amber: #FFB547;
+    --amber-soft: rgba(255, 181, 71, .14);
+    --red: #FF7A7A;
+    --red-soft: rgba(255, 122, 122, .14);
+    --mood: #0B9FCF;
+    --pain: #9575EE;
+    --radius: 18px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--text); }
+  body {
+    margin: 0;
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px; line-height: 1.4; -webkit-font-smoothing: antialiased;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 8px; }
+  button { font: inherit; color: inherit; }
+  #app { padding: 20px 22px 18px; }
+
+  /* Status banner */
+  .banner { position: relative; border-radius: 22px; padding: 18px 22px 20px; margin-bottom: 16px; overflow: hidden;
+    background: linear-gradient(120deg, var(--tint) 0%, rgba(255,255,255,.02) 75%); border: 1px solid var(--tint-line); }
+  .banner.steady { --tint: rgba(61,220,151,.18); --tint-line: rgba(61,220,151,.3); --tone: var(--green); }
+  .banner.watch { --tint: rgba(255,181,71,.2); --tint-line: rgba(255,181,71,.34); --tone: var(--amber); }
+  .banner.urgent { --tint: rgba(255,122,122,.22); --tint-line: rgba(255,122,122,.42); --tone: var(--red); }
+  .banner-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--text-2); }
+  .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 10px; border-radius: 999px;
+    background: rgba(0,0,0,.25); color: var(--tone); font-weight: 700; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+  .status-pill svg { width: 15px; height: 15px; }
+  .headline { font-size: 25px; line-height: 1.25; font-weight: 600; margin-top: 10px; letter-spacing: -.005em; max-width: 46ch; }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; margin-top: 4px; }
+  @media (max-width: 640px) { .grid, .grid2 { grid-template-columns: 1fr; } }
+
+  .section-title { font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 10px 2px; display: flex; align-items: center; gap: 8px; }
+  .section-title .count { letter-spacing: 0; background: rgba(255,255,255,.08); color: var(--text-2); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+
+  /* Insights */
+  .insight { position: relative; padding: 16px 16px 16px 20px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); margin-bottom: 12px; overflow: hidden; }
+  .insight::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--sev); }
+  .insight.info { --sev: var(--accent); }
+  .insight.watch { --sev: var(--amber); }
+  .insight.urgent { --sev: var(--red); }
+  .sev { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--sev); }
+  .sev svg { width: 14px; height: 14px; }
+  .insight h3 { margin: 6px 0 6px; font-size: 19px; line-height: 1.28; font-weight: 600; }
+  .insight p { margin: 0; color: var(--text-2); font-size: 15.5px; }
+  .evidence { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; }
+  .evidence li { font-size: 13px; color: var(--muted); padding-left: 14px; position: relative; }
+  .evidence li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.25); }
+  .suggest { margin-top: 12px; display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.04); font-size: 15px; color: var(--text); }
+  .suggest svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--accent); }
+
+  /* Adherence */
+  .adh { display: flex; gap: 16px; align-items: center; }
+  .ring { position: relative; width: 104px; height: 104px; flex: none; }
+  .ring svg { width: 104px; height: 104px; transform: rotate(-90deg); }
+  .ring-val { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .ring-val b { font-size: 26px; font-weight: 650; display: block; line-height: 1; }
+  .ring-val small { font-size: 11.5px; color: var(--muted); letter-spacing: .04em; }
+  .bars { flex: 1; min-width: 0; display: grid; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 74px minmax(0, 1fr) 44px; align-items: center; gap: 8px; font-size: 14px; }
+  .bar-row .lbl { color: var(--text-2); }
+  .bar-row .val { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .track { height: 8px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .fill { height: 100%; border-radius: 4px; background: var(--accent); }
+  .fill.low { background: var(--amber); }
+  .adh-note { margin-top: 12px; font-size: 13.5px; color: var(--muted); }
+  .adh-note b { color: var(--text-2); font-weight: 600; }
+  .low-tag { font-size: 11px; font-weight: 700; color: var(--amber); letter-spacing: .06em; text-transform: uppercase; margin-left: 4px; }
+
+  /* Wellbeing sparklines (small multiples, one scale each) */
+  .spark { display: grid; grid-template-columns: 62px minmax(0, 1fr) 62px; align-items: center; gap: 10px; }
+  .spark + .spark { margin-top: 10px; }
+  .spark .name { font-size: 14px; color: var(--text-2); }
+  .spark .name i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .plot { position: relative; height: 46px; }
+  .plot svg { width: 100%; height: 46px; display: block; overflow: visible; }
+  .plot .end { position: absolute; width: 9px; height: 9px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--surface); }
+  .plot .hit { position: absolute; top: 0; bottom: 0; width: 16px; transform: translateX(-50%); }
+  .spark .now { text-align: right; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .spark .now small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .axis { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin: 6px 72px 0 72px; }
+  .trend { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; padding: 3px 10px; border-radius: 999px; margin-left: auto; }
+  .trend.declining { background: var(--amber-soft); color: var(--amber); }
+  .trend.improving { background: var(--green-soft); color: var(--green); }
+  .trend.steady { background: rgba(255,255,255,.07); color: var(--text-2); }
+  .symptoms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .sym { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--text-2); }
+  .sym b { color: var(--text); font-weight: 600; }
+
+  /* Alerts */
+  .alert { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 8px; transition: opacity .4s; }
+  .alert .sev-dot { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--soft); color: var(--tone); }
+  .alert .sev-dot svg { width: 18px; height: 18px; }
+  .alert.watch { --tone: var(--amber); --soft: var(--amber-soft); }
+  .alert.urgent { --tone: var(--red); --soft: var(--red-soft); border-color: rgba(255,122,122,.35); }
+  .alert.info { --tone: var(--accent); --soft: var(--accent-soft); }
+  .alert-msg { font-size: 15.5px; line-height: 1.3; }
+  .alert-meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .alert.done { opacity: .55; }
+  .done-tag { display: inline-flex; gap: 6px; align-items: center; color: var(--green); font-weight: 600; font-size: 14px; }
+  .done-tag svg { width: 15px; height: 15px; }
+
+  .btn { border: 0; cursor: pointer; border-radius: 999px; padding: 8px 16px; font-size: 14.5px; font-weight: 600; background: var(--accent); color: #00202B;
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; transition: transform .12s, filter .2s; }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: scale(.97); }
+  .btn.ghost { background: rgba(255,255,255,.08); color: var(--text); }
+  .btn[disabled] { opacity: .6; cursor: default; }
+  .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Lists */
+  .row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row-title { font-size: 15.5px; font-weight: 600; }
+  .row-sub { font-size: 13.5px; color: var(--muted); margin-top: 1px; }
+  .row-when { font-size: 13.5px; color: var(--accent); font-weight: 600; }
+  .row .btn { margin-top: 8px; padding: 6px 13px; font-size: 13.5px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 13.5px; font-weight: 700; color: #0A1322; flex: none; }
+  .msg-text { font-size: 14.5px; color: var(--text-2); margin-top: 2px; }
+  .ico { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); flex: none; }
+  .ico svg { width: 17px; height: 17px; }
+  .empty { color: var(--muted); font-size: 14.5px; padding: 4px 0; }
+
+  footer { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 12.5px; padding: 8px 0 2px; }
+  footer svg { width: 14px; height: 14px; color: var(--accent); }
+
+  .sk { background: linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.05) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .state { min-height: 220px; display: grid; place-items: center; text-align: center; padding: 30px; }
+  .state h2 { margin: 10px 0 6px; font-size: 21px; font-weight: 600; }
+  .state p { margin: 0; font-size: 15px; color: var(--muted); max-width: 440px; }
+  .state svg { color: var(--text-2); }
+
+  .toast { position: fixed; left: 50%; bottom: 14px; transform: translate(-50%, 20px); opacity: 0; background: rgba(20,34,56,.96); border: 1px solid rgba(255,255,255,.12);
+    padding: 9px 16px; border-radius: 999px; font-size: 14px; max-width: calc(100% - 40px); box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    transition: opacity .25s, transform .25s; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.error { border-color: rgba(255,122,122,.5); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app" aria-live="polite"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26), postMessage JSON-RPC ---------- */
+const bridge = (() => {
+  const handlers = {};
+  const pending = new Map();
+  let seq = 0;
+  const post = (msg) => { try { window.parent.postMessage(msg, "*"); } catch (_) { /* detached */ } };
+  window.addEventListener("message", (ev) => {
+    if (ev.source !== window.parent) return;
+    const m = ev.data;
+    if (!m || typeof m !== "object" || m.jsonrpc !== "2.0") return;
+    if (m.method === undefined && m.id !== undefined) {
+      const p = pending.get(m.id);
+      if (!p) return;
+      pending.delete(m.id);
+      if (m.error) p.reject(new Error(m.error.message || "Request failed"));
+      else p.resolve(m.result);
+      return;
+    }
+    if (m.id !== undefined && m.id !== null) {
+      if (m.method === "ping" || m.method === "ui/resource-teardown") post({ jsonrpc: "2.0", id: m.id, result: {} });
+      else post({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Method not found: " + m.method } });
+      return;
+    }
+    const h = handlers[m.method];
+    if (h) { try { h(m.params || {}); } catch (err) { showState("Something went wrong", String(err && err.message || err)); } }
+  });
+  return {
+    on(method, fn) { handlers[method] = fn; },
+    notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); },
+    request(method, params, timeoutMs = 30000) {
+      const id = ++seq;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { pending.delete(id); reject(new Error("The request timed out")); }, timeoutMs);
+        pending.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v); }, reject: (e) => { clearTimeout(timer); reject(e); } });
+        post({ jsonrpc: "2.0", id, method, params: params || {} });
+      });
+    },
+  };
+})();
+
+/* ---------- helpers ---------- */
+const $app = document.getElementById("app");
+const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const arr = (v) => (Array.isArray(v) ? v : []);
+const num = (v) => (typeof v === "number" && isFinite(v) ? v : (typeof v === "string" && v.trim() !== "" && isFinite(+v) ? +v : null));
+const clampPct = (v) => Math.max(0, Math.min(100, Math.round(num(v) || 0)));
+function parseDate(iso) { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d; }
+function ago(iso) {
+  const d = parseDate(iso); if (!d) return "";
+  const s = (Date.now() - d.getTime()) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.round(s / 60) + " min ago";
+  if (s < 86400 && d.getDate() === new Date().getDate()) return "Today " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+function structuredFrom(r) {
+  if (!r || typeof r !== "object") return null;
+  if (r.structuredContent && typeof r.structuredContent === "object") return r.structuredContent;
+  for (const b of arr(r.content)) {
+    if (b && b.type === "text" && typeof b.text === "string") { try { const v = JSON.parse(b.text); if (v && typeof v === "object") return v; } catch (_) { /* not JSON */ } }
+  }
+  return null;
+}
+function textFrom(r) { const b = arr(r && r.content).find((c) => c && c.type === "text"); return b ? String(b.text || "") : ""; }
+let toastTimer = 0;
+function toast(msg, kind) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show" + (kind === "error" ? " error" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = "toast"; }, 3600);
+}
+const AVATAR = { rose: "#F7A1B5", maya: "#9DB8FF", leo: "#8EDBA9", grace: "#F6CF52" };
+function avatarColor(name) {
+  const k = String(name || "").toLowerCase().split(/\s/)[0];
+  if (AVATAR[k]) return AVATAR[k];
+  const pal = ["#F7A1B5", "#9DB8FF", "#8EDBA9", "#F6CF52", "#C7B3FF", "#7FE0E8"];
+  let h = 0; for (const ch of k) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return pal[h % pal.length];
+}
+
+const ICON = {
+  steady: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3L13 4.5"/></svg>',
+  watch: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.8v3.6M8 10.9v.3"/></svg>',
+  urgent: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.2l6.3 11H1.7z"/><path d="M8 6.5v3M8 11.4v.2"/></svg>',
+  info: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.4v3.8M8 5v.3"/></svg>',
+  arrow: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h11M11 5.5L15.5 10 11 14.5"/></svg>',
+  cal: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="14" height="13" rx="3"/><path d="M7 2.5v3M13 2.5v3M3 8.5h14"/></svg>',
+  spark: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z"/></svg>',
+  big: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>',
+};
+const STATUS_TEXT = { steady: "Steady", watch: "Worth watching", urgent: "Needs attention" };
+const sevOf = (s) => (["info", "watch", "urgent"].includes(String(s)) ? String(s) : "info");
+
+/* ---------- charts ---------- */
+function ring(pct) {
+  const r = 44, c = 2 * Math.PI * r, p = clampPct(pct);
+  return `<div class="ring" role="img" aria-label="${p} percent of doses taken">
+    <svg viewBox="0 0 104 104"><circle cx="52" cy="52" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="10"/>
+    <circle cx="52" cy="52" r="${r}" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round"
+      stroke-dasharray="${(c * p / 100).toFixed(1)} ${c.toFixed(1)}"/></svg>
+    <div class="ring-val"><div><b>${p}%</b><small>TAKEN</small></div></div></div>`;
+}
+
+/* One small line chart per measure (mood 1-5, pain 0-10): never two scales on one axis. */
+function sparkRow(days, key, label, color, lo, hi, unit) {
+  const pts = days.map((d, i) => ({ i, v: num(d && d[key]), date: d && d.date })).filter((p) => p.v !== null);
+  if (pts.length < 2) return "";
+  const min = Math.min(lo, ...pts.map((p) => p.v)), max = Math.max(hi, ...pts.map((p) => p.v));
+  const W = 300, H = 46, pad = 5, n = Math.max(days.length - 1, 1);
+  const x = (i) => pad + (i / n) * (W - 2 * pad);
+  const y = (v) => H - pad - ((v - min) / (max - min || 1)) * (H - 2 * pad);
+  const line = pts.map((p, k) => `${k ? "L" : "M"}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
+  const area = `${line}L${x(pts[pts.length - 1].i).toFixed(1)},${H}L${x(pts[0].i).toFixed(1)},${H}Z`;
+  const last = pts[pts.length - 1], first = pts[0];
+  const pctX = (i) => (x(i) / W * 100).toFixed(2) + "%";
+  const pctY = (v) => (y(v) / H * 100).toFixed(2) + "%";
+  // Hover targets are wider than the marks; the end dot sits in HTML so the stretched SVG can't distort it.
+  const hits = pts.map((p) => `<span class="hit" style="left:${pctX(p.i)}" title="${esc(p.date || "")}: ${esc(label)} ${p.v}${esc(unit)}"></span>`).join("");
+  const gid = "g-" + key;
+  return `<div class="spark">
+    <div class="name"><i style="background:${color}"></i>${esc(label)}</div>
+    <div class="plot">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(label)} from ${first.v} to ${last.v}">
+        <defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".28"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+        <path d="${area}" fill="url(#${gid})"/>
+        <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <span class="end" style="left:${pctX(last.i)};top:${pctY(last.v)};background:${color}"></span>
+      ${hits}
+    </div>
+    <div class="now">${last.v}${esc(unit)}<small>was ${first.v}</small></div>
+  </div>`;
+}
+
+/* ---------- state + rendering ---------- */
+let model = null;
+const alertBusy = new Set();
+const alertDone = new Set();
+
+function render() {
+  const d = model || {};
+  const person = d.person || {};
+  const status = ["steady", "watch", "urgent"].includes(d.status) ? d.status : "steady";
+  const who = person.short_name || person.name || "";
+  const period = d.period === "today" ? "Today" : d.period === "week" ? "This week" : (d.period ? String(d.period) : "");
+
+  const banner = `<section class="banner ${status}">
+      <div class="banner-top"><span class="status-pill">${ICON[status]}${STATUS_TEXT[status]}</span>
+      <span>${esc([person.name || who, period].filter(Boolean).join(" · "))}</span></div>
+      <div class="headline">${esc(d.headline || (who ? `Here's how ${who} is doing.` : "Here's the latest from the care circle."))}</div>
+    </section>`;
+
+  // Insights
+  const insights = arr(d.insights);
+  const insightHtml = insights.length
+    ? insights.map((i) => {
+        const sev = sevOf(i && i.severity);
+        const ev = arr(i && i.evidence).slice(0, 5);
+        return `<article class="insight ${sev}">
+          <div class="sev">${ICON[sev]}${sev === "info" ? "Insight" : sev === "watch" ? "Watch" : "Urgent"}</div>
+          <h3>${esc(i.title || "")}</h3>
+          ${i.detail ? `<p>${esc(i.detail)}</p>` : ""}
+          ${ev.length ? `<ul class="evidence">${ev.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
+          ${i.suggestion ? `<div class="suggest">${ICON.arrow}<div>${esc(i.suggestion)}</div></div>` : ""}
+        </article>`;
+      }).join("")
+    : '<div class="tile empty">No new patterns this period. Things look consistent.</div>';
+
+  // Adherence
+  const a = d.adherence || {};
+  const barRow = (label, v) => {
+    if (num(v) === null) return "";
+    const p = clampPct(v);
+    return `<div class="bar-row"><span class="lbl">${label}</span><div class="track"><div class="fill${p < 75 ? " low" : ""}" style="width:${p}%"></div></div><span class="val">${p}%</span></div>`;
+  };
+  const missedMeds = arr(a.by_med).filter((m) => m && (num(m.missed) || 0) > 0).sort((x, y) => (num(y.missed) || 0) - (num(x.missed) || 0)).slice(0, 3);
+  const adherence = num(a.pct) !== null ? `<div class="tile">
+      <div class="section-title" style="margin-bottom:12px">Medicines</div>
+      <div class="adh">${ring(a.pct)}<div class="bars">
+        ${num(a.taken) !== null && num(a.scheduled) !== null ? `<div style="font-size:14px;color:var(--text-2)"><b style="color:var(--text);font-size:17px">${num(a.taken)}</b> of ${num(a.scheduled)} doses</div>` : ""}
+        ${barRow("Morning", a.morning_pct)}${barRow("Evening", a.evening_pct)}
+      </div></div>
+      ${missedMeds.length ? `<div class="adh-note">Missed: ${missedMeds.map((m) => `<b>${esc(m.name)}</b> ×${num(m.missed)}`).join(", ")}</div>` : ""}
+    </div>` : "";
+
+  // Wellbeing
+  const w = d.wellbeing || {};
+  const days = arr(w.days).filter((x) => x && typeof x === "object");
+  const trend = ["declining", "steady", "improving"].includes(w.trend) ? w.trend : "";
+  const symCount = {};
+  for (const day of days) for (const s of arr(day.symptoms)) { const k = String(s).trim(); if (k) symCount[k] = (symCount[k] || 0) + 1; }
+  const topSym = Object.entries(symCount).sort((x, y) => y[1] - x[1]).slice(0, 4);
+  const mood = sparkRow(days, "mood", "Mood", "var(--mood)", 1, 5, "/5");
+  const pain = sparkRow(days, "pain", "Pain", "var(--pain)", 0, 10, "/10");
+  const wellbeing = (mood || pain || topSym.length) ? `<div class="tile">
+      <div class="section-title" style="margin-bottom:12px">Wellbeing${trend ? `<span class="trend ${trend}">${trend === "declining" ? "↓" : trend === "improving" ? "↑" : "→"} ${trend}</span>` : ""}</div>
+      ${mood}${pain}
+      ${(mood || pain) && days.length > 1 ? `<div class="axis"><span>${esc(days[0].date || "")}</span><span>${esc(days[days.length - 1].date || "")}</span></div>` : ""}
+      ${topSym.length ? `<div class="symptoms">${topSym.map(([s, n]) => `<span class="sym"><b>${esc(s)}</b> · ${n} day${n === 1 ? "" : "s"}</span>`).join("")}</div>` : ""}
+    </div>` : "";
+
+  // Alerts
+  const alerts = arr(d.alerts);
+  const alertHtml = alerts.length ? `<div class="section-title">Open alerts <span class="count">${alerts.filter((x) => !alertDone.has(String(x.id))).length}</span></div>
+    ${alerts.map((al) => {
+      const id = String(al.id);
+      const sev = sevOf(al.severity);
+      const done = alertDone.has(id), isBusy = alertBusy.has(id);
+      const action = done
+        ? `<span class="done-tag">${ICON.steady}Handled</span>`
+        : `<button class="btn ghost" data-resolve="${esc(id)}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Saving' : "Mark handled"}</button>`;
+      const meta = [al.kind ? String(al.kind).replace(/_/g, " ") : "", ago(al.at)].filter(Boolean).join(" · ");
+      return `<div class="alert ${sev}${done ? " done" : ""}"><div class="sev-dot">${ICON[sev]}</div>
+        <div style="min-width:0"><div class="alert-msg">${esc(al.message || "Alert")}</div>${meta ? `<div class="alert-meta">${esc(meta)}</div>` : ""}</div>${action}</div>`;
+    }).join("")}` : "";
+
+  // Upcoming + messages
+  const upcoming = arr(d.upcoming).slice(0, 4);
+  const upHtml = upcoming.length ? upcoming.map((u) => {
+    const doc = /\bdr\.?\s/i.test(String(u.provider || ""));
+    return `<div class="row"><div class="ico">${ICON.cal}</div><div style="min-width:0">
+      ${u.when_label ? `<div class="row-when">${esc(u.when_label)}</div>` : ""}
+      <div class="row-title">${esc(u.title || "Appointment")}</div>
+      ${u.provider ? `<div class="row-sub">${esc(u.provider)}</div>` : ""}
+      ${doc ? `<button class="btn ghost" data-visit="${esc(u.title || "")}" data-provider="${esc(u.provider || "")}">Prepare visit brief</button>` : ""}
+    </div></div>`;
+  }).join("") : '<div class="empty">No upcoming appointments.</div>';
+
+  const messages = arr(d.messages).slice(0, 4);
+  const msgHtml = messages.length ? messages.map((m) => {
+    const from = String(m.from || "Someone");
+    return `<div class="row"><div class="avatar" style="background:${avatarColor(from)}">${esc(from.charAt(0).toUpperCase())}</div>
+      <div style="min-width:0"><div class="row-title">${esc(from)} <span class="row-sub" style="font-weight:400">· ${esc(m.when_label || "")}</span></div>
+      <div class="msg-text">${esc(m.text || "")}</div></div></div>`;
+  }).join("") : '<div class="empty">No recent messages.</div>';
+
+  $app.innerHTML = `
+    ${banner}
+    <div class="grid">
+      <section aria-label="Insights"><div class="section-title">What Nova noticed${insights.length ? ` <span class="count">${insights.length}</span>` : ""}</div>${insightHtml}</section>
+      <aside>${adherence}${wellbeing}</aside>
+    </div>
+    ${alertHtml ? `<section style="margin-top:2px;margin-bottom:12px" aria-label="Alerts">${alertHtml}</section>` : ""}
+    <div class="grid2">
+      <section><div class="section-title">Coming up</div><div class="tile" style="padding:4px 16px">${upHtml}</div></section>
+      <section><div class="section-title">From the circle</div><div class="tile" style="padding:4px 16px">${msgHtml}</div></section>
+    </div>
+    ${d.generated_by ? `<footer>${ICON.spark}Generated by ${esc(d.generated_by)}</footer>` : ""}`;
+}
+
+function renderSkeleton() {
+  const card = '<div class="tile"><div class="sk" style="height:12px;width:30%"></div><div class="sk" style="height:20px;width:85%;margin-top:12px"></div><div class="sk" style="height:14px;width:95%;margin-top:10px"></div><div class="sk" style="height:14px;width:70%;margin-top:8px"></div></div>';
+  $app.innerHTML = `
+    <div class="banner steady" style="--tint:rgba(255,255,255,.05);--tint-line:rgba(255,255,255,.08)"><div class="sk" style="height:22px;width:130px;border-radius:999px"></div><div class="sk" style="height:26px;width:75%;margin-top:14px"></div></div>
+    <div class="grid"><section>${card}${card}</section>
+    <aside><div class="tile" style="display:flex;gap:16px;align-items:center"><div class="sk" style="width:104px;height:104px;border-radius:50%"></div><div style="flex:1"><div class="sk" style="height:12px"></div><div class="sk" style="height:12px;margin-top:14px"></div></div></div>
+    <div class="tile"><div class="sk" style="height:46px"></div><div class="sk" style="height:46px;margin-top:10px"></div></div></aside></div>`;
+}
+
+function showState(title, detail) {
+  $app.innerHTML = `<div class="state"><div>${ICON.big}<h2>${esc(title)}</h2><p>${esc(detail || "")}</p></div></div>`;
+}
+
+/* ---------- actions ---------- */
+async function resolveAlert(id) {
+  if (alertBusy.has(id) || alertDone.has(id)) return;
+  alertBusy.add(id);
+  render();
+  try {
+    const original = arr(model && model.alerts).find((x) => String(x.id) === id);
+    const alertId = original && typeof original.id === "number" ? original.id : (isFinite(+id) ? +id : id);
+    const res = await bridge.request("tools/call", { name: "resolve_alert", arguments: { alert_id: alertId } });
+    if (!res || res.isError) throw new Error(textFrom(res) || "Couldn't update that alert.");
+    alertDone.add(id);
+    const sc = structuredFrom(res) || {};
+    toast(sc.speech || "Marked as handled");
+  } catch (err) {
+    toast(String(err && err.message || err), "error");
+  } finally {
+    alertBusy.delete(id);
+    render();
+  }
+}
+
+$app.addEventListener("click", (e) => {
+  const r = e.target.closest("[data-resolve]");
+  if (r) { resolveAlert(r.getAttribute("data-resolve")); return; }
+  const v = e.target.closest("[data-visit]");
+  if (v) {
+    const p = (model && model.person) || {};
+    const who = p.short_name || p.name || "";
+    const title = v.getAttribute("data-visit") || "appointment";
+    const provider = v.getAttribute("data-provider");
+    const text = `Prepare a visit brief for ${who ? who + "'s " : "the "}${title.toLowerCase()}${provider ? " with " + provider : ""}`;
+    v.disabled = true;
+    bridge.request("ui/message", { role: "user", content: { type: "text", text } })
+      .catch(() => toast("Ask Alexa to prepare a visit brief", "error"))
+      .finally(() => { v.disabled = false; });
+  }
+});
+
+/* ---------- size reporting ---------- */
+let lastH = 0, lastW = 0, rafId = 0;
+function reportSize() {
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(() => {
+    const rect = $app.getBoundingClientRect();
+    const h = Math.ceil(rect.height), w = Math.ceil(rect.width);
+    if (h === lastH && w === lastW) return;
+    lastH = h; lastW = w;
+    bridge.notify("ui/notifications/size-changed", { width: w, height: h });
+  });
+}
+if ("ResizeObserver" in window) new ResizeObserver(reportSize).observe($app);
+
+/* ---------- lifecycle ---------- */
+bridge.on("ui/notifications/tool-input", () => {});
+bridge.on("ui/notifications/tool-result", (params) => {
+  if (params && params.isError) { showState("The briefing isn't available", textFrom(params) || "Please try again in a moment."); return; }
+  const data = structuredFrom(params);
+  if (!data) { showState("The briefing isn't available", "Nova didn't send any details this time."); return; }
+  model = data;
+  alertDone.clear();
+  render();
+});
+bridge.on("ui/notifications/tool-cancelled", (p) => showState("Cancelled", (p && p.reason) || ""));
+bridge.on("ui/notifications/host-context-changed", () => {});
+
+renderSkeleton();
+reportSize();
+if (window.parent === window) {
+  showState("Open this from Alexa", "This briefing appears on an Echo Show when you ask how someone in your circle is doing.");
+} else {
+  bridge.request("ui/initialize", {
+    appCapabilities: { availableDisplayModes: ["inline"] },
+    clientInfo: { name: "nova-briefing", version: "0.1.0" },
+    protocolVersion: "2026-01-26",
+  }, 10000).then(() => bridge.notify("ui/notifications/initialized", {}))
+    .catch(() => showState("Couldn't connect", "This view needs an MCP Apps host."));
+}
+</script>
+</body>
+</html>

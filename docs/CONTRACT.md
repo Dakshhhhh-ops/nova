@@ -127,3 +127,59 @@ Self-contained HTML (inline CSS/JS, no external requests). Protocol per ext-apps
 4. Host posts `ui/notifications/tool-input` `{arguments}` then `ui/notifications/tool-result` (params = CallToolResult: `{content, structuredContent}`).
 5. View may post requests `tools/call` `{name, arguments}`; host proxies to the MCP server and replies with the CallToolResult.
 6. View posts `ui/notifications/size-changed` `{width, height}` when its height changes.
+
+---
+
+# v2 additions: proactive care engine, vision, Ring, notifications
+
+## Household clock (time-lapse)
+The household has its own clock so a whole day can play out in a minute.
+- MCP server: `GET /demo/clock` → `{now, speed}`; `POST /demo/clock` body `{time?: "HH:MM", speed?: number}` → `{now, speed}`. `speed` 1 = real time; 60 = one minute per second.
+- Simulator proxies: `GET /api/clock`, `POST /api/clock` (same shapes). `/api/status` also has `household_now` and `clock_speed`.
+- SSE `{type: "clock", now, speed}` every ~2 s and right after any change. The UI should tick its clocks locally between events using `speed`.
+
+## Announcements (Nova speaks first)
+The care engine on the MCP server creates announcements; the simulator polls the MCP resource `nova://announcements` for each device and pushes new ones over SSE.
+
+`Announcement = { id, at, to, kind, severity, title, speech, expects_reply, replies: [str], status, related: {} }`
+- `kind`: `dose_reminder` | `dose_followup` | `caregiver_escalation` | `checkin_prompt` | `appointment_reminder` | `wellness_check` | `care_plan_change` | `message` | `visitor` | `info`
+- `severity`: `info` | `watch` | `urgent`
+- SSE `{type: "announcement", device, item: Announcement}`
+- UI behaviour: play a short chime, speak `speech`, show a large announcement card on that device's screen (title + speech), with the light bar in Alexa's style: **yellow pulsing** for caregiver notifications (`caregiver_escalation`, `visitor`, `message` to a caregiver), cyan for prompts to Rose, **red** for `urgent`. If `expects_reply`, show `replies` as big tappable chips; a tap sends that text as a normal utterance on the device (`POST /api/chat`) and acks the announcement.
+- `POST /api/announcements/{id}/ack` body `{device, action: "acknowledged" | "dismissed"}`.
+- `GET /api/announcements?device=maya` → `{items: [Announcement]}` newest first (for a notifications drawer; show an unread count badge on the device header).
+
+## Vision (Amazon Nova multimodal)
+- `GET /api/samples` → `{samples: [{id, kind: "pill"|"document", label, url}]}` (images served from `/samples/...`).
+- `POST /api/vision` body `{device, kind: "pill"|"document", image: "data:image/png;base64,..."}` → same shape as `/api/chat` (`{reply, cards, trace, brain, latency_ms}`), with trace over SSE as usual.
+- Rose's device: a "Show Alexa" camera action (webcam capture via `getUserMedia` when available, file upload, or one of the sample pill bottles) → `kind: "pill"` → tool `check_pill_photo` → card `ui://nova/pillcheck.html`.
+- Maya's device: a "Scan paperwork" action (upload or the sample after-visit summary) → `kind: "document"` → tool `read_care_document` → card `ui://nova/reconcile.html`.
+
+`check_pill_photo` structuredContent:
+```json
+{ "speech": "...", "verdict": "ok_now|wrong_time|already_taken|not_on_list|unclear",
+  "identified": {"name": "Atorvastatin", "strength": "40 mg", "directions": "...", "label_text": "...", "confidence": 0.9},
+  "matched_med": {"id": "atorvastatin", "name": "Atorvastatin", "dose": "40 mg", "purpose": "cholesterol", "appearance": "...", "times": ["9 PM"]} ,
+  "due_now": [{"name": "Lisinopril", "appearance": "small pink oval pill", "time_label": "8 AM"}],
+  "advice": "Put this one back. Your morning pills are ...", "generated_by": "..." }
+```
+`read_care_document` structuredContent:
+```json
+{ "speech": "...", "change_set_id": "cs_ab12", "status": "pending",
+  "source": {"title": "After Visit Summary", "provider": "Dr. Anika Patel", "facility": "Ohio Heart Center", "date": "10/24/2026"},
+  "changes": [{"op": "change|start|stop|continue", "name": "Lisinopril", "from": "20 mg once daily", "to": "10 mg once daily", "reason": "dizziness, low blood pressure"}],
+  "instructions": ["Check blood pressure every morning and write it down", "..."],
+  "generated_by": "..." }
+```
+`reconcile.html` buttons: **Approve changes** → `tools/call apply_care_changes {change_set_id, approve: true}`; **Discard** → `approve: false`. Result: `{speech, status: "applied"|"discarded", applied: [change], plan: [{name, dose, times, appearance}]}`; the view should then show the updated plan.
+
+## Ring (simulated front door)
+- `POST /api/ring/event` body `{kind: "ding"|"motion"|"door_open", who?: "grace"|"delivery"|"rose"|"unknown"}` → `{ok, signal}`. The simulator forwards to the MCP server webhook `POST /integrations/ring/events`.
+- Timeline items gain `kind: "ring"`.
+- UI: a compact **Ring Video Doorbell · Front door (Columbus)** panel (third, smaller device under/next to Rose's) with an illustrated porch "live view", the last event, and buttons: "Grace arrives", "Package delivered", "Rose heads out for a walk", "Motion". 
+
+## New tools (agent-visible)
+- `read_notifications()` → `{speech, items: [Announcement]}` ("Alexa, what are my notifications?")
+- `snooze_reminder(minutes=10)` → `{speech, at}`
+- `recent_activity(hours=24)` → `{speech, items}` (caregivers: "When did Mom last open the door?")
+- `check_pill_photo`, `read_care_document`, `apply_care_changes` (see above)

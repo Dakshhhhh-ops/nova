@@ -290,7 +290,9 @@ def detect_insights(store: Store, person_id: str, t: datetime | None = None) -> 
                 ),
                 "evidence": evidence,
                 "suggestion": suggestion,
-                "related": {"medication": med["name"], "symptom": fam, "since": iso(first), "count": len(hits)},
+                "related": {"medication": med["name"], "symptom": fam, "since": iso(first), "count": len(hits),
+                            "lag_days": lag, "change_note": med.get("change_note"),
+                            "bp_after": (f"{mean(post, 'systolic')}/{mean(post, 'diastolic')}" if pre and post else None)},
             })
 
     # 2. Evening doses slipping while mornings hold.
@@ -473,24 +475,64 @@ def narrate_briefing(ctx: dict[str, Any]) -> dict[str, str]:
     return fallback
 
 
+SMALL = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
+
+
+def say_n(n: int) -> str:
+    return SMALL[n] if 0 <= n < len(SMALL) else str(n)
+
+
+def say_bp(bp: str) -> str:
+    a, b = bp.split("/")
+    return f"{a} over {b}"
+
+
+def spoken(insight: dict[str, Any], pronoun: str = "her") -> str:
+    """One insight as a natural spoken sentence (no parentheses, no phone numbers, no repeated names)."""
+    r = insight.get("related") or {}
+    kind = insight["id"]
+    if kind.startswith("after-change") and r:
+        note = (r.get("change_note") or "").lower()
+        nums = re.findall(r"(\d+)\s*mg", note)
+        how = "doubled" if len(nums) == 2 and int(nums[1]) == 2 * int(nums[0]) else "changed"
+        who = "Dr. Patel " if "patel" in note else "the doctor "
+        lag = r.get("lag_days")
+        when = f"{say_n(lag)} day{'s' if lag != 1 else ''} after" if lag is not None and lag <= 10 else "after"
+        out = (f"{pronoun.capitalize()} {r['symptom']} started {when} {who}{how} {pronoun} {r['medication'].lower()}, "
+               f"and {'she' if pronoun == 'her' else 'they'}'s mentioned it {say_n(r['count'])} times since.")
+        if r.get("bp_after"):
+            out += f" {pronoun.capitalize()} home blood pressure is down to about {say_bp(r['bp_after'])}."
+        return out
+    if kind == "evening-doses":
+        return f"{pronoun.capitalize()} evening pills are slipping; mornings are fine."
+    if kind == "missed-today":
+        return insight["title"] + "."
+    return insight["title"] + "."
+
+
 def _template_briefing(ctx: dict[str, Any]) -> dict[str, str]:
     name = ctx["name"]
     ins = ctx["facts"].get("insights") or []
     adh = ctx["facts"].get("adherence") or {}
+    upcoming = ctx["facts"].get("upcoming") or []
     if not ins:
         return {
             "headline": "A steady day",
-            "speech": f"{name} is doing well. Medications are at {adh.get('pct', 100)} percent and nothing needs your attention.",
+            "speech": f"{name} is doing well. She's taken {adh.get('pct', 100)} percent of her pills and nothing needs your attention.",
         }
     top = ins[0]
-    first = lambda text: re.split(r"(?<!Dr\.)(?<=[.!?])\s+", text.strip())[0]  # noqa: E731
-    opener = (f"{name} is mostly okay, but one thing needs your attention." if top["severity"] != "info"
-              else f"{name} is doing okay overall.")
-    parts = [opener, f"{top['title']}. {first(top['detail'])}"]
-    if top.get("suggestion"):
-        parts.append(first(top["suggestion"]))
-    if len(ins) > 1:
-        parts.append(f"There {'is' if len(ins) == 2 else 'are'} {len(ins) - 1} more thing{'s' if len(ins) > 2 else ''} on screen.")
+    parts = [f"{name} is mostly okay, but one thing needs your attention." if top["severity"] != "info"
+             else f"{name} is doing okay overall."]
+    parts.append(spoken(top))
+    if top["id"].startswith("after-change"):
+        doctor = "Dr. Patel" if "patel" in (top.get("suggestion") or "").lower() else "The doctor"
+        parts.append(f"{doctor}'s notes say to call about it.")
+    second = next((i for i in ins[1:] if i["severity"] != "info"), None)
+    if second:
+        parts.append(f"Also, {spoken(second)[0].lower() + spoken(second)[1:]}")
+    medical = next((u for u in upcoming if u.get("provider") and u["provider"].split()[0] not in u["title"]), None)
+    if medical:
+        parts.append(f"Want me to prepare a brief for {mid_sentence(medical['when_label']).split(' at ')[0]}'s visit?")
     return {"headline": top["title"], "speech": " ".join(parts)}
 
 

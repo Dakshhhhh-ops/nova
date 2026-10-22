@@ -60,7 +60,7 @@ Messages between family members arrive the same way, live, on the other person's
 
 ### 3. It connects the dots, with evidence
 *"How's Mom doing?"* gives a spoken briefing plus an on-screen card:
-> *Dizziness began after her lisinopril change.* Home BP averaged 152/91 before the change and 108/66 since. Rose has mentioned dizziness 4 times since Oct 15. Grace saw her unsteady. Dr. Patel's notes say to call about dizziness (614-555-0190).
+> *Dizziness began after her lisinopril change.* Home BP averaged 152/91 before the change and 110/66 since. Rose has mentioned dizziness 4 times since Oct 15. Grace saw her unsteady. Dr. Patel's notes say to call about dizziness (614-555-0190).
 
 It also tracks evening doses slipping while mornings hold, mood, pain and sleep trends, and *"she's stopped her walks"*. Every insight comes from deterministic, testable rules and carries its evidence. Amazon Nova only writes the language.
 

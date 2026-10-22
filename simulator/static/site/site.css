@@ -648,6 +648,7 @@ code { font-family: var(--mono); font-size: .86em; }
 
 .foot { border-top: 1px solid var(--line); background: var(--ink); }
 .foot-inner { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px 32px; padding: 30px 0 34px; color: var(--faint); font-size: 10.5px; }
+.gl .foot-inner { padding-bottom: 76px; } /* clear the frame's chin, which covers the last 40px of the page */
 .foot-top { color: var(--mist); }
 .foot-top:hover { color: var(--ivory); }
 
@@ -783,10 +784,10 @@ code { font-family: var(--mono); font-size: .86em; }
 .build.is-gl .build-head { pointer-events: none; }
 /* the 3D slides behind the text: a soft dark fade keeps the copy readable over it */
 .build.is-gl .build-head::before { content: ""; position: absolute; z-index: -1; pointer-events: none;
-  left: -30vw; top: -16%; bottom: -20%; width: calc(30vw + min(560px, 38%) + 220px);
+  left: -30vw; top: -16%; bottom: -70%; width: calc(30vw + min(560px, 38%) + 220px);
   background: linear-gradient(90deg, rgba(10, 11, 16, .93) 0, rgba(10, 11, 16, .88) calc(100% - 260px), rgba(10, 11, 16, 0) 100%);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 16%, #000 84%, transparent 100%);
-  mask-image: linear-gradient(180deg, transparent 0, #000 16%, #000 84%, transparent 100%); }
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 10%, #000 72%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 10%, #000 72%, transparent 100%); }
 
 /* CTA */
 .cta.is-gl .cta-ring { display: none; }

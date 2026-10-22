@@ -1347,7 +1347,8 @@ async function build() {
       }
       return SC;
     }
-    const behind = { x0: textLeft + (textRight - textLeft) * 0.32, x1: labelLeft - 32, y0: r.top + 80, y1: r.bottom - 40 - 32 };
+    // sits low in the section, so the heading and the first lines of copy stay clear above it
+    const behind = { x0: textLeft + (textRight - textLeft) * 0.32, x1: labelLeft - 32, y0: r.top + r.height * 0.26, y1: r.bottom - 40 - 12 };
     const ok = (g) => g.x1 - g.x0 > 200 && g.y1 - g.y0 > 200;
     let reg;
     if (ok(behind) && innerWidth >= 1180) reg = behind;

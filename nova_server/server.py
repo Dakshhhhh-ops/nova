@@ -784,8 +784,10 @@ async def prepare_visit(
     meds = []
     for m in store.medications(elder["id"]):
         by = next((b for b in adh["by_med"] if b["name"] == m["name"]), None)
+        changed = ins.short_date(parse(m["changed_on"])) if m.get("changed_on") else None
         meds.append({"name": m["name"], "dose": m["dose"], "adherence_pct": by["pct"] if by else None,
-                     "note": f"Changed {ins.short_date(parse(m['changed_on']))}: {m['change_note']}" if m.get("change_note") else ""})
+                     "note": f"Changed {changed}: {m['change_note']}" if m.get("change_note") else "",
+                     "changed_label": changed, "change_note": m.get("change_note")})
     sym_count: dict[str, dict[str, Any]] = {}
     for c in store.checkins(elder["id"], t - timedelta(days=21)):
         for s in c["symptoms"]:

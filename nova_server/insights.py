@@ -638,7 +638,7 @@ def _template_visit(ctx: dict[str, Any]) -> dict[str, Any]:
     facts = ctx["facts"]
     adh = facts.get("adherence", {})
     sym = facts.get("symptoms") or []
-    changed = [m for m in facts.get("medications", []) if m.get("note")]
+    changed = [m for m in facts.get("medications", []) if m.get("change_note")]
     summary = f"{name} has taken {adh.get('pct', '?')}% of scheduled doses over the last two weeks"
     if adh.get("evening_pct") is not None and adh.get("morning_pct") is not None:
         summary += f" (mornings {adh['morning_pct']}%, evenings {adh['evening_pct']}%)"
@@ -647,7 +647,10 @@ def _template_visit(ctx: dict[str, Any]) -> dict[str, Any]:
         s = sym[0]
         summary += f" Since {s['first_label']} she has reported {s['name']} {s['count']} times"
         if changed:
-            summary += f", starting shortly after the {changed[0]['name'].lower()} change ({changed[0]['note']})"
+            c = changed[0]
+            summary += f", starting shortly after her {c['name'].lower()} dose was changed on {c.get('changed_label') or 'a recent date'}"
+            if c.get("change_note"):
+                summary += f" ({c['change_note']})"
         summary += "."
     questions = []
     if sym and changed:

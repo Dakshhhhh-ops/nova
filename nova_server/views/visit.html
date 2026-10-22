@@ -31,10 +31,10 @@
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 8px; }
   button { font: inherit; color: inherit; }
-  #app { padding: 18px 20px 20px; }
+  #app { padding: 0 0 16px; }
 
-  /* The "document" */
-  .sheet { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: 0 1px 0 rgba(255,255,255,.04) inset; }
+  /* The "document" fills the card edge to edge (the host already draws the card frame) */
+  .sheet { background: var(--paper); border-bottom: 1px solid var(--line); overflow: hidden; }
   .sheet-head { padding: 20px 24px 18px; background: linear-gradient(180deg, rgba(0,202,255,.10), rgba(0,202,255,0)); border-bottom: 1px solid var(--line); position: relative; }
   .sheet-head::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--accent), rgba(0,202,255,.2)); }
   .doc-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
@@ -98,7 +98,7 @@
   .spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12.5px; padding: 12px 6px 0; flex-wrap: wrap; }
+  footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12.5px; padding: 14px 24px 0; flex-wrap: wrap; }
   footer svg { width: 14px; height: 14px; color: var(--accent); vertical-align: -2px; margin-right: 6px; }
   .empty { color: var(--muted); font-size: 15px; }
 

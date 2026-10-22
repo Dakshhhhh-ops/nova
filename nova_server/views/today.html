@@ -55,8 +55,33 @@
   .seg.missed { background: var(--red); }
   .seg.skipped { background: rgba(255,255,255,.32); }
 
-  .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; align-items: start; }
-  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } .top { flex-direction: column; align-items: flex-start; } .progress { text-align: left; } .segs { justify-content: flex-start; } }
+  /* Hero: the one thing to do right now */
+  .hero { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; gap: 18px; align-items: center;
+    padding: 16px 18px; border-radius: 22px; margin-bottom: 20px; border: 1px solid var(--line); background: var(--surface); }
+  .hero.due { background: linear-gradient(110deg, rgba(0,202,255,.20), rgba(0,202,255,.05) 60%, var(--surface)); border-color: rgba(0,202,255,.42); }
+  .hero.missed { background: linear-gradient(110deg, rgba(255,122,122,.16), rgba(255,122,122,.04) 60%, var(--surface)); border-color: rgba(255,122,122,.34); }
+  .hero.done { background: linear-gradient(110deg, rgba(61,220,151,.16), rgba(61,220,151,.04) 60%, var(--surface)); border-color: rgba(61,220,151,.3); }
+  .hero .pill-tile { width: 76px; height: 76px; border-radius: 20px; background: rgba(255,255,255,.07); }
+  .hero .pill-tile svg { width: 58px; height: 58px; }
+  .hero-label { font-size: 14px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--accent); }
+  .hero.missed .hero-label { color: var(--red); }
+  .hero.done .hero-label { color: var(--green); }
+  .hero.next .hero-label { color: var(--text-2); }
+  .hero-name { font-size: 28px; font-weight: 600; line-height: 1.15; margin-top: 3px; }
+  .hero-name span { font-weight: 400; color: var(--text-2); font-size: 22px; margin-left: 6px; }
+  .hero-sub { font-size: 17px; color: var(--text-2); margin-top: 4px; }
+  .hero .btn { font-size: 19px; padding: 13px 24px; }
+  .hero .btn svg { width: 18px; height: 18px; }
+  .done-ico { width: 76px; height: 76px; border-radius: 20px; display: grid; place-items: center; background: var(--green-soft); color: var(--green); }
+  .done-ico svg { width: 36px; height: 36px; }
+
+  .bottom { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 6px; }
+  @media (max-width: 620px) {
+    .bottom { grid-template-columns: 1fr; }
+    .top { flex-direction: column; align-items: flex-start; } .progress { text-align: left; } .segs { justify-content: flex-start; }
+    .hero { grid-template-columns: 60px minmax(0, 1fr); } .hero .btn { grid-column: 1 / -1; justify-content: center; }
+    .hero .pill-tile, .done-ico { width: 60px; height: 60px; }
+  }
 
   .section-title { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 10px 2px; }
 
@@ -111,10 +136,6 @@
 
   /* Side column */
   .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
-  .next { background: linear-gradient(135deg, rgba(0,202,255,.16), rgba(0,202,255,.04)); border-color: rgba(0,202,255,.25); }
-  .next-label { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
-  .next-value { font-size: 22px; font-weight: 600; margin-top: 4px; line-height: 1.2; }
-  .next-time { color: var(--text-2); font-weight: 400; }
 
   .appt { display: grid; grid-template-columns: 50px minmax(0,1fr); gap: 12px; align-items: center; padding: 10px 0; }
   .appt + .appt { border-top: 1px solid var(--line); }
@@ -288,6 +309,7 @@ function chipFor(d, personId) {
 function render() {
   const d = model || {};
   const person = d.person || {};
+  const who = person.short_name || person.name || "";
   const doses = arr(d.doses).map((x, i) => ({ ...x, _i: i, _st: normStatus(x.status) }));
   const taken = doses.filter((x) => x._st === "taken").length;
 
@@ -327,10 +349,33 @@ function render() {
       }).join("")
     : '<div class="tile empty">No medicines scheduled for today.</div>';
 
-  // Side column
-  const next = d.next_dose && (d.next_dose.name || d.next_dose.time_label)
-    ? `<div class="tile next"><div class="next-label">Next dose</div><div class="next-value">${esc(d.next_dose.name || "")} <span class="next-time">${d.next_dose.time_label ? "at " + esc(d.next_dose.time_label) : ""}</span></div></div>`
-    : "";
+  // Hero: a due dose first, then a missed one, then what's next, else "all done".
+  const focus = doses.find((x) => x._st === "due") || doses.find((x) => x._st === "missed");
+  let hero = "";
+  if (focus) {
+    const isBusy = busy.has(focus._i);
+    const sub = [focus.appearance, focus.purpose].filter(Boolean).map((s) => esc(cap(s))).join(" · ");
+    hero = `<section class="hero ${focus._st}">
+      <div class="pill-tile">${pillSVG(focus.appearance)}</div>
+      <div style="min-width:0"><div class="hero-label">${focus._st === "due" ? "Due now" : "Missed"}${focus.time_label ? " · " + esc(focus.time_label) : ""}</div>
+        <div class="hero-name">${esc(focus.name || "Medicine")}<span>${esc(focus.dose || "")}</span></div>
+        ${sub ? `<div class="hero-sub">${sub}</div>` : ""}</div>
+      <button class="btn" data-take="${focus._i}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Logging' : ICON.check + "Mark taken"}</button>
+    </section>`;
+  } else if (doses.length && doses.every((x) => x._st === "taken" || x._st === "skipped")) {
+    hero = `<section class="hero done"><div class="done-ico">${ICON.check}</div>
+      <div><div class="hero-label">All done</div><div class="hero-name">Every dose today is taken</div><div class="hero-sub">Nice work${who ? ", " + esc(who) : ""}.</div></div><span></span></section>`;
+  } else {
+    // Prefer the live dose list (it changes when a dose is logged here); next_dose is only a fallback.
+    const up = doses.find((x) => x._st === "upcoming");
+    const nd = up || (d.next_dose && (d.next_dose.name || d.next_dose.time_label) ? d.next_dose : null);
+    if (nd) {
+      hero = `<section class="hero next"><div class="pill-tile">${pillSVG(nd.appearance)}</div>
+        <div><div class="hero-label">Next dose${nd.time_label ? " · " + esc(nd.time_label) : ""}</div>
+        <div class="hero-name">${esc(nd.name || "")}${nd.dose ? `<span>${esc(nd.dose)}</span>` : ""}</div>
+        ${nd.appearance ? `<div class="hero-sub">${esc(cap(nd.appearance))}</div>` : ""}</div><span></span></section>`;
+    }
+  }
 
   const appts = arr(d.appointments).slice(0, 3);
   const apptHtml = appts.length
@@ -352,20 +397,16 @@ function render() {
       ${unread ? '<button class="btn ghost" data-read>Read</button>' : ""}
     </div>`;
 
-  const who = person.short_name || person.name || "";
   $app.innerHTML = `
     <header class="top">
       <div><div class="eyebrow">Today${who ? " · " + esc(who) : ""}</div><h1>${esc(d.date_label || new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</h1></div>
       ${progress}
     </header>
-    <div class="grid">
-      <section aria-label="Medicines"><div class="section-title">Medicines</div>${slotHtml}</section>
-      <aside>
-        ${next}
-        <div class="section-title">Coming up</div>
-        <div class="tile" style="padding:6px 16px">${apptHtml}</div>
-        ${msgs}
-      </aside>
+    ${hero}
+    <section aria-label="Medicines"><div class="section-title">Today's medicines</div>${slotHtml}</section>
+    <div class="bottom">
+      <section><div class="section-title">Coming up</div><div class="tile" style="padding:6px 16px">${apptHtml}</div></section>
+      <section><div class="section-title">Messages</div>${msgs}</section>
     </div>`;
 }
 
@@ -374,9 +415,10 @@ function renderSkeleton() {
   $app.innerHTML = `
     <header class="top"><div><div class="sk" style="height:13px;width:120px"></div><div class="sk" style="height:30px;width:300px;margin-top:10px"></div></div>
     <div class="progress"><div class="sk" style="height:18px;width:180px;margin-left:auto"></div><div class="sk" style="height:8px;width:200px;margin-top:10px"></div></div></header>
-    <div class="grid"><section>${row}${row}${row}</section>
-    <aside><div class="tile"><div class="sk" style="height:14px;width:40%"></div><div class="sk" style="height:22px;width:80%;margin-top:10px"></div></div>
-    <div class="tile"><div class="sk" style="height:48px"></div><div class="sk" style="height:48px;margin-top:12px"></div></div></aside></div>`;
+    <div class="hero"><div class="sk" style="width:76px;height:76px;border-radius:20px"></div>
+      <div><div class="sk" style="height:14px;width:120px"></div><div class="sk" style="height:26px;width:60%;margin-top:10px"></div><div class="sk" style="height:16px;width:75%;margin-top:10px"></div></div>
+      <div class="sk" style="width:150px;height:48px;border-radius:999px"></div></div>
+    <section>${row}${row}${row}</section>`;
 }
 
 function showState(title, detail) {

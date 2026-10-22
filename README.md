@@ -1,6 +1,8 @@
-# Nova · a care circle for Alexa+
+# Nova · catches medication mistakes before they happen
 
-**Nova turns Alexa+ into a proactive, multimodal care circle for an older adult who lives alone, and for the family who worry about them.**
+**Nova catches medication mistakes before they happen, and connects the dots (like a dose change and new dizziness) for an older adult who lives alone and the family who worry about her.**
+
+It links three places on Alexa+: **the living room** (Rose's Echo Show in her kitchen), **the front door** (her Ring doorbell) and **the cloud** (Maya's Echo Show in Seattle, and Nova itself).
 
 It doesn't wait to be asked. It reminds Rose when her pill is due, follows up, and only then tells her daughter. It reads pill bottles and the doctor's paperwork with Amazon Nova. It notices when the front door hasn't opened all morning, and it connects small signals into the one insight that matters: *"her dizziness started two days after the blood pressure dose was doubled."*
 
@@ -222,6 +224,18 @@ uv run pytest -q
 | `list_alerts` / `resolve_alert` | family | Open alerts, mark handled |
 | `set_sharing` | Rose | Privacy: what the circle can see |
 | `acknowledge_notification` (app only) | both | Device screens acknowledge announcements |
+
+## Running it for real: health data
+Nova handles protected health information (medications, symptoms, blood pressure), so a real deployment is a HIPAA project, not just a hosting choice. The demo uses a fictional household and is **not** a HIPAA deployment as it stands. Here is what changes for a care organization running it:
+
+- **Who signs what.** The home-care agency, health plan or pharmacy runs Nova in its own AWS account and signs a **Business Associate Addendum (BAA) with AWS** (through AWS Artifact). Families link their Alexa accounts to that organization's Nova.
+- **Only HIPAA-eligible services.** Amazon Bedrock (and Bedrock AgentCore) and Amazon Polly are on AWS's HIPAA Eligible Services list, and compute and storage come from the same list (for example Amazon ECS and Amazon RDS). Amazon Bedrock doesn't store prompts and completions or use them to train models.
+- **Encryption everywhere.** TLS on every hop (Alexa+ → Nova is MCP over HTTPS). SQLite is replaced by Amazon RDS encrypted with AWS KMS, with encrypted backups.
+- **Minimum necessary, already in the design.** Identity comes from the token, never from speech. Caregivers see only the categories Rose shares (`set_sharing`, which only she can change). Nova asks before telling the family about a symptom. Plan changes need a person's approval. Every dose, alert and change records who did it (`logged_by`, `handled_by`, `created_by`); production adds a full access log.
+- **Voice in a shared room.** Spoken lines stay short and general; the details go on the screen or behind "tell me more". In production, caregiver devices would require an Alexa voice profile or PIN before health details.
+- **Retention and exit.** Data is kept for the care relationship. Unlinking the account revokes Nova's tokens (OAuth revocation is already implemented), and the organization can export or delete a household's data on request.
+- **Not a medical device.** Nova doesn't diagnose or change treatment. It relays the care team's own instructions, shows its evidence, and asks a person to approve plan changes, so it stays a care-coordination tool.
+- **Who pays.** The organization that owns the care relationship licenses Nova per household (home-care agencies, Medicare Advantage and Part D plans scored on adherence, pharmacies). Families pay nothing extra.
 
 ## Safety and privacy
 - **No diagnosis, no new medical advice.** Medication and symptom answers come from the care team's own notes, with sources. Plan changes need a person's approval.

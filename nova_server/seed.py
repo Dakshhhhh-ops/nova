@@ -41,6 +41,10 @@ PEOPLE = [
 ]
 
 
+# Evening doses have started slipping over the last five days (mornings hold).
+EVENING_MISSES = {("metformin", 1), ("metformin", 3), ("metformin", 4), ("atorvastatin", 2), ("atorvastatin", 4)}
+
+
 def seed(store: Store, *, rng_seed: int = 7) -> None:
     rng = random.Random(rng_seed)
     store.wipe()
@@ -60,7 +64,7 @@ def seed(store: Store, *, rng_seed: int = 7) -> None:
              appearance="small pink oval pill", times=["08:00"], with_food=0,
              instructions="Stand up slowly. Report dizziness or fainting.",
              started=iso(today - timedelta(days=400)), changed_on=iso(dose_change),
-             change_note="Increased from 10 mg to 20 mg by Dr. Patel"),
+             change_note="Dr. Patel raised it from 10 mg to 20 mg"),
         dict(id="metformin", name="Metformin", dose="500 mg", purpose="blood sugar",
              appearance="large white oblong pill", times=["08:00", "18:00"], with_food=1,
              instructions="Take with breakfast and with dinner, never on an empty stomach.",
@@ -92,14 +96,9 @@ def seed(store: Store, *, rng_seed: int = 7) -> None:
                 at = day.replace(hour=hh, minute=mm)
                 if day_offset == 0 and at > t - timedelta(minutes=45):
                     continue  # still upcoming today
-                evening = hh >= 17
-                recent = day_offset <= 5
-                if day_offset == 0 and m["id"] == "metformin" and evening:
+                if day_offset == 0 and m["id"] == "metformin" and hh >= 17:
                     continue  # tonight's dinner dose not logged yet: shows as missed later in the day
-                miss_chance = 0.03
-                if evening and recent:
-                    miss_chance = 0.5
-                if rng.random() < miss_chance:
+                if hh >= 17 and (m["id"], day_offset) in EVENING_MISSES:
                     continue  # no log at all: a missed dose
                 taken_at = at + timedelta(minutes=rng.randint(2, 40))
                 who = "rose" if rng.random() > 0.15 else "grace"
@@ -129,7 +128,7 @@ def seed(store: Store, *, rng_seed: int = 7) -> None:
     store.add_message("grace", "circle",
                       "Rose was a little unsteady getting up from the couch today. Sitting BP 104/62. "
                       "She says it passes after a minute.", at=today - timedelta(days=3) + timedelta(hours=15))
-    store.add_message("leo", "circle", "I can drive Mom to the cardiology appointment on Friday.",
+    store.add_message("leo", "circle", "I can drive Mom to her cardiology appointment.",
                       at=today - timedelta(days=2) + timedelta(hours=19, minutes=12))
     store.add_message("maya", "rose",
                       "Hi Mom! Lily's piano recital video is in the family album. Call you Sunday. Love you!",

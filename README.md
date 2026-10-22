@@ -62,7 +62,7 @@ Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard
 | 11:00 AM, a quiet home | No pills logged and no movement at the door: a wellness check, then an urgent alert to the family |
 | A bottle running low | A refill nudge, sent to the pharmacy with a pickup plan |
 
-**It sees.** Rose holds a bottle up to the Echo Show camera. Amazon Nova reads the label and Nova checks it against her plan: the right pill at the right time, a pill already taken, an outdated strength, or a medicine her doctor said to avoid (*"Please don't take ibuprofen, Rose…"*). Maya photographs an after-visit summary, and Nova proposes the plan changes (*change, start, stop, continue*, with the doctor's reasons). Nothing changes until she approves.
+**It sees.** Rose holds a bottle up to the Echo Show camera. Amazon Nova reads the label and Nova checks it against her plan: the right pill at the right time, a pill already taken, an outdated strength, or a medicine her doctor said to avoid (*"Please don't take ibuprofen, Rose…"*). Nova says *take it* only when it is sure: the exact product (not a combination or extended-release version), the strength read and matching the plan, and a confident read. Otherwise it asks her to check with the pharmacist, and it refuses outright when it can't read the label. Maya photographs an after-visit summary, and Nova proposes the plan changes (*change, start, stop, continue*, with the doctor's reasons). Nothing changes until she approves.
 
 **It connects the dots, with evidence.** *"How's Mom doing?"* gets a one-sentence answer and a card that fits one screen:
 
@@ -241,9 +241,9 @@ All settings are environment variables (see [.env.example](.env.example)).
 uv run pytest -q
 ```
 
-68 tests run in CI on every push. They cover:
+81 tests run in CI on every push. They cover:
 - the care engine (the escalation ladder, snooze, check-ins and wellness checks);
-- pill checks and reconciliation;
+- pill checks, including the safety rules for unreadable labels, low-confidence reads, missing strengths and look-alike products, and reconciliation;
 - the dizziness insight and its evidence, BP limits, privacy, grounded answers and red flags;
 - a real Streamable HTTP session with bearer auth and elicitation, and the full OAuth 2.1 account-linking flow;
 - the Ring API client against recorded responses, and the Ring webhooks (signature, dedupe, event mapping);
@@ -271,7 +271,7 @@ nova/
 ├── samples/            Demo images and fixtures
 ├── skills/nova-care/   Agent Skill
 ├── scripts/            Demo-video recorder, UI checks
-├── tests/              pytest suite (68 tests)
+├── tests/              pytest suite (81 tests)
 ├── docs/               Architecture, design, demo script, submission notes
 ├── serve.py            Single-port server for deployment
 └── run.py              Local launcher

@@ -50,6 +50,7 @@
   .source { margin: -4px 0 16px; padding: 14px 18px 14px 20px; border-left: 2px solid var(--red); border-radius: 0 14px 14px 0; background: rgba(255,107,87,.06); }
   .source q { display: block; font-family: var(--serif); font-size: 21px; line-height: 1.32; quotes: "\201C" "\201D"; }
   .source cite { display: block; margin-top: 8px; font-family: var(--mono); font-style: normal; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .verdict.check_first { --tone: var(--amber); --tone-bg: rgba(255,181,71,.20); --tone-line: rgba(255,181,71,.46); }
   .verdict.unclear { --tone: var(--grey); --tone-bg: rgba(168,179,196,.14); --tone-line: rgba(168,179,196,.3); }
   .v-ico { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: var(--tone); color: #0A1322; box-shadow: 0 0 0 8px color-mix(in srgb, var(--tone) 18%, transparent); }
   .v-ico svg { width: 38px; height: 38px; }
@@ -282,6 +283,7 @@ const ICON = {
   not_on_list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>',
   dose_mismatch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 6.5v7M12 17.5v.3"/></svg>',
   avoid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M6.4 17.6L17.6 6.4"/></svg>',
+  check_first: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 6.5v7M12 17.5v.3"/></svg>',
   unclear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 9a3 3 0 1 1 4.3 2.7c-.9.5-1.5 1.2-1.5 2.3M12 17.5v.3"/></svg>',
   bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>',
   bottle: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5.5" y="2.5" width="9" height="3" rx="1"/><path d="M6 5.5h8v11a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 6 16.5z"/><path d="M6 9h8v4.5H6z"/></svg>',
@@ -309,7 +311,7 @@ function pillSVG(appearance) {
 
 /* ---------- rendering ---------- */
 const KICKER = { ok_now: "Good to take", wrong_time: "Not right now", already_taken: "Already taken", not_on_list: "Not on your list",
-  dose_mismatch: "Different strength", avoid: "Don't take this", unclear: "Can't read it" };
+  dose_mismatch: "Different strength", avoid: "Don't take this", check_first: "Check first", unclear: "Can't read it" };
 
 
 const gCap = (s) => { s = String(s || ""); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; };
@@ -380,9 +382,12 @@ function render(d) {
     not_on_list: "This isn't on your medicine list",
     dose_mismatch: "Set this bottle aside",
     avoid: `Please don't take ${idf.name ? idf.name.toLowerCase() : "this"}`,
+    check_first: "Check with the pharmacist first",
     unclear: "I couldn't read the label",
   }[verdict];
-  let sub = verdict === "unclear" ? "Hold the label up to the camera, in good light." : (idName ? `I see ${idName}` : "");
+  let sub = verdict === "unclear" ? "Please don't take it yet. Hold the label up to the camera, in good light."
+    : verdict === "check_first" ? (arr(d.reasons).length ? `I can't be sure: ${arr(d.reasons).join("; ")}.` : "I can't be sure from this photo.")
+    : (idName ? `I see ${idName}` : "");
   if (verdict === "dose_mismatch") {
     sub = idf.strength && med && med.dose ? `This bottle is ${idf.strength}, but your plan is now ${med.dose}.` : "The strength doesn't match your current plan.";
   }

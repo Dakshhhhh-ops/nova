@@ -7,8 +7,8 @@ Copy each section into the matching Devpost field.
 - Code: https://github.com/Dakshhhhh-ops/nova
 
 ## Tracks
-- Track: **Alexa+** (self-hosted MCP server over Streamable HTTP, plus a simulated Alexa+ experience in a web app)
-- Track: **Ring** (Nova calls the Ring Partner API at runtime: `users/me`, `devices`, device `status`, and event `history` for doorbell presses and people at the door; plus signed Webhook v1.1 events). *If Devpost allows only one track, choose Alexa+; Ring is part of the same project either way.*
+- Track: **Alexa+** (self-hosted MCP server over Streamable HTTP, plus a simulated Alexa+ experience in a web app). One track prize per project, and Alexa+ is where Nova is strongest.
+- Ring is part of the Alexa+ entry, not a separate one: Nova calls the Ring Partner API at runtime (`users/me`, `devices`, device `status`, event `history`) and takes signed Webhook v1.1 events, so the front door becomes a care signal.
 - Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova models, including multimodal; Amazon Polly)
 - Mini challenge: **Open Source** (`mcp-apps-lite-host`, see below)
 
@@ -28,7 +28,7 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 
 **Running it for real.** Nova handles health data, so a real deployment runs in the care organization's own AWS account under a Business Associate Addendum, using HIPAA-eligible services only (Amazon Bedrock, Amazon Polly, Amazon ECS/RDS), with TLS everywhere and KMS-encrypted storage. "Minimum necessary" is already in the design: identity from the token, sharing controlled by Rose, consent before symptoms are shared, approval before plan changes, and an audit trail of who logged or handled what. Details are in the README.
 
-**How it works.** Nova is a self-hosted MCP server (official Python SDK 2.3, Streamable HTTP, MCP 2026-07-28 with 2025-11-25 compatibility), the open standard Alexa+ uses for integrations. It has 25 tools, 8 resources (including `nova://announcements`, the queue Nova uses to speak first), 2 prompts and 5 MCP Apps views that render on the Echo Show screens. Each Echo connects with a bearer token for one person, so the same tool answers differently for Rose and for Maya. A simulated Alexa+ (two Echo Shows and a Ring doorbell in the browser) runs an agent on Amazon Nova through the Bedrock Converse API, delivers Nova's announcements live, and speaks with Amazon Polly. A time-lapse clock plays a whole day in a minute. Deterministic rules find the patterns (so every insight is testable and cites evidence); Amazon Nova reads the images and writes the language. Account linking uses standard OAuth 2.1 (dynamic client registration, PKCE), so any MCP client can link a person's account. 68 tests and CI.
+**How it works.** Nova is a self-hosted MCP server (official Python SDK 2.3, Streamable HTTP, MCP 2026-07-28 with 2025-11-25 compatibility), the open standard Alexa+ uses for integrations. It has 25 tools, 8 resources (including `nova://announcements`, the queue Nova uses to speak first), 2 prompts and 5 MCP Apps views that render on the Echo Show screens. Each Echo connects with a bearer token for one person, so the same tool answers differently for Rose and for Maya. A simulated Alexa+ (two Echo Shows and a Ring doorbell in the browser) runs an agent on Amazon Nova through the Bedrock Converse API, delivers Nova's announcements live, and speaks with Amazon Polly. A time-lapse clock plays a whole day in a minute. Deterministic rules find the patterns (so every insight is testable and cites evidence); Amazon Nova reads the images and writes the language. Account linking uses standard OAuth 2.1 (dynamic client registration, PKCE), so any MCP client can link a person's account. 81 tests and CI.
 
 **Built with:** Python, MCP Python SDK 2.3 (MCPServer, Streamable HTTP, MCP Apps extension, resolvers/elicitation, OAuth 2.1 authorization server with dynamic registration and PKCE), Amazon Bedrock (Converse API, tool use, image input) with Amazon Nova 2 Lite, Amazon Polly (generative voice), FastAPI, SQLite, vanilla JS (Web Speech API, getUserMedia, WebAudio), Docker.
 
@@ -52,7 +52,7 @@ Each tool we used, answered the same way: what we used it for, what worked, what
 
 **MCP (spec + Python SDK 2.3)**
 - *Used for:* the whole Alexa+ integration: MCPServer, Streamable HTTP, structured output, tool annotations, icons, resources, prompts, MCP Apps, elicitation through resolvers, and an OAuth 2.1 authorization server (dynamic registration, PKCE, RFC 9728 metadata).
-- *Worked well:* A lot comes out of the box: structured output from type hints, protected-resource and authorization-server metadata from one `AuthSettings`, a DNS-rebinding guard, and an in-process `Client(server)` that made 68 tests easy to write. The migration error for `mcp.server.fastmcp` points straight to the guide.
+- *Worked well:* A lot comes out of the box: structured output from type hints, protected-resource and authorization-server metadata from one `AuthSettings`, a DNS-rebinding guard, and an in-process `Client(server)` that made 81 tests easy to write. The migration error for `mcp.server.fastmcp` points straight to the guide.
 - *Needs work:* Three behaviors cost real time (see the friction log): Apps tools registered after the server is built silently don't appear; `ctx.elicit()` fails on 2026-07-28 connections with an error that doesn't mention resolvers; and a resolver that elicits throws for clients without the elicitation capability unless you check `client_capabilities` yourself.
 - *Onboarding:* Good once you find the v2 docs. The rename from FastMCP to MCPServer and the new resolver model needed source reading.
 - *Would build with it again:* Yes.

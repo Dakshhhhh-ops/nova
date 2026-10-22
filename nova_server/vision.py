@@ -93,6 +93,34 @@ def _strength(s: str | None) -> str:
     return f"{m.group(1).replace(',', '')} {m.group(2)}" if m else ""
 
 
+# words a label may add to the plan's drug name without making it a different product
+_SALT_WORDS = {"hcl", "hydrochloride", "sodium", "potassium", "calcium", "magnesium", "tablet", "tablets", "tab", "tabs",
+               "oral", "usp", "generic"}
+# words that do make it a different product: combinations and modified-release forms
+_PRODUCT_WORDS = {"er", "xr", "xl", "sr", "cr", "dr", "la", "odt", "hctz", "hydrochlorothiazide", "and", "plus", "with"}
+SAFE_CONFIDENCE = 0.8   # below this, Nova never says "take it"
+READ_CONFIDENCE = 0.5   # below this, Nova says it can't read the label
+
+
+def exact_product(label_name: str | None, plan_name: str) -> bool:
+    """True when the label names the same product as the plan (allowing salt words), not a combination or ER form."""
+    words = [w for w in re.split(r"[^a-z0-9]+", (label_name or "").lower()) if w]
+    plan = [w for w in re.split(r"[^a-z0-9]+", plan_name.lower()) if w]
+    if not words or not plan or words[:len(plan)] != plan:
+        return False
+    extra = [w for w in words[len(plan):] if not re.fullmatch(r"\d+(mg|mcg|g|iu|ml)?|mg|mcg|g|iu|ml", w)]
+    return all(w in _SALT_WORDS for w in extra) and not any(w in _PRODUCT_WORDS for w in extra)
+
+
+def _confidence(data: dict[str, Any], by: str) -> float:
+    c = data.get("confidence")
+    try:
+        c = float(c)
+    except (TypeError, ValueError):
+        return 1.0 if "fixture" in by.lower() else 0.6  # a model that doesn't say how sure it is: treat as unsure
+    return c / 100 if c > 1 else c
+
+
 def match_medication(store: Store, person_id: str, name: str | None) -> dict[str, Any] | None:
     n = _norm(name)
     if not n:
@@ -115,9 +143,13 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
     due_now = [d for d in today if d["status"] in ("due", "missed")]
     due_view = [{"name": d["name"], "appearance": d["appearance"], "time_label": d["time_label"], "status": d["status"]} for d in due_now]
     base = {"identified": data or {}, "matched_med": None, "due_now": due_view, "generated_by": by}
-    if not data or not data.get("name"):
-        return {**base, "verdict": "unclear", "advice": "Hold the label closer to the camera, in good light.",
-                "speech": "I couldn't read that label. Can you hold it a little closer to the camera?"}
+    confidence = _confidence(data or {}, by)
+    base["confidence"] = round(confidence, 2)
+    if not data or not data.get("name") or confidence < READ_CONFIDENCE:
+        return {**base, "verdict": "unclear", "advice": "Don't take anything from this bottle until the label is checked. "
+                                                         "Hold it closer to the camera, in good light, or ask the pharmacist.",
+                "speech": f"I can't read that label clearly, {name}, so please don't take it yet. "
+                          "Hold it a little closer to the camera, or ask Maya or the pharmacist."}
     med = match_medication(store, elder["id"], data.get("name"))
     avoid = avoid_note(store, elder["id"], data.get("name") or "")
     if avoid and not med:
@@ -153,6 +185,20 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
     if open_now:
         d = open_now[0]
         food = " with something to eat" if med.get("with_food") else ""
+        # "take it" only when Nova is sure: the exact product, the strength read and matching, a confident read
+        reasons = []
+        if not exact_product(data.get("name"), med["name"]):
+            reasons.append(f"the label says {data['name']}, not just {med['name']}")
+        if not label_strength:
+            reasons.append("I can't read the strength")
+        if confidence < SAFE_CONFIDENCE:
+            reasons.append("the photo isn't clear enough to be sure")
+        if reasons:
+            return {**base, "verdict": "check_first", "reasons": reasons,
+                    "advice": f"Check this bottle with the pharmacist or Maya before taking it: {'; '.join(reasons)}.",
+                    "speech": f"That looks like your {med['name'].lower()}, {name}, but I can't be sure from this photo. "
+                              "Please check it with Maya or the pharmacist before you take it.",
+                    "more": f"Why: {'; '.join(reasons)}."}
         return {**base, "verdict": "ok_now", "advice": f"Take one now{food}, then say 'I took it'.",
                 "speech": f"Yes, that's your {med['name']} {med['dose']} for {med['purpose']}, and it's due now. "
                           f"Take one{food}, then tell me when you're done."}

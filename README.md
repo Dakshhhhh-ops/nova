@@ -25,6 +25,13 @@ Nova is a self-hosted **MCP server** (Streamable HTTP, MCP 2026-07-28, compatibl
 
 Voice is the right interface: no app to learn, no screen to unlock, and Alexa is already in the kitchen.
 
+## Who would ship this
+Nova is an integration a care brand hosts and Alexa+ calls, so it has natural owners:
+- **Home-care agencies** (Grace's employer) offer Nova to clients' families: aides see the plan and log visits, and families get the briefing and escalations.
+- **Medicare Advantage and Part D plans** are scored on medication adherence for diabetes drugs, RAS antagonists (such as lisinopril) and statins: Rose's exact three prescriptions. Reminders, the escalation ladder and refill nudges move those numbers.
+- **Pharmacies** use the refill flow and the reconciliation after a visit, which is where dose errors happen.
+- **Families directly**, through Alexa+ account linking, with the older adult in control of what's shared.
+
 ## What Nova does
 
 ### 1. It speaks first: the proactive care engine

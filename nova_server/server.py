@@ -25,7 +25,7 @@ from mcp.server.apps import Apps
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.elicitation import AcceptedElicitation, ElicitationResult
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.resolve import Elicit, Resolve
 from mcp.server.mcpserver.prompts.base import UserMessage
 from mcp.server.mcpserver.resources import Resource
@@ -445,14 +445,18 @@ def primary_caregiver() -> dict[str, Any] | None:
     return next((p for p in caregivers if p["relation"] == "daughter"), caregivers[0] if caregivers else None)
 
 
-def ask_before_sharing(how_are_you_feeling: str):
+def ask_before_sharing(how_are_you_feeling: str, ctx: Context):
     """Resolver: ask the elder before the circle hears about a concerning symptom.
 
     Runs before the tool body. Returning `Elicit` makes the SDK ask the user: an
     `InputRequiredResult` round trip on 2026-07-28 connections, or a standard
     `elicitation/create` request on 2025-11-25 connections (Alexa+). It must be
-    deterministic, because it re-runs on every round.
+    deterministic, because it re-runs on every round. Clients that can't ask (no elicitation
+    capability) skip the question, and the symptom stays private by default.
     """
+    caps = ctx.client_capabilities
+    if caps is None or getattr(caps, "elicitation", None) is None:
+        return None
     me = caller()
     if me["role"] != "elder" or ins.red_flags(how_are_you_feeling):
         return None  # caregivers don't need consent; emergencies don't wait for it

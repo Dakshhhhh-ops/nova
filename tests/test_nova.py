@@ -166,3 +166,10 @@ async def test_http_consent_flow(http_server):
     assert asked and "Maya" in asked[0]
     assert out["shared_with"]
     assert "let Maya" in out["speech"]
+
+
+async def test_checkin_without_elicitation_support_still_works():
+    # A client that can't ask questions (no elicitation capability) must not get an error;
+    # the symptom is recorded and stays private by default.
+    out = await call("daily_checkin", {"how_are_you_feeling": "I'm a bit dizzy this morning"})
+    assert out["checkin"] and out["shared_with"] == []

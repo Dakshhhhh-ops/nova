@@ -370,6 +370,44 @@ export function createSky(options = {}) {
       uniform float uSunVis, uMoonVis, uNight, uStars, uTime, uAspect, uTwinkle, uFlat;
       varying vec2 vUv;
       float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+      vec2 rot(vec2 v, float a){ float c = cos(a), s = sin(a); return vec2(c * v.x - s * v.y, s * v.x + c * v.y); }
+      // One layer of stars on a jittered grid: soft gaussian cores, a faint halo on bright ones,
+      // uneven scintillation (two incommensurate sines) and a warm-to-cool tint.
+      vec3 starLayer(vec2 p, float scale, float keep, float seed, float t, float gain){
+        vec2 g = p * scale;
+        vec2 id = floor(g);
+        float h = hash(id + seed);
+        if (h < keep) return vec3(0.0);
+        vec2 f = fract(g) - 0.5;
+        vec2 off = vec2(hash(id + seed + 1.7), hash(id + seed + 3.1)) - 0.5;
+        float d = length(f - off * 0.7);
+        float b = fract(h * 113.0);
+        float core = exp(-d * d * mix(260.0, 110.0, b));
+        float halo = exp(-d * 9.0) * 0.06 * b * b;
+        float tw = 0.72 + 0.28 * sin(t * (1.3 + h * 3.1) + h * 91.0) * sin(t * (0.41 + h * 0.8) + h * 17.0);
+        tw = mix(1.0, tw, uTwinkle);
+        vec3 tint = mix(vec3(1.0, 0.88, 0.76), vec3(0.78, 0.87, 1.0), fract(h * 7.31));
+        return tint * (core + halo) * tw * (0.45 + 0.95 * b) * gain;
+      }
+      // A rare shooting star: about two in three 10-second windows, a short streak in the upper sky.
+      float meteor(vec2 p, float t){
+        float period = 10.0;
+        float n = floor(t / period);
+        float u = t - n * period;
+        float life = 1.15;
+        if (u > life || hash(vec2(n, 7.3)) < 0.35) return 0.0;
+        float k = u / life;
+        vec2 a = vec2((hash(vec2(n, 1.3)) - 0.5) * uAspect * 0.75, 0.14 + 0.28 * hash(vec2(n, 2.9)));
+        vec2 dir = normalize(vec2(hash(vec2(n, 4.1)) > 0.5 ? 1.0 : -1.0, -0.38 - 0.2 * hash(vec2(n, 5.7))));
+        vec2 head = a + dir * k * 0.55;
+        vec2 rel = p - head;
+        float along = dot(rel, -dir);
+        float len = 0.15;
+        if (along < 0.0 || along > len) return 0.0;
+        float across = abs(rel.x * dir.y - rel.y * dir.x);
+        float trail = 1.0 - along / len;
+        return smoothstep(0.0024, 0.0, across) * trail * trail * sin(3.14159 * k);
+      }
       void main(){
         float y = vUv.y;
         vec3 col = mix(uHor, uMid, smoothstep(0.0, 0.58, y));
@@ -395,18 +433,16 @@ export function createSky(options = {}) {
           bloomOk = max(bloomOk, mdisc * uMoonVis * 0.6);
           // stars
           if (uStars * uNight > 0.01) {
-            vec2 g = p * 64.0;
-            vec2 id = floor(g);
-            vec2 f = fract(g) - 0.5;
-            float h = hash(id);
-            if (h > 0.986) {
-              vec2 off = vec2(hash(id + 1.7), hash(id + 3.1)) - 0.5;
-              float sd = length(f - off * 0.6);
-              float tw = mix(1.0, 0.55 + 0.45 * sin(uTime * (0.8 + h * 2.5) + h * 91.0), uTwinkle);
-              float size = 0.06 + 0.06 * fract(h * 37.0);
-              float s = smoothstep(size, 0.0, sd) * tw * uNight * smoothstep(0.12, 0.5, y);
-              col += vec3(0.86, 0.92, 1.0) * s * (0.6 + 0.9 * fract(h * 113.0));
-            }
+            // The sky turns slowly around a pole above the frame; nearer layers move a little faster.
+            float t = uTime;
+            vec2 pole = vec2(0.0, 1.35);
+            float spin = t * uTwinkle;
+            vec3 stars = starLayer(rot(p - pole, spin * 0.0016) + pole, 118.0, 0.972, 11.0, t, 0.55)
+                       + starLayer(rot(p - pole, spin * 0.0024) + pole, 66.0, 0.984, 29.0, t, 0.95)
+                       + starLayer(rot(p - pole, spin * 0.0034) + pole, 34.0, 0.991, 53.0, t, 1.35);
+            float fade = uNight * smoothstep(0.12, 0.5, y);
+            col += stars * fade;
+            col += vec3(0.9, 0.95, 1.0) * meteor(p, t) * 1.6 * fade * uTwinkle;
           }
         }
         // break up banding

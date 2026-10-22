@@ -49,13 +49,13 @@ class RingLive {
       const s = await call("/api/status");
       const ring = isObj(s?.ring) ? s.ring : {};
       if (!ring.linked) {
-        this.body.innerHTML = `<span class="rl-muted">No live Ring token on this server (Playground tokens last 30 minutes). Sync shows the last real sync, labelled Recorded.</span>`;
+        this.body.innerHTML = `<span class="rl-muted">No Ring token on this server. Sync shows the last real sync.</span>`;
         return;
       }
       if (Array.isArray(ring.devices) && ring.devices.length) {
         this.render({ ok: ring.ok, source: "live", devices: ring.devices, at: ring.last_sync }, "Last sync");
       } else {
-        this.body.innerHTML = `<span class="rl-muted">Ring account linked. Press Sync to read it.</span>`;
+        this.body.innerHTML = `<span class="rl-muted">Ring account linked. Press Sync to read it now.</span>`;
       }
     } catch { /* the status call is best effort */ }
   }
@@ -67,7 +67,7 @@ class RingLive {
     try {
       const res = await call("/api/ring/sync", { method: "POST" });
       if (res?.ok) this.render(res, "Live Ring API");
-      else if (isObj(res?.recorded)) this.render({ ...res.recorded, calls: res.calls, error: res.error, hint: res.hint }, "Recorded (live call failed)");
+      else if (isObj(res?.recorded)) this.render({ ...res.recorded, calls: res.calls, error: res.error, hint: res.hint }, "Recorded · live call failed");
       else this.renderError(res);
     } catch (err) {
       this.renderError({ error: err.message });
@@ -79,7 +79,7 @@ class RingLive {
   }
 
   render(res, label) {
-    const live = label === "Live Ring API";
+    const live = label === "Live Ring API" || label === "Live";
     this.src.textContent = label;
     this.src.className = `rl-src ${live ? "is-live" : "is-recorded"}`;
     this.src.hidden = false;

@@ -65,6 +65,8 @@ def structured_of(result: Any) -> dict[str, Any]:
 
 
 MAX_SPOKEN_CHARS = 420
+REPEAT = re.compile(r"^\s*(alexa,?\s*)?(can you |could you |please )?(repeat( that| it)?|say (that|it) again|"
+                    r"what did you (just )?say|pardon|come again|i didn'?t (catch|hear) (that|you))\b", re.I)
 
 
 def for_model(data: dict[str, Any], has_ui: bool) -> dict[str, Any]:
@@ -227,6 +229,16 @@ class Agent:
             await emit({"type": "trace", "device": device.id, "item": item})
 
         await push({"kind": "user", "text": text})
+        if REPEAT.search(text):
+            # Older listeners often ask Alexa to repeat itself: say the last thing again, word for word.
+            last = next((m["text"] for m in reversed(device.history) if m["role"] == "assistant" and m.get("text")), "")
+            last = last.replace("(Nova announcement) ", "")
+            if last:
+                device.history.append({"role": "user", "text": text})
+                device.history.append({"role": "assistant", "text": last})
+                await push({"kind": "reply", "text": last})
+                return {"reply": last, "cards": [], "trace": trace, "brain": "repeat",
+                        "latency_ms": int((time.perf_counter() - t_start) * 1000)}
         device.history.append({"role": "user", "text": text})
         brain = self.brain_for(device)
         system = system_prompt(device)

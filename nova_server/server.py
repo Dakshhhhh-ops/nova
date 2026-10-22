@@ -964,6 +964,22 @@ def get_vitals(days: Annotated[int, Field(description="How far back", ge=1, le=6
             "readings": [{"at": r["at"], "bp": f"{r['systolic']}/{r['diastolic']}", "pulse": r["pulse"]} for r in rows]}
 
 
+@mcp.tool(
+    name="visit_checklist",
+    title="Visit checklist",
+    description=("For the home aide (or family visiting): 'What should I do at Rose's today?' Missed doses, recent "
+                 "symptoms to check, refills to pick up, low pill supply and the next appointment."),
+    annotations=READ,
+)
+def visit_checklist() -> dict[str, Any]:
+    me = caller()
+    elder = care_recipient(me)
+    if not shared(me, elder, "medications"):
+        return not_shared(elder, "medications")
+    items = engine.visit_checklist(elder, now())
+    return {"speech": f"For today's visit: {' '.join(items)}", "items": items}
+
+
 # ---------------------------------------------------------------------------
 # Refills
 # ---------------------------------------------------------------------------

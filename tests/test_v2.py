@@ -250,3 +250,12 @@ async def test_appointments_vitals_and_resolving_the_top_alert():
     await call("care_briefing", {}, as_person="maya")  # opens alerts
     res = await call("resolve_alert", {}, as_person="maya")
     assert res["alert"] and res["alert"]["status"] == "handled"
+
+
+async def test_grace_gets_a_visit_checklist_at_the_door():
+    eng = freeze_and_seed(at(10, 5))
+    out = eng.on_ring_event("ding", "grace")
+    assert any("blood pressure sitting and standing" in i for i in out["checklist"])
+    assert any(a["title"] == "Visit checklist" for a in server.store.announcements("grace"))
+    tool = await call("visit_checklist", {}, as_person="grace")
+    assert tool["items"] and tool["speech"].startswith("For today's visit")

@@ -325,6 +325,34 @@ class CareEngine:
                                         f"The {r['name']} refill is ready at {r['pharmacy']}.")
         return fired
 
+    # -- aide handoff -----------------------------------------------------------
+    def visit_checklist(self, elder: dict[str, Any], t: datetime) -> list[str]:
+        """What the home aide should know when she walks in, built from today's signals."""
+        name = elder["short_name"]
+        items: list[str] = []
+        today = ins.doses_for_day(self.store, elder["id"], t, t)
+        missed = [d for d in today if d["status"] in ("missed", "due")]
+        if missed:
+            items.append(f"{name} hasn't logged {speak_list([d['name'] + ' (' + d['time_label'] + ')' for d in missed[:3]])} yet.")
+        recent = self.store.checkins(elder["id"], t - timedelta(days=3))
+        dizzy = [c for c in recent if any(ins.symptom_family(s) == "dizziness" for s in c["symptoms"])
+                 or ins.symptom_family(c["utterance"] or "") == "dizziness"]
+        if dizzy:
+            items.append(f"She's reported dizziness {len(dizzy)} time{'s' if len(dizzy) > 1 else ''} in three days: "
+                         "please check her blood pressure sitting and standing.")
+        for r in self.store.refills(elder["id"]):
+            items.append(f"The {r['name']} refill is {'ready for pickup' if r['status'] == 'ready' else 'ordered'} "
+                         f"at {r['pharmacy']}.")
+        low = [m for m in self.store.medications(elder["id"]) if m.get("supply") is not None
+               and m["supply"] // max(1, len(m["times"])) <= 5]
+        if low:
+            items.append(f"Refill the pill organizer; {speak_list([m['name'] for m in low])} is running low.")
+        appt = next((a for a in self.store.appointments(elder["id"], t, t + timedelta(days=4))
+                     if not (a["provider"] and a["provider"].split()[0] in a["title"])), None)
+        if appt:
+            items.append(f"{appt['title']} with {appt['provider']} {ins.mid_sentence(ins.when_label(parse(appt['at']), t))}.")
+        return items or [f"Nothing unusual today. {name} is up to date."]
+
     # -- Ring (front door) ----------------------------------------------------
     def on_ring_event(self, kind: str, who: str | None) -> dict[str, Any]:
         """Turn a front-door event into a signal plus the right announcements."""
@@ -346,6 +374,12 @@ class CareEngine:
         if kind == "ding" and who == "grace":
             out["announced"] += self._fire(key + ":rose", elder["id"], "visitor", "Front door",
                                            "Grace is at the front door.")
+            aide = next((p for p in self.store.caregivers() if (p.get("relation") or "").startswith("home aide")), None)
+            if aide:
+                checklist = self.visit_checklist(elder, t)
+                out["checklist"] = checklist
+                out["announced"] += self._fire(key + f":{aide['id']}", aide["id"], "info", "Visit checklist",
+                                               f"Hi {aide['short_name']}. For today's visit: " + " ".join(checklist))
             for cg in self._family():
                 out["announced"] += self._fire(key + f":{cg['id']}", cg["id"], "visitor", "Grace arrived",
                                                f"Grace arrived at Mom's at {ins.time_label(t)}.")

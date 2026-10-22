@@ -95,3 +95,9 @@ def test_vision_ring_clock_and_notifications(sim):
 def test_reset(sim):
     assert sim.post("/api/reset").json()["ok"]
     assert sim.get("/api/timeline").json()["items"]
+
+
+def test_say_that_again(sim):
+    first = sim.post("/api/chat", json={"device": "kitchen", "text": "What did the doctor say about salt?"}).json()["reply"]
+    again = sim.post("/api/chat", json={"device": "kitchen", "text": "Can you say that again?"}).json()
+    assert again["reply"] == first and again["brain"] == "repeat"

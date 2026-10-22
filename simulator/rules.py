@@ -67,6 +67,8 @@ def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> 
     if re.search(r"refill|running (low|out)|order more|more (pills|medicine)", t) and not re.search(r"not now", t):
         m = re.search(r"(lisinopril|metformin|atorvastatin|vitamin d)", t)
         return _call("request_refill", medication=m.group(1) if m else "")
+    if re.search(r"visit checklist|what should i (do|check)|anything to do (at|for) (mom|rose)|before my visit", t):
+        return _call("visit_checklist")
     if re.search(r"notifications?\b", t):
         return _call("read_notifications")
     if role != "elder" and re.search(r"remind (mom|her) again", t):

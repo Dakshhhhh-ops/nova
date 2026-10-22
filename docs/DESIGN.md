@@ -61,3 +61,14 @@ Short, human, specific. Use the product's real lines and the real story (Rose, 8
 
 ## Accessibility
 WCAG AA contrast for text, visible focus rings (nova cyan), keyboard reachable controls, `aria-live` for spoken replies, reduced-motion fallback, and content readable with JavaScript disabled on the landing.
+
+## v2 direction: everything in 3D (WebGL)
+User references: https://www.arcmarumo.com/ and spinning extruded 3D logo loops.
+- **Real WebGL** (Three.js 0.170, shared library `simulator/static/three/nova3d.js`, API in `docs/THREE_API.md`), not CSS 3D tricks.
+- **The screen as a frame:** the whole experience sits inside a glass "Echo screen" frame (curved bezel vignette, glare streaks, faint scanlines, grain), with a mono HUD in the corners (household timecode, `SOURCE: ALEXA+`, status).
+- **Objects, not widgets:** Echo Show 8/15 and the Ring doorbell are 3D objects with glass, fabric and emissive light rings (bloom). Pill bottles carry their real labels, and the after-visit summary is a sheet of paper. Things are picked up and dropped (drag a bottle onto the Echo camera).
+- **Logo loop:** the Nova mark extruded in chrome or iridescent glass, slowly spinning, catching the light.
+- **Curved carousels:** moments of the day as physical cards on a 3D arc (drag, wheel, arrows).
+- **Sky dome:** the time-of-day gradients above, with a sun and moon on an arc and stars. The household clock drives it; drag the sun to scrub.
+- **Live UI on 3D glass:** device screens are real HTML mapped onto the 3D glass with CSS3D, so voice, cards and iframes stay functional.
+- **Fallback:** without WebGL, or with `?flat=1`, the 2D layout still works.

@@ -737,6 +737,17 @@ code { font-family: var(--mono); font-size: .86em; }
 .day.is-gl .skyline { height: 7vh; bottom: 40px; } /* sits on the frame's chin, not behind it */
 .day.is-gl .day-pin { position: relative; height: 100vh; height: 100svh; overflow: hidden; background: #2A2F55; }
 .day.is-gl .day-viewport { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+/* while the 3D day is still loading (fast scrollers): the same moments as a row of cards, never full-width blocks */
+@media (min-width: 900px) and (min-height: 560px) {
+  .gl .day:not(.is-gl):not(.is-h) { background: linear-gradient(180deg, #2A2F55 0%, #5A5E92 60%, #B98A86 100%); }
+  .gl .day:not(.is-gl):not(.is-h) .day-track { display: flex; align-items: center; gap: clamp(24px, 2.4vw, 44px); min-height: 100vh; min-height: 100svh;
+    padding: 12vh var(--pad); overflow-x: auto; scrollbar-width: none; }
+  .gl .day:not(.is-gl):not(.is-h) .day-track::-webkit-scrollbar { display: none; }
+  .gl .day:not(.is-gl):not(.is-h) .moment { flex: none; width: clamp(320px, 24vw, 420px); padding: 28px 28px 30px; border-radius: 24px;
+    background: rgba(11, 12, 18, .82); border: 1px solid rgba(244, 238, 230, .1); box-shadow: 0 40px 80px -40px rgba(0, 0, 0, .6); }
+  .gl .day:not(.is-gl):not(.is-h) .moment-intro { width: clamp(380px, 34vw, 560px); background: none; border: 0; box-shadow: none; padding: 0; }
+  .gl .day:not(.is-gl):not(.is-h) .moment-intro h2 { font-size: clamp(40px, 3.6vw, 64px); }
+}
 .day.is-gl .day-track { display: block; }
 .day.is-gl .moment:not(.moment-intro) { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .day.is-gl .moment-intro { position: absolute; left: max(var(--pad), (100vw - var(--maxw)) / 2); top: calc(var(--nav-h) + 4vh); width: min(520px, 36vw); padding: 0; background: none; transition: opacity .6s var(--ease), transform .8s var(--ease); }

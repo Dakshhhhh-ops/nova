@@ -52,6 +52,9 @@
     var fail = function (err) { console.warn('Nova WebGL layer unavailable:', err && err.message || err); if (window.__nova && window.__nova.flat) window.__nova.flat(); else document.documentElement.classList.remove('gl'); };
     var start = function () { if (started) return; started = true; import('/static/site/site3d.js').then(function (m) { return m.boot(); }).catch(fail); };
     var later = function () { setTimeout(start, 1500); };
+    // someone scrolling straight in shouldn't wait for the intro: start loading the 3D right away
+    var onScroll = function () { if (window.scrollY > 40) { removeEventListener('scroll', onScroll); start(); } };
+    addEventListener('scroll', onScroll, { passive: true });
     if (window.__nova && window.__nova.introAt) later(); else document.addEventListener('nova:intro', later, { once: true });
     setTimeout(start, 6000);
   }

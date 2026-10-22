@@ -1,0 +1,8 @@
+{
+  "data": {
+    "type": "users",
+    "id": "ava1.ring.account.ROSE7X2Q",
+    "attributes": {"first_name": "Rose", "last_name": "Alvarez", "email": "rose.alvarez@example.com"}
+  },
+  "meta": {"time": "2026-10-23T14:00:00Z"}
+}

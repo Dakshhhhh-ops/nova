@@ -137,6 +137,13 @@ CREATE TABLE IF NOT EXISTS signals (
     who TEXT,
     text TEXT
 );
+CREATE TABLE IF NOT EXISTS ring_events (   -- events pulled from the Ring Partner API (dedupe)
+    id TEXT PRIMARY KEY,           -- Ring's event id
+    device_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,      -- ding | motion.human | ...
+    at TEXT NOT NULL,
+    signal_id INTEGER
+);
 CREATE TABLE IF NOT EXISTS change_sets (
     id TEXT PRIMARY KEY,
     person_id TEXT NOT NULL,
@@ -255,7 +262,8 @@ class Store:
         with self._lock:
             for table in (
                 "people", "sharing", "medications", "dose_events", "checkins",
-                "messages", "appointments", "care_notes", "alerts", "announcements", "signals", "change_sets", "vitals", "refills",
+                "messages", "appointments", "care_notes", "alerts", "announcements", "signals", "ring_events", "change_sets", "vitals",
+                "refills",
             ):
                 self._db.execute(f"DELETE FROM {table}")
             self._db.execute("DELETE FROM sqlite_sequence")
@@ -562,6 +570,13 @@ class Store:
             "INSERT INTO signals (person_id, at, source, kind, who, text) VALUES (?, ?, ?, ?, ?, ?)",
             (person_id, iso(at or now()), source, kind, who, text),
         )
+
+    def ring_event_seen(self, event_id: str) -> bool:
+        return bool(self.q("SELECT 1 FROM ring_events WHERE id = ?", (event_id,)))
+
+    def mark_ring_event(self, event_id: str, device_id: str, event_type: str, at: datetime, signal_id: int | None) -> None:
+        self.x("INSERT OR IGNORE INTO ring_events (id, device_id, event_type, at, signal_id) VALUES (?, ?, ?, ?, ?)",
+               (event_id, device_id, event_type, iso(at), signal_id))
 
     def signals(self, person_id: str, since: datetime) -> list[dict[str, Any]]:
         return self.q("SELECT * FROM signals WHERE person_id = ? AND at >= ? ORDER BY at", (person_id, iso(since)))

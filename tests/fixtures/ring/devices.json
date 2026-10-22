@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "type": "devices",
+      "id": "ava1.ring.device.FRONTDOOR01",
+      "attributes": {"name": "Front Door", "description": "Video Doorbell"},
+      "relationships": {
+        "location": {"links": {"related": "/v1/devices/ava1.ring.device.FRONTDOOR01/location"}},
+        "status": {"links": {"related": "/v1/devices/ava1.ring.device.FRONTDOOR01/status"}},
+        "configurations": {"links": {"related": "/v1/devices/ava1.ring.device.FRONTDOOR01/configurations"}},
+        "capabilities": {"links": {"related": "/v1/devices/ava1.ring.device.FRONTDOOR01/capabilities"}}
+      }
+    },
+    {
+      "type": "devices",
+      "id": "ava1.ring.device.BACKYARD02",
+      "attributes": {"name": "Backyard Cam", "description": "Stick Up Cam"},
+      "relationships": {
+        "status": {"links": {"related": "/v1/devices/ava1.ring.device.BACKYARD02/status"}}
+      }
+    }
+  ],
+  "meta": {"time": "2026-10-23T14:00:00Z"}
+}

@@ -303,7 +303,17 @@ async def status() -> dict[str, Any]:
         "mcp": {"url": MCP_URL, "connected": state["connected"], "error": state["error"],
                 "server_name": state["server"].get("title") or state["server"].get("name"), **state["server"]},
         "devices": [d.public() for d in DEVICES.values()],
+        "ring": await ring_link_status(),
     }
+
+
+async def ring_link_status() -> dict[str, Any]:
+    """Whether a real Ring account is linked on the Nova server (RING_ACCESS_TOKEN or a refresh token)."""
+    try:
+        async with httpx.AsyncClient(timeout=3) as http:
+            return (await http.get(f"{MCP_BASE}/integrations/ring/status")).json()
+    except Exception:
+        return {"linked": False}
 
 
 class ChatIn(BaseModel):
@@ -515,6 +525,27 @@ async def ring_event(body: RingIn) -> dict[str, Any]:
         "kind": "ring", "at": data.get("signal", {}).get("at"), "text": data.get("signal", {}).get("text"),
         "announced": data.get("announced", [])}})
     await hub.emit({"type": "circle", "item": {"ring": True}})
+    return data
+
+
+@app.post("/api/ring/sync")
+async def ring_sync() -> dict[str, Any]:
+    """"Sync from Ring": Nova calls the Ring Partner API (account, devices, status, event history) right now.
+    Every HTTP call Nova made to api.amazonvision.com shows in the inspector."""
+    async with httpx.AsyncClient(timeout=45) as http:
+        r = await http.post(f"{MCP_BASE}/integrations/ring/sync", headers={"x-nova-ring-secret": RING_SECRET})
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, r.text[:200])
+    data = r.json()
+    at = (HOUSEHOLD["now"] or household_now()).isoformat()
+    for c in data.get("calls", []):
+        await hub.emit({"type": "trace", "device": "kitchen", "item": {"kind": "ring_api", "at": at, **c}})
+    await hub.emit({"type": "trace", "device": "kitchen", "item": {
+        "kind": "ring_sync", "at": at, "ok": data.get("ok"), "linked": data.get("linked", True),
+        "error": data.get("error"), "hint": data.get("hint"), "account": data.get("account"),
+        "devices": data.get("devices", []), "imported": data.get("imported", []), "skipped": data.get("skipped", 0)}})
+    if data.get("imported"):
+        await hub.emit({"type": "circle", "item": {"ring": True}})
     return data
 
 

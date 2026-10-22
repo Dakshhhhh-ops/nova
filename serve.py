@@ -79,6 +79,7 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     server.engine.start()
+    server.ring_api.start_poller(server.store, server.engine)
     print(f"Nova on one port: {PUBLIC_URL}  (story /, live demo /live, MCP /mcp)")
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info", proxy_headers=True, forwarded_allow_ips="*")
 

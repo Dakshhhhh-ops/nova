@@ -17,7 +17,8 @@ import json
 import logging
 import os
 import re
-from datetime import timedelta
+import threading
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -36,7 +37,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from . import insights as ins
-from . import ring
+from . import ring, ring_api
 from . import speech as speech_mod
 from . import vision
 from .engine import CareEngine
@@ -204,6 +205,7 @@ def ui_tool(resource_uri: str, visibility: tuple[str, ...] = ("model", "app"), *
 
 
 READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
+READ_RING = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True)
 WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
 NOTIFY = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True)
 
@@ -918,7 +920,8 @@ def timeline(hours: int = 48) -> list[dict[str, Any]]:
                       "severity": a["severity"], "status": a["status"]})
     for elder in store.elders():
         for sig in store.signals(elder["id"], since):
-            items.append({"at": sig["at"], "kind": "ring", "who": "Ring · Front door", "text": sig["text"]})
+            items.append({"at": sig["at"], "kind": "ring", "signal": sig["kind"], "who": "Ring · Front door",
+                          "text": sig["text"]})
     for a in store.q("SELECT * FROM announcements WHERE due_at >= ? AND due_at <= ? AND kind IN "
                      "('caregiver_escalation', 'care_plan_change', 'dose_reminder', 'dose_followup', 'wellness_check')",
                      (iso(since), iso(t))):
@@ -1226,28 +1229,61 @@ def snooze_reminder(minutes: Annotated[int, Field(description="Minutes from now"
 @mcp.tool(
     name="recent_activity",
     title="Recent activity at home",
-    description=("Caregivers: 'When did Mom last open the door?', 'Has Grace been by?'. Front-door events (Ring), "
-                 "doses she logged and check-ins over the last hours."),
-    annotations=READ,
+    description=("Caregivers: 'When did Mom last open the door?', 'Has Grace been by?'. Front-door events (Ring: "
+                 "pulled fresh from the Ring Partner API when it's linked), doses she logged and check-ins."),
+    annotations=READ_RING,
 )
 @spoken
-def recent_activity(hours: Annotated[int, Field(description="How far back", ge=1, le=168)] = 24) -> dict[str, Any]:
+async def recent_activity(hours: Annotated[int, Field(description="How far back", ge=1, le=168)] = 24) -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
+    ring_note = await in_thread(ring_sync_if_stale)
     t = now()
     items = [i for i in timeline(hours) if i["kind"] in ("ring", "dose", "checkin")]
     if not items:
-        return {"speech": f"I haven't seen any activity at {elder['short_name']}'s in the last {hours} hours.", "items": []}
+        return {"speech": f"I haven't seen any activity at {elder['short_name']}'s in the last {hours} hours.", "items": [],
+                "ring": ring_note}
     parts = []
-    ring = [i for i in items if i["kind"] == "ring"]
+    ring = [i for i in items if i["kind"] == "ring" and i.get("signal") not in ("device_offline", "device_online")]
     if ring:
         r = ring[0]
         parts.append(f"Last front-door activity: {r['text']}, "
                      f"{ins.mid_sentence(ins.when_label(parse(r['at']), t))}.")
+    offline = next((i for i in items if i.get("signal") == "device_offline"), None)
+    if offline:
+        parts.append(f"Ring says the {offline['text']}.")
     doses = [i for i in items if i["kind"] == "dose"]
     if doses:
         parts.append(f"Last dose logged: {doses[0]['text']}, {ins.mid_sentence(ins.when_label(parse(doses[0]['at']), t))}.")
-    return {"speech": " ".join(parts) or f"{len(items)} events in the last {hours} hours.", "items": items[:20]}
+    return {"speech": " ".join(parts) or f"{len(items)} events in the last {hours} hours.", "items": items[:20],
+            "ring": ring_note}
+
+
+def ring_sync_if_stale(max_age_s: float = 300) -> dict[str, Any] | None:
+    """What Ring last reported. The first time, Nova asks Ring before answering; after that a stale result is
+    refreshed in the background, so a voice reply never waits on four Ring round trips. None when not linked."""
+    api = ring_api.RingAPI.from_env()
+    if api is None:
+        return None
+    last = ring_api.last_sync()
+    if not last.get("at"):
+        try:
+            res = ring_api.sync(store, engine, api)
+        finally:
+            api.close()
+    else:
+        res = last.get("result") or {}
+        if (datetime.now() - parse(last["at"])).total_seconds() >= max_age_s:
+            def refresh() -> None:
+                try:
+                    ring_api.sync(store, engine, api)
+                finally:
+                    api.close()
+            threading.Thread(target=refresh, daemon=True, name="ring-refresh").start()
+        else:
+            api.close()
+    return {"source": "Ring Partner API", "ok": res.get("ok"), "imported": len(res.get("imported") or []),
+            "devices": [{"name": d.get("name"), "online": d.get("online")} for d in res.get("devices") or []]}
 
 
 # ---------------------------------------------------------------------------
@@ -1401,6 +1437,32 @@ async def ring_webhook(request: Request) -> JSONResponse:
         return JSONResponse({"error": "invalid JSON"}, status_code=400)
     hint = request.headers.get("x-nova-demo-who") if DEMO_ROUTES else None
     return JSONResponse(ring.handle(store, engine, payload, hint_who=hint))
+
+
+@mcp.custom_route("/integrations/ring/status", methods=["GET"])
+async def ring_status(request: Request) -> JSONResponse:
+    """Is a Ring account linked, and when did Nova last read it?"""
+    last = ring_api.last_sync()
+    res = last.get("result") or {}
+    return JSONResponse({"linked": ring_api.auth_mode() is not None, "mode": ring_api.auth_mode(),
+                         "api": ring_api.API_BASE, "last_sync": last.get("at"), "ok": res.get("ok"),
+                         "devices": res.get("devices", [])})
+
+
+@mcp.custom_route("/integrations/ring/sync", methods=["POST"])
+async def ring_sync(request: Request) -> JSONResponse:
+    """Pull the Ring account, devices, status and event history now (the simulator's "Sync from Ring")."""
+    if request.headers.get("x-nova-ring-secret") != RING_SECRET:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    api = ring_api.RingAPI.from_env()
+    if api is None:
+        return JSONResponse({"ok": False, "linked": False, "calls": [],
+                             "error": "Ring isn't linked: set RING_ACCESS_TOKEN (Ring Developer Playground → "
+                                      "Generate Token) or RING_REFRESH_TOKEN with RING_CLIENT_ID/RING_CLIENT_SECRET."})
+    try:
+        return JSONResponse(await in_thread(ring_api.sync, store, engine, api))
+    finally:
+        api.close()
 
 
 async def _json(request: Request) -> dict[str, Any]:

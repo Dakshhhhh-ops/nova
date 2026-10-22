@@ -356,13 +356,18 @@ class CareEngine:
         return items or [f"Nothing unusual today. {name} is up to date."]
 
     # -- Ring (front door) ----------------------------------------------------
-    def on_ring_event(self, kind: str, who: str | None) -> dict[str, Any]:
-        """Turn a front-door event into a signal plus the right announcements."""
+    def on_ring_event(self, kind: str, who: str | None, *, at: datetime | None = None,
+                      announce: bool = True) -> dict[str, Any]:
+        """Turn a front-door event into a signal plus the right announcements.
+
+        `at` is when it happened (events pulled from Ring's history API arrive late); `announce=False` records
+        it on the timeline without speaking: nobody needs "Grace is at the door" an hour after she left.
+        """
         elders = self.store.elders()
         if not elders:
             return {"ok": False}
         elder = elders[0]
-        t = now()
+        t = at or now()
         who = (who or "unknown").lower()
         label = {"grace": "Grace", "delivery": "A delivery driver", "rose": elder["short_name"], "unknown": "Someone"}.get(who, who.title())
         text = {
@@ -372,6 +377,8 @@ class CareEngine:
         }.get(kind, f"Front door: {kind}")
         sid = self.store.add_signal(elder["id"], "ring", kind, who, text, at=t)
         out = {"ok": True, "signal": {"id": sid, "at": iso(t), "kind": kind, "who": who, "text": text}, "announced": []}
+        if not announce:
+            return out
         key = f"ring:{sid}"
         if kind == "ding" and who == "grace":
             out["announced"] += self._fire(key + ":rose", elder["id"], "visitor", "Front door",

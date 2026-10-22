@@ -111,7 +111,7 @@ sequenceDiagram
 ```
 In production the `/link` step is Login with Amazon or Amazon Cognito. Codes are single use, refresh tokens rotate, and tokens can be revoked. The demo tokens (`nova-demo-rose`, …) still work for the simulator.
 
-## 6. The front door (Ring Partner API webhook)
+## 6. The front door (Ring Partner API: pull and push)
 ```mermaid
 sequenceDiagram
   autonumber
@@ -128,6 +128,8 @@ sequenceDiagram
   E-->>M: "Grace arrived at Mom's at 9:58."
   N-->>R: 200 (well within Ring's 5 s)
 ```
+**Pull, too.** `nova_server/ring_api.py` calls the Ring Partner API every 5 minutes, when a caregiver asks about recent activity, and on "Sync from Ring": `GET /v1/users/me` → `GET /v1/devices` → `GET /v1/devices/{id}/status` → `GET /v1/history/devices/{id}/events?event_types=ding,motion.human` (following `links.next`). New events become the same signals as webhooks. Fresh ones (under 10 minutes) are announced; older ones go on the timeline quietly. Ring's event ids are stored, so nothing is imported twice. A `503` from the status endpoint means the device is offline, which is a care signal too.
+
 `motion_detected` (with `attributes.sub_type`, e.g. `human`) feeds the "quiet home" wellness check; `device_offline` lands on the timeline. The simulator signs its events with the same HMAC, so the demo exercises the real verification path. A night-time `door_open` comes from a contact sensor, not Ring, and uses the simple shared-secret endpoint (`/integrations/ring/events`).
 
 ## Design choices

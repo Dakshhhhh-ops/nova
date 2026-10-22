@@ -135,3 +135,11 @@ def test_model_turn_speaks_tool_speech_without_a_second_call(sim, monkeypatch):
     assert out["brain"] == "Amazon Nova 2 Lite · Amazon Bedrock"
     more = sim.post("/api/chat", json={"device": "maya", "text": "Tell me more"}).json()
     assert more["brain"] == "more" and "110 over 66" in more["reply"]
+
+
+def test_ring_sync_without_a_token_explains_how_to_link(sim, monkeypatch):
+    monkeypatch.delenv("RING_ACCESS_TOKEN", raising=False)
+    monkeypatch.delenv("RING_REFRESH_TOKEN", raising=False)
+    assert sim.get("/api/status").json()["ring"]["linked"] is False
+    out = sim.post("/api/ring/sync").json()
+    assert out["linked"] is False and "RING_ACCESS_TOKEN" in out["error"]

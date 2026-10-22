@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "type": "history-events",
+      "id": "evt_8f2c1a_ding",
+      "attributes": {"event_type": "ding", "is_third_party_reviewed": false, "start": "{{2026-10-23T09:58:20}}", "end": "{{2026-10-23T09:58:50}}"},
+      "relationships": {"source": {"data": {"type": "devices", "id": "ava1.ring.device.FRONTDOOR01"}}}
+    },
+    {
+      "type": "history-events",
+      "id": "evt_8f2b90_motion",
+      "attributes": {"event_type": "motion.human", "is_third_party_reviewed": false, "start": "{{2026-10-23T09:57:40}}", "end": "{{2026-10-23T09:58:10}}"},
+      "relationships": {"source": {"data": {"type": "devices", "id": "ava1.ring.device.FRONTDOOR01"}}}
+    },
+    {
+      "type": "history-events",
+      "id": "evt_8f1d44_vehicle",
+      "attributes": {"event_type": "motion.vehicle", "is_third_party_reviewed": false, "start": "{{2026-10-23T09:30:05}}", "end": "{{2026-10-23T09:30:35}}"},
+      "relationships": {"source": {"data": {"type": "devices", "id": "ava1.ring.device.FRONTDOOR01"}}}
+    }
+  ],
+  "links": {"next": "/v1/history/devices/ava1.ring.device.FRONTDOOR01/events?page[key]=eyJrIjoiOGYxZDQ0In0"},
+  "meta": {"time": "2026-10-23T14:00:00Z"}
+}

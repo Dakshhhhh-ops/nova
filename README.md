@@ -10,7 +10,7 @@ Nova is a self-hosted **MCP server** (Streamable HTTP, MCP 2026-07-28, compatibl
 
 > **Try it live:** https://nova-6kte.onrender.com (story) · https://nova-6kte.onrender.com/live (live demo) · MCP endpoint `https://nova-6kte.onrender.com/mcp` (free hosting: the first load after idle takes ~30–50 s)
 >
-> Track: **Alexa+** (self-hosted MCP server + simulated Alexa+ experience) · Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova, multimodal; Amazon Polly)
+> Tracks: **Alexa+** (self-hosted MCP server + simulated Alexa+ experience) and **Ring** (Ring Partner API: devices, status, event history, signed webhooks) · Mini challenges: **AWS Builder** (Amazon Bedrock with Amazon Nova, multimodal; Amazon Polly) and **Open Source** ([mcp-apps-lite-host](https://github.com/Dakshhhhh-ops/mcp-apps-lite-host))
 
 ![Maya asks "How's Mom doing?" and Nova connects Rose's dizziness to her recent dose change](docs/img/briefing.png)
 
@@ -69,7 +69,9 @@ Messages between family members arrive the same way, live, on the other person's
 It also tracks evening doses slipping while mornings hold, mood, pain and sleep trends, and *"she's stopped her walks"*. Every insight comes from deterministic, testable rules and carries its evidence. Amazon Nova only writes the language.
 
 ### 4. It listens to the front door: Ring
-Nova takes **Ring Partner API Webhook v1.1** events at `/integrations/ring/webhook` (`button_press`, `motion_detected`, `device_online` / `device_offline`). It checks Ring's `X-Signature` (HMAC-SHA256 over the raw body) before reading anything, drops redelivered events by `meta.request_id`, and answers 200 right away (Ring retries 5xx, never 4xx). Ring doesn't say who rang, so Nova matches a doorbell press against the care calendar: a press near Grace's 10:00 visit is Grace, and she gets her visit checklist. We don't have Ring partner credentials, so the simulator sends the same signed payloads; with credentials you set `NOVA_RING_SIGNING_KEY` and register the URL in the Ring Developer Portal.
+**Nova calls the Ring Partner API** (`https://api.amazonvision.com`, `nova_server/ring_api.py`): `GET /v1/users/me` for the linked account, `GET /v1/devices` and `/v1/devices/{id}/status` to know the doorbell is online, and `GET /v1/history/devices/{id}/events?event_types=ding,motion.human` (following the `page[key]` cursor) to pull doorbell presses and people at the door. It asks for nothing else: no vehicles, animals, video or snapshots, and it keeps no Ring email or address. New events become care signals. A fresh one is announced, and an older one goes on the timeline quietly, because nobody needs "Grace is at the door" an hour after she left. Nova syncs every 5 minutes, when a caregiver asks *"Has Grace been by?"* (`recent_activity`), and from **Sync from Ring** in the live demo, which shows every Ring API call in the inspector. A camera that goes offline is a care signal too. Link an account with `RING_ACCESS_TOKEN` (Ring Developer Playground → Generate Token, about 30 minutes) or, in production, a refresh token from Ring account linking.
+
+For real time, Nova also takes **Ring Partner API Webhook v1.1** events at `/integrations/ring/webhook` (`button_press`, `motion_detected`, `device_online` / `device_offline`). It checks Ring's `X-Signature` (HMAC-SHA256 over the raw body) before reading anything, drops redelivered events by `meta.request_id`, and answers 200 right away (Ring retries 5xx, never 4xx). Ring doesn't say who rang, so Nova matches a doorbell press against the care calendar: a press near Grace's 10:00 visit is Grace, and she gets her visit checklist. We don't have Ring partner credentials, so the simulator sends the same signed payloads; with credentials you set `NOVA_RING_SIGNING_KEY` and register the URL in the Ring Developer Portal.
 
 What the front door becomes:
 - *Grace arrived at Mom's at 10:02*, logged as a visit and announced to the family.
@@ -191,9 +193,9 @@ It drives the story in real Chrome, captures Alexa's spoken replies, adds an Ama
 ```bash
 uv run pytest -q
 ```
-58 tests cover:
+66 tests cover:
 - the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
-- Ring Partner API webhooks (signature check, dedupe, event mapping, visitor matched from the calendar), live message delivery;
+- the Ring Partner API client against recorded-shape responses (required headers, pagination, 401/429/503 handling, dedupe, fresh vs backfilled events, minimum-necessary event types) and Ring webhooks (signature check, dedupe, event mapping, visitor matched from the calendar), live message delivery;
 - pill checks (wrong time, already taken, outdated strength, a drug the doctor said to avoid), reconciliation and approval;
 - BP limits read from the doctor's notes, the dizziness insight with its BP evidence;
 - privacy, grounded answers, red flags, Bedrock request shapes, and Amazon Nova taking over again by itself once a throttled quota resets;
@@ -248,7 +250,7 @@ Nova handles protected health information (medications, symptoms, blood pressure
 
 ## Roadmap
 - Production account linking (Login with Amazon or Amazon Cognito) and deployment on Amazon Bedrock AgentCore Runtime.
-- Ring partner credentials: register the webhook in the Ring Developer Portal and backfill missed events from the event history API (`GET /v1/history/devices/{id}/events`). Alexa proactive notifications for announcements.
+- Ring account linking in production (OAuth refresh tokens per household) and registering the webhook URL in the Ring Developer Portal. Alexa proactive notifications for announcements.
 - Amazon Nova Sonic for full-duplex voice; Fire TV ambient cards in the living room.
 
 ## License

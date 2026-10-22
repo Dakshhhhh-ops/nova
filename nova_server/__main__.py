@@ -43,6 +43,7 @@ def main() -> None:
     host = args.host or server.HOST
     port = args.port or server.PORT
     server.engine.start()  # the proactive care engine runs on the household clock
+    server.ring_api.start_poller(server.store, server.engine)  # backfill from Ring when RING_ACCESS_TOKEN is set
     app = server.mcp.streamable_http_app(host=host)
     print(f"Nova MCP server · Streamable HTTP · http://{host}:{port}/mcp")
     uvicorn.run(app, host=host, port=port, log_level="info")

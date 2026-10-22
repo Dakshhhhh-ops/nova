@@ -9,3 +9,6 @@ data/*.db-*
 .DS_Store
 node_modules/
 demo/
+
+# Last live Ring sync (written at runtime next to the database)
+data/ring-last-sync.json

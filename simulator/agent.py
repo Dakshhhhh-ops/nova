@@ -65,6 +65,8 @@ def structured_of(result: Any) -> dict[str, Any]:
 
 
 MAX_SPOKEN_CHARS = 420
+MORE = re.compile(r"^\s*(alexa,?\s*)?(yes|yeah|yep|sure|ok(ay)?|please|go on|go ahead|tell me more|more|"
+                  r"details|the details|the rest|what else|and\??|next( one)?|keep going)( please| alexa)?[.!?]*\s*$", re.I)
 REPEAT = re.compile(r"^\s*(alexa,?\s*)?(can you |could you |please )?(repeat( that| it)?|say (that|it) again|"
                     r"what did you (just )?say|pardon|come again|i didn'?t (catch|hear) (that|you))\b", re.I)
 
@@ -113,6 +115,7 @@ class Device:
         self.client: Client | None = None
         self.tools: list[Any] = []
         self.history: list[dict[str, Any]] = []
+        self.pending_more: str | None = None  # what to say if the person answers "tell me more"
         self.lock = asyncio.Lock()
         self._stack: AsyncExitStack | None = None
         self.elicit_handler: Callable[["Device", ElicitRequestParams], Awaitable[ElicitResult]] | None = None
@@ -194,7 +197,9 @@ def system_prompt(device: Device) -> str:
         "- 'Approve the changes' after a document scan means apply_care_changes with that change_set_id.\n"
         "- You can't place phone calls in this simulation; if asked to call someone, say you're calling their Echo "
         "and suggest send_message.\n"
-        "Answer in one to three short spoken sentences, no markdown or lists. Prefer the tool's `speech` text; you "
+        "When a tool result has `more`, say only its `speech` (it already ends by offering details); the app plays "
+        "`more` if the person says yes.\n"
+        "Answer in one or two short spoken sentences, no markdown or lists. Prefer the tool's `speech` text; you "
         "may shorten it. Never invent medical facts, doses or advice. If there is an emergency, tell them to call 911."
     )
 
@@ -229,6 +234,14 @@ class Agent:
             await emit({"type": "trace", "device": device.id, "item": item})
 
         await push({"kind": "user", "text": text})
+        if MORE.search(text) and device.pending_more:
+            more, device.pending_more = device.pending_more, None
+            device.history.append({"role": "user", "text": text})
+            device.history.append({"role": "assistant", "text": more})
+            await push({"kind": "reply", "text": more})
+            return {"reply": more, "cards": [], "trace": trace, "brain": "more",
+                    "latency_ms": int((time.perf_counter() - t_start) * 1000)}
+        device.pending_more = None
         if REPEAT.search(text):
             # Older listeners often ask Alexa to repeat itself: say the last thing again, word for word.
             last = next((m["text"] for m in reversed(device.history) if m["role"] == "assistant" and m.get("text")), "")
@@ -256,6 +269,12 @@ class Agent:
                         "tool_calls": [{"name": c["name"], "args": c["args"]} for c in step.tool_calls]})
             if not step.tool_calls:
                 reply = voice_guard(step.text, last_speech)
+                if brain.name != "rules":
+                    from nova_server.speech import concise
+
+                    reply, extra = concise(reply)
+                    if extra and not device.pending_more:
+                        device.pending_more = extra
                 device.history.append({"role": "assistant", "text": reply})
                 break
             device.history.append({"role": "assistant", "text": step.text, "tool_calls": step.tool_calls})
@@ -273,6 +292,8 @@ class Agent:
                 uri = device.ui_uri(call["name"]) if ok else None
                 if data.get("speech"):
                     last_speech = data["speech"]
+                if data.get("more"):
+                    device.pending_more = data["more"]
                 await push({"kind": "tool_result", "name": call["name"], "ok": ok, "speech": data.get("speech"),
                             "structured": data, "ui": uri, "ms": ms})
                 if uri and result is not None:

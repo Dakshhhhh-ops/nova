@@ -157,6 +157,12 @@ class RulesBrain(Backend):
         if call:
             return Step(tool_calls=[call])
         low = user.lower().strip(" .!?")
+        if re.fullmatch(r"(yes|yeah|sure|ok(ay)?|please|yes please|please do|do it)", low):
+            last = next((m.get("text", "") for m in reversed(history[:-1]) if m["role"] == "assistant" and m.get("text")), "")
+            if "prepare a brief" in last.lower() or "visit brief" in last.lower():
+                return Step(tool_calls=[_call("prepare_visit", appointment="")])
+            if "order a refill" in last.lower() or "refill" in last.lower():
+                return Step(tool_calls=[_call("request_refill", medication="")])
         name = "Rose" if self.role == "elder" else ""
         if re.fullmatch(r"(thank you|thanks|thank you so much|thanks alexa|thank you alexa)( alexa)?", low):
             return Step(text=f"You're welcome{', ' + name if name else ''}.")

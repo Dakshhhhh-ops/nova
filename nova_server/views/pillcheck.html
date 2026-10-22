@@ -128,6 +128,32 @@
   .label-text { font-family: var(--mono); border-color: rgba(244,238,230,.16); }
   .time { font-size: 11px; background: transparent; border: 1px solid rgba(59,209,255,.45); }
   .conf { font-size: 10px; }
+
+  /* Compact: it lives on an Echo Show screen. Verdict, advice and what's due fit above the fold. */
+  #app { padding: 14px 16px 18px; }
+  .verdict { grid-template-columns: 52px minmax(0, 1fr); gap: 14px; padding: 13px 18px; border-radius: 20px; margin-bottom: 10px; }
+  .v-ico { width: 52px; height: 52px; box-shadow: 0 0 0 6px color-mix(in srgb, var(--tone) 18%, transparent); }
+  .v-ico svg { width: 28px; height: 28px; }
+  .v-kicker { font-size: 10.5px; }
+  .v-title { font-size: 31px; }
+  .v-sub { font-size: 15px; margin-top: 2px; }
+  .advice { padding: 10px 14px; gap: 10px; margin-bottom: 10px; border-radius: 16px; }
+  .advice svg { width: 22px; height: 22px; }
+  .advice p { font-size: 20px; line-height: 1.28; }
+  .source { margin: -2px 0 10px; padding: 10px 14px 10px 16px; }
+  .source q { font-size: 18px; }
+  .section-title { margin: 0 0 6px 2px; }
+  .due { flex-wrap: nowrap; gap: 8px; margin-bottom: 12px; min-width: 0; }
+  .due-item { flex: 1 1 0; min-width: 0; gap: 10px; padding: 6px 12px 6px 6px; border-radius: 14px; }
+  .due-item .pill-tile { width: 34px; height: 34px; border-radius: 10px; }
+  .due-item .pill-tile svg { width: 26px; height: 26px; }
+  .due-line { min-width: 0; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
+  .due-name { font-size: 19px; overflow: hidden; text-overflow: ellipsis; }
+  .due-sub { flex: none; }
+  .due-more { flex: none; align-self: center; font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 0 4px; }
+  .compare { gap: 10px; }
+  .card { padding: 12px 14px; }
+  .card-name { font-size: 24px; }
 </style>
 </head>
 <body>
@@ -256,9 +282,10 @@ function render(d) {
   }
 
   const due = arr(d.due_now).filter((x) => obj(x));
+  const shown = due.slice(0, 2), more = due.length - shown.length;
   const dueHtml = due.length ? `<div class="section-title">${verdict === "wrong_time" || verdict === "not_on_list" ? "Take these instead" : "Due now"}</div>
-    <div class="due">${due.map((x) => `<div class="due-item"><div class="pill-tile">${pillSVG(x.appearance)}</div>
-      <div><div class="due-name">${esc(x.name || "")}</div><div class="due-sub">${esc([cap(x.appearance), x.time_label].filter(Boolean).join(" · "))}</div></div></div>`).join("")}</div>` : "";
+    <div class="due">${shown.map((x) => `<div class="due-item" title="${esc([x.name, cap(x.appearance), x.time_label].filter(Boolean).join(" · "))}"><div class="pill-tile">${pillSVG(x.appearance)}</div>
+      <div class="due-line"><span class="due-name">${esc(x.name || "")}</span><span class="due-sub">${esc(x.time_label || cap(x.appearance) || "")}</span></div></div>`).join("")}${more > 0 ? `<span class="due-more">+${more} more</span>` : ""}</div>` : "";
 
   const conf = num(idf.confidence);
   const confPct = conf === null ? null : Math.round(Math.max(0, Math.min(1, conf > 1 ? conf / 100 : conf)) * 100);

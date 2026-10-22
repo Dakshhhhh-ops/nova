@@ -35,6 +35,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from . import insights as ins
+from . import speech as speech_mod
 from . import vision
 from .engine import CareEngine
 from .oauth import NovaOAuthProvider
@@ -178,6 +179,23 @@ mcp = MCPServer(
     extensions=[apps],
 )
 
+def spoken(fn):
+    """Voice budget for every tool: at most two short sentences now, the rest in `more`."""
+    import functools
+    import inspect
+
+    if inspect.iscoroutinefunction(fn):
+        @functools.wraps(fn)
+        async def aw(*args, **kwargs):
+            return speech_mod.finalize(await fn(*args, **kwargs))
+        return aw
+
+    @functools.wraps(fn)
+    def w(*args, **kwargs):
+        return speech_mod.finalize(fn(*args, **kwargs))
+    return w
+
+
 def ui_tool(resource_uri: str, visibility: tuple[str, ...] = ("model", "app"), **kwargs: Any):
     """Register a tool bound to an MCP Apps view (`_meta.ui.resourceUri`)."""
     return mcp.tool(meta={"ui": {"resourceUri": resource_uri, "visibility": list(visibility)}}, **kwargs)
@@ -255,6 +273,7 @@ def build_today(me: dict[str, Any], elder: dict[str, Any]) -> dict[str, Any]:
     annotations=READ,
     icons=[NOVA_ICON],
 )
+@spoken
 def get_today() -> dict[str, Any]:
     me = caller()
     return build_today(me, care_recipient(me))
@@ -327,6 +346,7 @@ def match_doses(elder: dict[str, Any], medication: str, time_of_day: str, t) -> 
     ),
     annotations=WRITE,
 )
+@spoken
 async def log_medication(
     medication: Annotated[str, Field(description="Medication name, purpose, or description; empty means all doses due now")] = "",
     time_of_day: Annotated[str, Field(description="morning, evening, bedtime, or a time like '8 AM'; empty means now")] = "",
@@ -366,16 +386,16 @@ async def log_medication(
             parts.append(f"{speak_list([d['name'] for d in already])} {'was' if len(already) == 1 else 'were'} already logged earlier.")
     if future and not to_log and not already:
         parts.append(f"{speak_list([d['name'] for d in future])} isn't due until {future[0]['time_label']}.")
+    if low_supply and not any(r["name"] == low_supply[0][0] for r in store.refills(elder["id"])):
+        name, left = low_supply[0]
+        parts.append(f"You're down to {left} {name}; say 'order a refill' and I'll send it to the pharmacy."
+                     if me["id"] == elder["id"] else f"{elder['short_name']} has {left} {name} left.")
     food = [d for d in to_log if d.get("with_food")]
     if food and status == "taken" and me["id"] == elder["id"]:
         parts.append(f"Remember, {food[0]['name']} goes down best with food.")
     nxt = next((d for d in ins.doses_for_day(store, elder["id"], t, t) if d["status"] in ("upcoming",)), None)
     if nxt and to_log:
         parts.append(f"Next up is {nxt['name']} at {nxt['time_label']}.")
-    if low_supply and not any(r["name"] == low_supply[0][0] for r in store.refills(elder["id"])):
-        name, left = low_supply[0]
-        parts.append(f"You have {left} {name} left. Say 'order a refill' and I'll send it to the pharmacy."
-                     if me["id"] == elder["id"] else f"{elder['short_name']} has {left} {name} left.")
     return {
         "speech": " ".join(parts),
         "low_supply": [{"name": n, "left": left} for n, left in low_supply],
@@ -394,6 +414,7 @@ async def log_medication(
     ),
     annotations=READ,
 )
+@spoken
 def check_medication(
     medication: Annotated[str, Field(description="Medication name, purpose or description; empty for all")] = "",
     time_of_day: Annotated[str, Field(description="morning, evening, bedtime or a time; empty for any")] = "",
@@ -480,6 +501,7 @@ def ask_before_sharing(how_are_you_feeling: str, ctx: Context):
     ),
     annotations=WRITE,
 )
+@spoken
 async def daily_checkin(
     how_are_you_feeling: Annotated[str, Field(description="What the person said about how they feel, verbatim")],
     consent: Annotated[ElicitationResult[NotifyConsent], Resolve(ask_before_sharing)],
@@ -501,7 +523,8 @@ async def daily_checkin(
         alert_id = store.add_alert(elder["id"], "urgent", "red-flag",
                                    f"{elder['short_name']} reported: “{how_are_you_feeling}” ({', '.join(flags)})")
         store.add_message(elder["id"], "circle", f"URGENT from Nova: {elder['short_name']} said “{how_are_you_feeling}”.", urgent=True)
-        speech = (f"That sounds serious, {elder['short_name']}. I've alerted {speak_list(names[:2])} right away. "
+        # Safety first: two sentences, both spoken now (never deferred to "more").
+        speech = (f"That sounds serious, {elder['short_name']}: I've alerted {speak_list(names[:2])} right away. "
                   "If you're hurt or it's getting worse, please call 911.")
         return {"speech": speech, "checkin": data, "red_flags": flags, "shared_with": names, "alert_id": alert_id}
 
@@ -517,17 +540,19 @@ async def daily_checkin(
             alert_id = store.add_alert(elder["id"], "watch", "checkin-symptom",
                                        f"{elder['short_name']} reported {symptom} and asked Nova to tell the circle.")
             shared_with = names
-            speech = f"{reply} I've let {speak_list(names[:2])} know."
+            speech = f"Thanks for telling me, {elder['short_name']}. I've let {speak_list(names[:2])} know."
         else:
-            speech = f"{reply} I'll keep it between us for now."
+            speech = f"Thanks for telling me, {elder['short_name']}. I'll keep it between us for now."
+    more = None
     if symptom == "dizziness":
         speech += " Please stand up slowly."
     if symptom in CONCERNING:
         note = next((n for n in store.care_notes(elder["id"]) if symptom[:5] in n["text"].lower() and "call" in n["text"].lower()), None)
         if note:
             doctor = note["source"].split("·")[-1].strip().replace("Dr. Anika ", "Dr. ")
-            speech += f" {doctor} asked to hear about {symptom}, so it's worth a call to the office."
-    return {"speech": speech, "checkin": data, "red_flags": [], "shared_with": shared_with, "alert_id": alert_id}
+            more = f"{doctor} asked to hear about {symptom}, so it's worth a call to the office."
+            speech += " Want the details?"
+    return {"speech": speech, "more": more, "checkin": data, "red_flags": [], "shared_with": shared_with, "alert_id": alert_id}
 
 
 def _sentence(text: str) -> str:
@@ -544,6 +569,7 @@ def _sentence(text: str) -> str:
     description="Send a short message to one person in the care circle or to everyone ('circle').",
     annotations=NOTIFY,
 )
+@spoken
 def send_message(
     to: Annotated[str, Field(description="A name, relation ('my daughter', 'Mom') or 'circle' for everyone")],
     message: Annotated[str, Field(description="The message, in the sender's words")],
@@ -577,6 +603,7 @@ def send_message(
     description="Read the caller's unread messages from the care circle, oldest first, and mark them read.",
     annotations=WRITE,
 )
+@spoken
 def read_messages() -> dict[str, Any]:
     me = caller()
     msgs = store.inbox(me["id"])
@@ -585,9 +612,15 @@ def read_messages() -> dict[str, Any]:
     store.mark_read([m["id"] for m in msgs], me["id"])
     t = now()
     out = [{"from": m["from_short"], "text": m["body"], "when_label": ins.when_label(parse(m["at"]), t), "urgent": bool(m["urgent"])} for m in msgs]
-    spoken = " ".join(f"From {m['from']}: {m['text']}" for m in out[:3])
-    more = f" And {len(out) - 3} more on screen." if len(out) > 3 else ""
-    return {"speech": f"You have {len(out)} new message{'s' if len(out) > 1 else ''}. {spoken}{more}", "messages": out}
+    first = out[0]
+    rest = " ".join(f"From {m['from']}: {m['text']}" for m in out[1:4])
+    lead = f"You have {len(out)} new message{'s' if len(out) > 1 else ''}. " if len(out) > 1 else ""
+    res = {"speech": f"{lead}From {first['from']}: {speech_mod.sentences(first['text'])[0]}", "messages": out}
+    if len(speech_mod.sentences(first["text"])) > 1 or rest:
+        tail = " ".join(speech_mod.sentences(first["text"])[1:])
+        res["speech"] += " Want the next one?" if not tail else " Want the rest?"
+        res["more"] = " ".join(x for x in (tail, rest) if x)
+    return res
 
 
 # ---------------------------------------------------------------------------
@@ -602,6 +635,7 @@ def read_messages() -> dict[str, Any]:
     ),
     annotations=READ,
 )
+@spoken
 async def ask_care_notes(question: Annotated[str, Field(description="The question, in the user's words")]) -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
@@ -618,6 +652,7 @@ async def ask_care_notes(question: Annotated[str, Field(description="The questio
     ),
     annotations=NOTIFY,
 )
+@spoken
 def get_help(reason: Annotated[str, Field(description="What's happening, in the person's words")] = "") -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
@@ -637,6 +672,7 @@ def get_help(reason: Annotated[str, Field(description="What's happening, in the 
     description="Open alerts for the care recipient, most severe first (caregivers).",
     annotations=READ,
 )
+@spoken
 def list_alerts() -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
@@ -658,6 +694,7 @@ def list_alerts() -> dict[str, Any]:
     description="Mark an alert as handled, with an optional note the circle will see.",
     annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False),
 )
+@spoken
 def resolve_alert(
     alert_id: Annotated[int, Field(description="The alert id; 0 means the most important open alert")] = 0,
     note: Annotated[str, Field(description="What was done, e.g. 'Called Dr. Patel's office'")] = "",
@@ -685,6 +722,7 @@ def resolve_alert(
     ),
     annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False),
 )
+@spoken
 def set_sharing(
     category: Annotated[Literal["medications", "wellbeing", "appointments", "messages"], Field(description="What to share or hide")],
     shared_with_circle: Annotated[bool, Field(description="True to share, False to keep private")],
@@ -755,6 +793,7 @@ def briefing_facts(me: dict[str, Any], elder: dict[str, Any], period: str) -> di
     annotations=READ,
     icons=[NOVA_ICON],
 )
+@spoken
 async def care_briefing(
     period: Annotated[Literal["today", "week"], Field(description="today or week")] = "week",
     person: Annotated[str, Field(description="Who the briefing is about, if the circle has more than one elder")] = "",
@@ -770,6 +809,7 @@ async def care_briefing(
     })
     return {
         "speech": narrative["speech"],
+        "more": narrative.get("more") or None,
         "headline": narrative["headline"],
         "status": status,
         "person": person_ref(elder),
@@ -790,6 +830,7 @@ async def care_briefing(
     annotations=READ,
     icons=[NOVA_ICON],
 )
+@spoken
 async def prepare_visit(
     appointment: Annotated[str, Field(description="Which appointment (e.g. 'cardiology', 'Dr. Patel'); empty for the next medical one")] = "",
 ) -> dict[str, Any]:
@@ -913,6 +954,7 @@ def caregiver_briefing_prompt(period: str = "week") -> list[UserMessage]:
     description="'When is my doctor appointment?', 'Who's coming this week?' Upcoming visits, who's driving, and where.",
     annotations=READ,
 )
+@spoken
 def list_appointments(days: Annotated[int, Field(description="How far ahead", ge=1, le=60)] = 14) -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
@@ -936,7 +978,10 @@ def list_appointments(days: Annotated[int, Field(description="How far ahead", ge
             if driver and driver["id"] != me["id"]:
                 ride = f" {driver['short_name']} is driving{' you' if me['id'] == elder['id'] else ''}."
             parts.append(f"{who} {a['provider']} for the {a['title'].lower()} {when}, at {a['location']}.{ride}")
-    return {"speech": " ".join(parts[:3]), "appointments": items}
+    medical = [x for x in parts if not x.split()[0].istitle() or " sees " in x or x.startswith("You see")]
+    others = [x for x in parts if x not in medical]
+    ordered = medical + others
+    return {"speech": ordered[0], "more": " ".join(ordered[1:3]) or None, "appointments": items}
 
 
 @mcp.tool(
@@ -945,6 +990,7 @@ def list_appointments(days: Annotated[int, Field(description="How far ahead", ge
     description="'What's Mom's blood pressure?', 'How has my blood pressure been?' Recent readings, the average and the doctor's limits.",
     annotations=READ,
 )
+@spoken
 def get_vitals(days: Annotated[int, Field(description="How far back", ge=1, le=60)] = 7) -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
@@ -975,6 +1021,7 @@ def get_vitals(days: Annotated[int, Field(description="How far back", ge=1, le=6
                  "symptoms to check, refills to pick up, low pill supply and the next appointment."),
     annotations=READ,
 )
+@spoken
 def visit_checklist() -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
@@ -1007,6 +1054,7 @@ def supply_status(elder_id: str) -> list[dict[str, Any]]:
                  "and tells the circle who can pick it up. Empty medication means whatever is running lowest."),
     annotations=NOTIFY,
 )
+@spoken
 def request_refill(medication: Annotated[str, Field(description="Which medication; empty for the one running lowest")] = "") -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
@@ -1033,8 +1081,8 @@ def request_refill(medication: Annotated[str, Field(description="Which medicatio
             store.announce(p["id"], "info", "Refill ordered",
                            f"{me['short_name']} ordered a {pick['name']} refill for {elder['short_name']} at {PHARMACY}.{pickup}",
                            dedupe=f"refill:{rid}:{p['id']}")
-    return {"speech": f"Done. I sent a refill request for {pick['name']} to {PHARMACY}. They usually have it ready in "
-                      f"about two hours.{pickup}",
+    return {"speech": f"Done, I've sent the {pick['name']} refill to {PHARMACY}.{pickup}",
+            "more": "They usually have it ready in about two hours.",
             "refill": {"id": rid, "name": pick["name"], "pharmacy": PHARMACY, "status": "requested"}, "supply": pick}
 
 
@@ -1048,6 +1096,7 @@ def request_refill(medication: Annotated[str, Field(description="Which medicatio
                  "the limits the doctor wrote in the care notes and tells the family if it's out of range."),
     annotations=WRITE,
 )
+@spoken
 def log_vitals(
     systolic: Annotated[int, Field(description="Top number", ge=50, le=260)],
     diastolic: Annotated[int, Field(description="Bottom number", ge=30, le=160)],
@@ -1075,11 +1124,11 @@ def log_vitals(
                                f"Mom's blood pressure just read {systolic} over {diastolic}, which is {direction}er than "
                                f"Dr. Patel's limit. Her notes say to call the office.",
                                severity="watch", expects_reply=True, replies=["Call Mom", "Ask Grace to stop by"])
-        speech = (f"I've logged {who} blood pressure, {reading}. That's {direction}er than the limit in Dr. Patel's notes, "
-                  f"so I've let the family know. If you feel faint, sit down, and call the office." if me["id"] == elder["id"]
+        speech = (f"That's {reading}, {direction}er than Dr. Patel's limit, so I've let the family know. "
+                  f"If you feel faint, sit down and call the office." if me["id"] == elder["id"]
                   else f"Logged {reading}. That's out of range, so I've opened an alert.")
     else:
-        speech = f"Got it, {reading}.{trend} That's within the range Dr. Patel set."
+        speech = f"Got it, {reading}, within the range Dr. Patel set.{trend}"
     return {"speech": speech, "reading": {"systolic": systolic, "diastolic": diastolic, "pulse": pulse},
             "limits": {"high": f"{hi_s}/{hi_d}", "low": f"{lo_s}/{lo_d}", "source": note["source"] if note else None},
             "out_of_range": out_of_range, "alert_id": alert_id,
@@ -1114,6 +1163,7 @@ def announcements_resource() -> dict[str, Any]:
     description="'What are my notifications?' Recent things Nova told the caller: reminders, escalations, messages, visitors.",
     annotations=READ,
 )
+@spoken
 def read_notifications() -> dict[str, Any]:
     me = caller()
     items = [a for a in store.announcements(me["id"], due_by=now(), limit=10)
@@ -1147,6 +1197,7 @@ def acknowledge_notification(
     description="'Remind me in 10 minutes.' Re-schedules the latest medication reminder for the caller.",
     annotations=WRITE,
 )
+@spoken
 def snooze_reminder(minutes: Annotated[int, Field(description="Minutes from now", ge=1, le=240)] = 10) -> dict[str, Any]:
     me = caller()
     recent = [a for a in store.announcements(me["id"], due_by=now(), limit=10)
@@ -1177,6 +1228,7 @@ def snooze_reminder(minutes: Annotated[int, Field(description="Minutes from now"
                  "doses she logged and check-ins over the last hours."),
     annotations=READ,
 )
+@spoken
 def recent_activity(hours: Annotated[int, Field(description="How far back", ge=1, le=168)] = 24) -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
@@ -1209,6 +1261,7 @@ def recent_activity(hours: Annotated[int, Field(description="How far back", ge=1
     annotations=READ,
     icons=[NOVA_ICON],
 )
+@spoken
 async def check_pill_photo(
     image_base64: Annotated[str, Field(description="The photo as base64 or a data URL")],
     mime_type: Annotated[str, Field(description="Image MIME type")] = "image/png",
@@ -1230,6 +1283,7 @@ async def check_pill_photo(
     annotations=READ,
     icons=[NOVA_ICON],
 )
+@spoken
 async def read_care_document(
     image_base64: Annotated[str, Field(description="The photo as base64 or a data URL")],
     mime_type: Annotated[str, Field(description="Image MIME type")] = "image/png",
@@ -1248,6 +1302,7 @@ async def read_care_document(
                  "updates the plan, saves the instructions as a care note and tells Rose in plain words."),
     annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False),
 )
+@spoken
 def apply_care_changes(
     change_set_id: Annotated[str, Field(description="The change_set_id from read_care_document")],
     approve: Annotated[bool, Field(description="True to apply, False to discard")] = True,

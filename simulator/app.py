@@ -233,6 +233,8 @@ async def poll_announcements() -> None:
                     items = json.loads(text).get("items", [])
                     for item in items:
                         await hub.emit({"type": "announcement", "device": d.id, "item": item})
+                        if (item.get("related") or {}).get("more"):
+                            d.pending_more = item["related"]["more"]
                         # Keep the conversation aware of what Nova just said, so "I took it" makes sense.
                         d.history.append({"role": "assistant", "text": f"(Nova announcement) {item['speech']}"})
                     if items:

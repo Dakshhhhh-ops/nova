@@ -130,7 +130,7 @@ class CareEngine:
                 if self._crossed(at, last, t):
                     fired += self._fire(
                         f"dose_reminder:{slot}", elder["id"], "dose_reminder", f"{ins.time_label(at)} medicines",
-                        f"It's {ins.time_label(at)}, {name}. Time for your {names}{food}. That's {looks}.",
+                        f"It's {ins.time_label(at)}, {name}: time for your {names}{food}.",
                         due_at=at, expects_reply=True, replies=["I took it", "Remind me in 10 minutes", "I'll skip it tonight"],
                         related=related,
                     )
@@ -292,12 +292,14 @@ class CareEngine:
         at = t.replace(hour=18, minute=0, second=0)
         if t.weekday() != 6 or not self._crossed(at, last, t):
             return []
-        text = self.weekly_digest(elder, t)
+        from .speech import concise
+
+        text, more = concise(self.weekly_digest(elder, t), offer="Want the rest?")
         fired: list[str] = []
         for cg in self._family():
             fired += self._fire(f"digest:{t.date()}:{cg['id']}", cg["id"], "info", f"{elder['short_name']}'s week",
-                                text, due_at=at, expects_reply=True,
-                                replies=["How's Mom doing?", "Prepare a brief for Mom's cardiology visit"])
+                                text, due_at=at, expects_reply=True, related={"more": more} if more else None,
+                                replies=["Tell me more", "Prepare a brief for Mom's cardiology visit"])
         return fired
 
     # -- refills --------------------------------------------------------------

@@ -462,14 +462,15 @@ def narrate_briefing(ctx: dict[str, Any]) -> dict[str, str]:
         f"You are Nova, speaking through Alexa to {ctx['viewer']} ({ctx['relation']} of {ctx['name']}). "
         f"Write a briefing about {ctx['name']} for {ctx['period']}.\n\n"
         f"FACTS (JSON):\n{json.dumps(ctx['facts'], default=str)[:6000]}\n\n"
-        "Return JSON with keys: headline (max 12 words, no name needed) and speech "
-        "(2-3 short spoken sentences, max 60 words: start with the overall picture, then the single most important "
-        "thing and what to do about it; end by offering one next step such as preparing a visit brief)."
+        "Return JSON with keys: headline (max 12 words, no name needed), speech (ONE or TWO short spoken sentences, "
+        "max 30 words: the overall picture and the single most important thing, ending with 'Want the details?'), and "
+        "more (2-3 short sentences: the evidence and one next step, such as preparing a visit brief)."
     )
     try:
         data = parse_json(b.complete(VOICE_RULES, prompt, max_tokens=300, json_mode=True))
         if data and data.get("speech"):
-            return {"headline": str(data.get("headline") or fallback["headline"]), "speech": str(data["speech"])}
+            return {"headline": str(data.get("headline") or fallback["headline"]), "speech": str(data["speech"]),
+                    "more": str(data.get("more") or fallback.get("more") or "")}
     except Exception as exc:
         log.warning("briefing narration failed: %s", exc)
     return fallback
@@ -521,9 +522,10 @@ def _template_briefing(ctx: dict[str, Any]) -> dict[str, str]:
             "speech": f"{name} is doing well. She's taken {adh.get('pct', 100)} percent of her pills and nothing needs your attention.",
         }
     top = ins[0]
-    parts = [f"{name} is mostly okay, but one thing needs your attention." if top["severity"] != "info"
-             else f"{name} is doing okay overall."]
-    parts.append(spoken(top))
+    first_fact = speech_sentences(spoken(top))
+    lead = (f"{name} is mostly okay, but {first_fact[0][0].lower() + first_fact[0][1:]}" if top["severity"] != "info"
+            else f"{name} is doing okay overall. {first_fact[0]}")
+    parts = list(first_fact[1:])
     if top["id"].startswith("after-change"):
         doctor = "Dr. Patel" if "patel" in (top.get("suggestion") or "").lower() else "The doctor"
         parts.append(f"{doctor}'s notes say to call about it.")
@@ -533,7 +535,12 @@ def _template_briefing(ctx: dict[str, Any]) -> dict[str, str]:
     medical = next((u for u in upcoming if u.get("provider") and u["provider"].split()[0] not in u["title"]), None)
     if medical:
         parts.append(f"Want me to prepare a brief for {mid_sentence(medical['when_label']).split(' at ')[0]}'s visit?")
-    return {"headline": top["title"], "speech": " ".join(parts)}
+    return {"headline": top["title"], "speech": f"{lead} Want the details?", "more": " ".join(parts)}
+
+
+def speech_sentences(text: str) -> list[str]:
+    from .speech import sentences
+    return sentences(text)
 
 
 CHECKIN_SCHEMA_HINT = (

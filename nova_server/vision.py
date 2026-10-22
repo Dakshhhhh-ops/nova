@@ -125,9 +125,10 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
         src = note["source"].split("·")[0].strip().lower()
         return {**base, "verdict": "avoid", "source": note["source"],
                 "advice": f"Don't take it. {sentence}" + (f" {alternative}" if alternative else ""),
-                "speech": f"Please don't take {data['name'].lower()}, {name}. Your {src} say to avoid it"
-                          f"{' ' + _because(sentence) if _because(sentence) else ''}."
-                          + (f" The same notes say: {alternative[0].lower() + alternative[1:]}" if alternative else "")}
+                "speech": f"Please don't take {data['name'].lower()}, {name}: your {src} say to avoid it."
+                          + (f" For pain, they allow acetaminophen instead." if alternative and "acetaminophen" in alternative.lower() else ""),
+                "more": (f"The reason given is {_because(sentence).replace('because of ', '')}. " if _because(sentence) else "")
+                        + (f"The same notes say: {alternative[0].lower() + alternative[1:]}" if alternative else "")}
     if not med:
         return {**base, "verdict": "not_on_list",
                 "advice": "Don't take it. Ask Maya or the pharmacist before taking anything new.",
@@ -143,8 +144,9 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
         changed = f" {med['change_note']}." if med.get("change_note") else ""
         return {**base, "verdict": "dose_mismatch",
                 "advice": f"Set this bottle aside. Your plan says {med['dose']}.",
-                "speech": f"Careful, {name}. This bottle is {med['name']} {data['strength']}, but your plan now says "
-                          f"{med['dose']}.{changed} Please use the new {med['dose']} tablets and set this bottle aside."}
+                "speech": f"Careful, {name}: this is the old {data['strength']} {med['name'].lower()}. "
+                          f"Your plan is now {med['dose']}, so please set this bottle aside.",
+                "more": changed.strip() or None}
     mine = [d for d in today if d["med_id"] == med["id"]]
     open_now = [d for d in mine if d["status"] in ("due", "missed")]
     taken = [d for d in mine if d["status"] == "taken"]
@@ -163,10 +165,12 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
     if due_now:
         speak = ", ".join(f"{d['name']} ({d['appearance']})" for d in due_now)
         others = f" Right now it's time for {speak}."
+    due_names = speak_names([d["name"] for d in due_now])
     return {**base, "verdict": "wrong_time",
             "advice": f"Put this one back until {speak_times(times)}." + (f" Take {speak} now." if speak else ""),
-            "speech": f"That's {med['name']}, your {speak_times(times)} pill for {med['purpose']}. "
-                      f"It isn't due now, so put it back.{others}"}
+            "speech": f"That's {med['name'].lower()}, your {speak_times(times)} pill, so put it back."
+                      + (f" Right now it's time for your {due_names}." if due_names else ""),
+            "more": f"Right now:{others.replace(' Right now it' + chr(39) + 's time for', '')}" if others else None}
 
 
 def avoid_note(store: Store, person_id: str, drug: str) -> tuple[dict[str, Any], str, str | None] | None:
@@ -187,6 +191,11 @@ def avoid_note(store: Store, person_id: str, drug: str) -> tuple[dict[str, Any],
 def _because(sentence: str) -> str:
     m = re.search(r"\b(because of [^.]+)", sentence, flags=re.I)
     return m.group(1) if m else ""
+
+
+def speak_names(names: list[str]) -> str:
+    names = [n.lower() if n.lower() != n.upper() and not n.startswith("Vitamin") else n for n in names]
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1] if names else ""
 
 
 def speak_times(times: list[str]) -> str:

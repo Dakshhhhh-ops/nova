@@ -101,3 +101,13 @@ def test_say_that_again(sim):
     first = sim.post("/api/chat", json={"device": "kitchen", "text": "What did the doctor say about salt?"}).json()["reply"]
     again = sim.post("/api/chat", json={"device": "kitchen", "text": "Can you say that again?"}).json()
     assert again["reply"] == first and again["brain"] == "repeat"
+
+
+def test_short_reply_then_tell_me_more(sim):
+    sim.post("/api/reset")
+    brief = sim.post("/api/chat", json={"device": "maya", "text": "How's Mom doing?"}).json()["reply"]
+    assert brief.endswith("Want the details?") and len(brief.split()) <= 40
+    more = sim.post("/api/chat", json={"device": "maya", "text": "Yes"}).json()
+    assert more["brain"] == "more" and "blood pressure" in more["reply"]
+    visit = sim.post("/api/chat", json={"device": "maya", "text": "Yes please"}).json()
+    assert any(c["resource_uri"] == "ui://nova/visit.html" for c in visit["cards"])

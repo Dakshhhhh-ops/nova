@@ -204,8 +204,9 @@ def test_sunday_digest_reaches_the_family():
     eng = freeze_and_seed(sunday.replace(hour=17, minute=50))
     fired = run(eng, sunday.replace(hour=17, minute=55), sunday.replace(hour=18, minute=5))
     assert {k.split(":")[-1] for k in fired if k.startswith("digest:")} == {"maya", "leo"}
-    text = next(a for a in server.store.announcements("maya") if a["title"] == "Rose's week")["speech"]
-    assert "percent of her doses" in text and "Blood pressure averaged" in text
+    ann = next(a for a in server.store.announcements("maya") if a["title"] == "Rose's week")
+    text = ann["speech"] + " " + (ann["related"] or {}).get("more", "")
+    assert "percent of her doses" in ann["speech"] and "Blood pressure averaged" in text
 
 
 # -- refills ----------------------------------------------------------------
@@ -238,7 +239,8 @@ async def test_pill_check_catches_a_drug_the_doctor_said_to_avoid():
     out = await call("check_pill_photo", {"image_base64": b64("pill-ibuprofen.png")})
     assert out["verdict"] == "avoid"
     assert "don't take ibuprofen" in out["speech"].lower()
-    assert "blood pressure" in out["speech"] and "acetaminophen" in out["speech"].lower()
+    assert "acetaminophen" in out["speech"].lower()  # the safe alternative is said right away
+    assert "blood pressure" in out["more"]  # the reason is a "tell me more"
 
 
 async def test_appointments_vitals_and_resolving_the_top_alert():

@@ -55,10 +55,10 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 
 **Amazon Bedrock + Amazon Nova.** Used for the agent loop (Converse tool use) and for narration, extraction, grounded Q&A and visit briefs.
 - *Worked well:* The Converse API's tool-use shape maps one-to-one onto MCP tools (`inputSchema.json` = MCP `inputSchema`). Nova Lite-class models are fast enough for voice turns.
-- *Needs work:* Picking the right model identifier per region (`us.` / `eu.` / `apac.` / `global.` inference profiles, Nova vs Nova 2) needed a probe-and-fallback loop in code.
+- *Needs work:* **New-account quotas blocked us.** On a fresh account, every Amazon Nova model (Nova 2 Lite, Nova Lite, Micro, Pro) in us-east-1, us-west-2 and eu-north-1 returned `ThrottlingException: Too many tokens per day` after a handful of 5-token test calls. Other regions returned `AccessDeniedException` pointing at account verification. eu-central-1 answered once and then throttled too. Nothing in the console or the error says what the quota is, how much is left, or when it resets. Picking the right model identifier per region (`us.` / `eu.` / `apac.` / `global.` inference profiles, Nova vs Nova 2) also needed a probe-and-fallback loop in code.
 - *Would build with it again:* Yes.
 
-**Amazon Polly.** Used for spoken replies. Generative voices sound natural for an older listener. We added a browser speech fallback for when Polly isn't configured.
+**Amazon Polly.** Used for spoken replies and proactive announcements (generative voice "Ruth"). It worked first time on the new account, and generative voices sound natural for an older listener. We kept a browser speech fallback for machines without AWS.
 
 ## Friction log
 
@@ -69,6 +69,7 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 | 3 | Test an MCP server against Alexa+ | Looked for a way to connect a self-hosted MCP URL to Alexa+ without Preview access | A sandbox or test console | None, so we built a simulator | High | Simulated Alexa+ in a web app | An Alexa+ MCP test console with account-linking sandbox for hackathon participants |
 | 4 | Choose an Amazon Nova model ID for Bedrock Converse | Started from a regional default profile | One stable identifier per model | IDs differ by geography prefix and generation; the right one depends on the region and what is enabled | Low | Probe a candidate list at startup and fall back | An API or SDK helper that resolves "best inference profile for model X in region Y" |
 | 5 | Run the simulator without AWS | Machine's local AWS credentials were invalid (`InvalidClientTokenId`) | A clear path to keep building | Every Bedrock and Polly call failed | Medium | Built fallbacks: local Ollama model, then a rules router; browser speech instead of Polly | A free, rate-limited Bedrock sandbox key for hackathons (the AWS credit codes ran out on Oct 7) |
+| 6 | Call Amazon Nova from a brand-new AWS account | Created an IAM user with `AmazonBedrockFullAccess`, configured the CLI, called Converse on `us.amazon.nova-2-lite-v1:0`, then every other Nova model and region | A few thousand tokens to build and record a demo | `ThrottlingException: Too many tokens per day` after under 50 tokens in total, in every US/EU region; `AccessDeniedException` (account verification) in others; the IAM user can't even read Service Quotas (`servicequotas:ListServiceQuotas` isn't in `AmazonBedrockFullAccess`) | Critical | Made throttling fail fast and fall back per turn (offline router, local model) so the demo never stalls; Polly still worked; filed a quota increase | Show the daily token quota, the amount used and the reset time in the Bedrock console and in the throttling error; give new accounts a usable default for Nova Lite/Micro; add `servicequotas:Get*`/`List*` for Bedrock to `AmazonBedrockFullAccess`; offer hackathon participants a fast-track quota |
 
 ## Feature requests
 1. **Alexa+ MCP test console** for non-Preview developers: point Alexa+ at a public MCP URL, sandboxed account linking, see the tool calls. *Critical.*

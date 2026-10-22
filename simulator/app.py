@@ -112,20 +112,31 @@ def is_connection_error(exc: BaseException) -> bool:
                                    "readerror", "session terminated", "404 not found"))
 
 
-async def reconnect(device: Device) -> None:
-    log.warning("MCP connection to the Nova server was lost; reconnecting %s", device.id)
-    device.client = None  # the old session is dead; drop it rather than closing it from another task
-    await device.connect(MCP_URL)
+_reconnect_locks: dict[str, asyncio.Lock] = {}
+
+
+async def reconnect(device: Device, stale: Any = None) -> None:
+    """Replace a dead MCP session. Concurrent callers (the poller and a chat turn) share one reconnect."""
+    lock = _reconnect_locks.setdefault(device.id, asyncio.Lock())
+    async with lock:
+        if device.client is not None and device.client is not stale:
+            return  # another caller already reconnected
+        log.warning("MCP connection to the Nova server was lost; reconnecting %s", device.id)
+        device.client = None  # the old session is dead; drop it rather than closing it from another task
+        await device.connect(MCP_URL)
 
 
 async def with_mcp(device: Device, op):
     """Run an MCP operation for a device; on a lost connection, reconnect once and retry."""
+    stale = device.client
     try:
+        if device.client is None:
+            raise ConnectionError("connection closed: no session")
         return await op()
     except Exception as exc:
-        if not is_connection_error(exc):
+        if not (is_connection_error(exc) or isinstance(exc, AssertionError)):
             raise
-        await reconnect(device)
+        await reconnect(device, stale)
         return await op()
 
 

@@ -126,7 +126,7 @@ Submitting? See [docs/CHECKLIST.md](docs/CHECKLIST.md). Sequence diagrams for a 
 | Layer | What it is |
 |---|---|
 | `nova_server/` | The Alexa+ integration: an MCP server on the official Python SDK (`mcp` 2.3). Streamable HTTP at `/mcp`, plus the care engine thread, vision and the Ring webhook. |
-| `simulator/` | A simulated Alexa+: two Echo devices and a Ring doorbell, each Echo with its own MCP session and bearer token, an Amazon Nova tool-use agent, an MCP Apps host, live announcement delivery, a time-lapse clock and a protocol inspector. |
+| `simulator/` | A simulated Alexa+: two Echo devices and a Ring doorbell, each Echo with its own MCP session and bearer token, an Amazon Nova tool-use agent, an MCP Apps host (published on its own as [mcp-apps-lite-host](https://github.com/Dakshhhhh-ops/mcp-apps-lite-host)), live announcement delivery, a time-lapse clock and a protocol inspector. |
 | `samples/` | Demo photos (three prescription bottles, an over-the-counter ibuprofen bottle, an after-visit summary) and their generator. All names are fictional. |
 | `skills/nova-care/` | An Agent Skill that teaches any agent how to run Nova conversations well. |
 

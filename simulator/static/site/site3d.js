@@ -1275,7 +1275,7 @@ async function build() {
   gsap.set(labels, { opacity: 0, x: 30 });
 
   const st = { p: 0 };
-  const GAP = 0.85;
+  const GAP = 0.74; // layer spacing: tighter keeps the stack compact, so it can be drawn larger
   const v = new THREE.Vector3();
   let C = new THREE.Vector3(), SC = 1, labelRel = [];
   // one pose for a progress value: the camera swings from the front to the side, the layers come apart
@@ -1329,8 +1329,8 @@ async function build() {
     labelRel = labels.map((l) => { const b = l.getBoundingClientRect(); return { x: b.left - r.left - (+gsap.getProperty(l, 'x') || 0), y: b.top - r.top }; });
     // two places the 3D can live, 48px clear of the text and the labels: beside the text column, or under it.
     // Take whichever lets it be bigger: a bigger stack is a readable stack.
-    const beside = { x0: textRight + 48, x1: labelLeft - 48, y0: r.top + 96, y1: r.bottom - 40 - 48 };
-    const under = { x0: textLeft, x1: labelLeft - 48, y0: textBottom + 48, y1: r.bottom - 40 - 48 };
+    const beside = { x0: textRight + 32, x1: labelLeft - 32, y0: r.top + 96, y1: r.bottom - 40 - 40 };
+    const under = { x0: textLeft, x1: labelLeft - 32, y0: textBottom + 40, y1: r.bottom - 40 - 40 };
     function fit(reg) {
       stage.camera.clearViewOffset();
       stage.setCamera({ position: [0, 1.0, 11], target: [0, 0.75, 0] });
@@ -1341,7 +1341,7 @@ async function build() {
         echo.group.scale.setScalar(SC);
         pose(1);
         const bb = bounds();
-        const f = Math.min((reg.x1 - reg.x0) / (bb.x1 - bb.x0), (reg.y1 - reg.y0) / (bb.y1 - bb.y0)) * 0.96;
+        const f = Math.min((reg.x1 - reg.x0) / (bb.x1 - bb.x0), (reg.y1 - reg.y0) / (bb.y1 - bb.y0));
         SC = clamp(SC * f, 0.2, 4);
       }
       return SC;

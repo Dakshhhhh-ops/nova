@@ -958,4 +958,4 @@ code { font-family: var(--mono); font-size: .86em; }
 .build.is-gl .build-head > * { max-width: min(560px, 38%); }
 .build.is-gl .build-head h2 { font-size: clamp(38px, 3.4vw, 62px); }
 .build.is-gl .build-lede { font-size: 16px; }
-.build.is-gl.is-x .layers { top: var(--nav-clear); bottom: auto; width: min(340px, 22vw); }
+.build.is-gl.is-x .layers { top: var(--nav-clear); bottom: auto; width: min(320px, 20vw); }

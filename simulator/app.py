@@ -158,11 +158,14 @@ async def lifespan(_: FastAPI):
     poller = asyncio.create_task(poll_announcements())
     yield
     poller.cancel()
+    try:
+        await poller
+    except BaseException:  # the poller ends with CancelledError; nothing to report on shutdown
+        pass
     for d in DEVICES.values():
-        try:
-            await d.close()
-        except Exception:
-            pass
+        # MCP sessions were opened by another task; closing them here trips anyio's task checks.
+        # The process (or test client) is going away, so just drop them.
+        d.client = None
 
 
 async def fetch_clock() -> dict[str, Any]:

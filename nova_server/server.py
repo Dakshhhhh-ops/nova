@@ -943,8 +943,8 @@ def request_refill(medication: Annotated[str, Field(description="Which medicatio
         return {"speech": "I couldn't tell which medication to refill.", "refill": None}
     existing = next((r for r in store.refills(elder["id"]) if r["med_id"] == pick["med_id"]), None)
     if existing:
-        state = "is ready for pickup" if existing["status"] == "ready" else "was already sent"
-        return {"speech": f"The {pick['name']} refill {state} at {PHARMACY}.", "refill": existing}
+        state = f"is ready for pickup at {PHARMACY}" if existing["status"] == "ready" else f"was already sent to {PHARMACY}"
+        return {"speech": f"The {pick['name']} refill {state}.", "refill": existing}
     t = now()
     rid = store.x("INSERT INTO refills (med_id, person_id, requested_at, requested_by, pharmacy, ready_at) VALUES (?, ?, ?, ?, ?, ?)",
                   (pick["med_id"], elder["id"], iso(t), me["id"], PHARMACY, iso(t + timedelta(hours=2))))

@@ -13,6 +13,7 @@ Run:  python -m nova_server            (http://127.0.0.1:8765/mcp)
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -35,6 +36,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from . import insights as ins
+from . import ring
 from . import speech as speech_mod
 from . import vision
 from .engine import CareEngine
@@ -1381,6 +1383,24 @@ async def ring_events(request: Request) -> JSONResponse:
     if kind not in ("ding", "motion", "door_open"):
         return JSONResponse({"error": f"unknown kind {kind}"}, status_code=400)
     return JSONResponse(engine.on_ring_event(kind, body.get("who")))
+
+
+@mcp.custom_route("/integrations/ring/webhook", methods=["POST"])
+async def ring_webhook(request: Request) -> JSONResponse:
+    """Ring Partner API Webhook v1.1: verify X-Signature over the raw body, dedupe, map to care signals.
+
+    Ring treats 4xx as permanent and retries 5xx, so only a bad signature or bad JSON gets a 4xx.
+    In the demo, an optional `X-Nova-Demo-Who` header names the visitor (real Ring payloads don't).
+    """
+    raw = await request.body()
+    if not ring.verify(raw, request.headers.get("x-signature")):
+        return JSONResponse({"error": "invalid signature"}, status_code=401)
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+    hint = request.headers.get("x-nova-demo-who") if DEMO_ROUTES else None
+    return JSONResponse(ring.handle(store, engine, payload, hint_who=hint))
 
 
 async def _json(request: Request) -> dict[str, Any]:

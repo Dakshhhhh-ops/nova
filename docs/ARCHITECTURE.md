@@ -111,6 +111,25 @@ sequenceDiagram
 ```
 In production the `/link` step is Login with Amazon or Amazon Cognito. Codes are single use, refresh tokens rotate, and tokens can be revoked. The demo tokens (`nova-demo-rose`, …) still work for the simulator.
 
+## 6. The front door (Ring Partner API webhook)
+```mermaid
+sequenceDiagram
+  autonumber
+  participant R as Ring (Partner API)
+  participant N as Nova /integrations/ring/webhook
+  participant E as Care engine
+  participant G as Grace (aide)
+  participant M as Maya's Echo Show
+  R->>N: POST Webhook v1.1 {meta.request_id, data.type: "button_press", attributes.timestamp}<br/>X-Signature: sha256=HMAC(raw body)
+  N->>N: verify HMAC before parsing (401 if wrong: Ring won't retry a 4xx)
+  N->>N: seen this request_id? → 200 {duplicate}
+  N->>E: ding at 9:58 — who? Ring doesn't say → calendar: Grace's visit at 10:00
+  E-->>G: "For today's visit: she hasn't logged her 8 AM pills; check her BP sitting and standing; Metformin is running low."
+  E-->>M: "Grace arrived at Mom's at 9:58."
+  N-->>R: 200 (well within Ring's 5 s)
+```
+`motion_detected` (with `attributes.sub_type`, e.g. `human`) feeds the "quiet home" wellness check; `device_offline` lands on the timeline. The simulator signs its events with the same HMAC, so the demo exercises the real verification path. A night-time `door_open` comes from a contact sensor, not Ring, and uses the simple shared-secret endpoint (`/integrations/ring/events`).
+
 ## Design choices
 - **Deterministic signals, model language.** Patterns (a symptom after a dose change, evening doses slipping, a quiet home) come from rules that are testable and cite evidence. Amazon Nova writes the spoken briefing, extracts check-ins, answers from the notes and reads images. Every model call has a template or fixture fallback.
 - **Identity from the token, never from speech.** The same tool answers differently for Rose and Maya; only Rose can change what's shared.

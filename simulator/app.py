@@ -494,9 +494,20 @@ class RingIn(BaseModel):
 
 @app.post("/api/ring/event")
 async def ring_event(body: RingIn) -> dict[str, Any]:
-    async with httpx.AsyncClient(timeout=10) as http:
-        r = await http.post(f"{MCP_BASE}/integrations/ring/events", json=body.model_dump(exclude_none=True),
-                            headers={"x-nova-ring-secret": RING_SECRET})
+    from nova_server import ring
+
+    if body.kind == "door_open":  # not a Ring event type: the door sensor path stays on the simple webhook
+        async with httpx.AsyncClient(timeout=10) as http:
+            r = await http.post(f"{MCP_BASE}/integrations/ring/events", json=body.model_dump(exclude_none=True),
+                                headers={"x-nova-ring-secret": RING_SECRET})
+    else:
+        # Exactly what Ring would send: a Webhook v1.1 payload, HMAC-signed over the raw body.
+        raw = ring.to_json_bytes(ring.make_event(body.kind, sub_type="human"))
+        headers = {"content-type": "application/json", "x-signature": ring.sign(raw)}
+        if body.who and body.who != "unknown":
+            headers["x-nova-demo-who"] = body.who  # demo-only hint: real payloads don't identify people
+        async with httpx.AsyncClient(timeout=10) as http:
+            r = await http.post(f"{MCP_BASE}/integrations/ring/webhook", content=raw, headers=headers)
     if r.status_code >= 400:
         raise HTTPException(r.status_code, r.text[:200])
     data = r.json()

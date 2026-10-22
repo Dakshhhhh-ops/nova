@@ -68,8 +68,10 @@ Messages between family members arrive the same way, live, on the other person's
 
 It also tracks evening doses slipping while mornings hold, mood, pain and sleep trends, and *"she's stopped her walks"*. Every insight comes from deterministic, testable rules and carries its evidence. Amazon Nova only writes the language.
 
-### 4. It listens to the front door: Ring (simulated)
-Front-door events arrive through a webhook and become care signals:
+### 4. It listens to the front door: Ring
+Nova takes **Ring Partner API Webhook v1.1** events at `/integrations/ring/webhook` (`button_press`, `motion_detected`, `device_online` / `device_offline`). It checks Ring's `X-Signature` (HMAC-SHA256 over the raw body) before reading anything, drops redelivered events by `meta.request_id`, and answers 200 right away (Ring retries 5xx, never 4xx). Ring doesn't say who rang, so Nova matches a doorbell press against the care calendar: a press near Grace's 10:00 visit is Grace, and she gets her visit checklist. We don't have Ring partner credentials, so the simulator sends the same signed payloads; with credentials you set `NOVA_RING_SIGNING_KEY` and register the URL in the Ring Developer Portal.
+
+What the front door becomes:
 - *Grace arrived at Mom's at 10:02*, logged as a visit and announced to the family.
 - *The front door opened at 2:14 AM*: an urgent notification (night wandering).
 - No movement all morning feeds the wellness check.
@@ -189,9 +191,9 @@ It drives the story in real Chrome, captures Alexa's spoken replies, adds an Ama
 ```bash
 uv run pytest -q
 ```
-43 tests cover:
+53 tests cover:
 - the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
-- Ring events, live message delivery;
+- Ring Partner API webhooks (signature check, dedupe, event mapping, visitor matched from the calendar), live message delivery;
 - pill checks (wrong time, already taken, outdated strength, a drug the doctor said to avoid), reconciliation and approval;
 - BP limits read from the doctor's notes, the dizziness insight with its BP evidence;
 - privacy, grounded answers, red flags, Bedrock request shapes;
@@ -241,12 +243,12 @@ Nova handles protected health information (medications, symptoms, blood pressure
 - **No diagnosis, no new medical advice.** Medication and symptom answers come from the care team's own notes, with sources. Plan changes need a person's approval.
 - **The older adult is in charge.** Consent before sharing symptoms; per-category sharing only she can change.
 - **Emergencies are not gated.** Falls, chest pain, breathing trouble and stroke signs alert everyone and tell her to call 911.
-- **Identity comes from the token**, never from what someone says. The Ring webhook is protected by a shared secret.
+- **Identity comes from the token**, never from what someone says. The Ring webhook verifies Ring's HMAC-SHA256 signature over the raw body before parsing it.
 - The household, names, pharmacy and hospital in the demo are fictional.
 
 ## Roadmap
 - Production account linking (Login with Amazon or Amazon Cognito) and deployment on Amazon Bedrock AgentCore Runtime.
-- Real Ring events through the Ring developer APIs, and Alexa proactive notifications for announcements.
+- Ring partner credentials: register the webhook in the Ring Developer Portal and backfill missed events from the event history API (`GET /v1/history/devices/{id}/events`). Alexa proactive notifications for announcements.
 - Amazon Nova Sonic for full-duplex voice; Fire TV ambient cards in the living room.
 
 ## License

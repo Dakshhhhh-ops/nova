@@ -210,9 +210,11 @@ class Agent:
         self.backend: Backend = get_backend()
 
     def brain_for(self, device: Device) -> Backend:
+        self.backend = get_backend()  # picks up Amazon Nova as soon as Bedrock answers again
         return self.backend if self.backend.name != "none" else RulesBrain(device.person["role"])
 
     def brain_info(self) -> dict[str, str]:
+        self.backend = get_backend()
         if self.backend.name == "none":
             return {"name": "rules", "label": RulesBrain("elder").label}
         return {"name": self.backend.name, "label": self.backend.label}

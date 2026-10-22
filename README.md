@@ -191,12 +191,12 @@ It drives the story in real Chrome, captures Alexa's spoken replies, adds an Ama
 ```bash
 uv run pytest -q
 ```
-53 tests cover:
+57 tests cover:
 - the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
 - Ring Partner API webhooks (signature check, dedupe, event mapping, visitor matched from the calendar), live message delivery;
 - pill checks (wrong time, already taken, outdated strength, a drug the doctor said to avoid), reconciliation and approval;
 - BP limits read from the doctor's notes, the dizziness insight with its BP evidence;
-- privacy, grounded answers, red flags, Bedrock request shapes;
+- privacy, grounded answers, red flags, Bedrock request shapes, and Amazon Nova taking over again by itself once a throttled quota resets;
 - a real Streamable HTTP round trip with bearer auth and a consent elicitation;
 - the full OAuth account-linking flow (discovery, registration, PKCE, linking, token exchange, single-use codes, refresh rotation);
 - the simulator's HTTP API (chat with cards, camera, Ring, clock, notifications, reset) against a real MCP server.

@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -139,11 +140,20 @@ class Bedrock(Backend):
         log.warning("Bedrock unavailable: %s", self.error)
         return False
 
+    def _converse(self, **kwargs: Any) -> dict[str, Any]:
+        """Converse, but step aside when the daily quota runs out (retried in the background later)."""
+        try:
+            return self._client.converse(**kwargs)
+        except Exception as exc:
+            if "tokens per day" in str(exc):
+                _demote(str(exc))
+            raise
+
     def complete(self, system: str, prompt: str, *, max_tokens: int = 600, json_mode: bool = False) -> str:
         assert self._client and self.model_id
         if json_mode:
             prompt += "\n\nRespond with a single JSON object and nothing else."
-        resp = self._client.converse(
+        resp = self._converse(
             modelId=self.model_id,
             system=[{"text": system}],
             messages=[{"role": "user", "content": [{"text": prompt}]}],
@@ -168,7 +178,7 @@ class Bedrock(Backend):
                     for t in tools
                 ]
             }
-        resp = self._client.converse(**kwargs)
+        resp = self._converse(**kwargs)
         out = Step(latency_ms=int((time.perf_counter() - t0) * 1000))
         for block in resp["output"]["message"]["content"]:
             if "text" in block:
@@ -317,15 +327,66 @@ def parse_json(text: str) -> dict[str, Any] | None:
 _BACKEND: Backend | None = None
 
 
-def get_backend(force: str | None = None) -> Backend:
-    """Pick the best available model once per process.
+_BEDROCK_ERROR: str | None = None  # why the last Bedrock probe failed
+_LAST_PROBE = 0.0
+_PROBING = threading.Lock()
+RETRY_SECONDS = float(os.getenv("NOVA_LLM_RETRY_SECONDS", "600"))
 
-    NOVA_LLM=auto (default) tries Bedrock, then Ollama, then none.
+
+def bedrock_note() -> str | None:
+    """Why Amazon Nova isn't answering right now, in a few words for the UI (None if it is, or wasn't tried)."""
+    e = _BEDROCK_ERROR or ""
+    if not e or isinstance(_BACKEND, Bedrock):
+        return None
+    if "tokens per day" in e or "Throttling" in e:
+        return "Amazon Nova daily quota reached, retrying"
+    if "AccessDenied" in e:
+        return "Amazon Nova access pending, retrying"
+    if "credential" in e.lower() or "security token" in e:
+        return "no AWS credentials"
+    return "Amazon Nova unavailable, retrying"
+
+
+def _demote(error: str) -> None:
+    """Bedrock hit its daily quota mid-session: use the fallback now and retry later."""
+    global _BACKEND, _BEDROCK_ERROR, _LAST_PROBE
+    if isinstance(_BACKEND, Bedrock):
+        log.warning("Amazon Nova daily quota reached; falling back until it resets")
+        _BACKEND, _BEDROCK_ERROR, _LAST_PROBE = Backend(), error, time.time()
+
+
+def _retry_bedrock() -> None:
+    """Re-probe Bedrock in the background: a quota that resets at midnight UTC shouldn't need a restart."""
+    global _BACKEND, _BEDROCK_ERROR, _LAST_PROBE
+    if not _PROBING.acquire(blocking=False):
+        return
+    try:
+        _LAST_PROBE = time.time()
+        b = Bedrock()
+        if b.available():
+            _BACKEND, _BEDROCK_ERROR = b, None
+            log.info("Amazon Nova is back: switched to %s", b.label)
+        else:
+            _BEDROCK_ERROR = b.error
+    finally:
+        _PROBING.release()
+
+
+def get_backend(force: str | None = None) -> Backend:
+    """Pick the best available model.
+
+    NOVA_LLM=auto (default) tries Bedrock, then Ollama, then none. If Bedrock was
+    unavailable (throttled, access pending), it is retried in the background every
+    NOVA_LLM_RETRY_SECONDS and takes over as soon as it answers.
     """
-    global _BACKEND
-    if _BACKEND is not None and force is None:
-        return _BACKEND
+    global _BACKEND, _BEDROCK_ERROR, _LAST_PROBE
     choice = (force or os.getenv("NOVA_LLM", "auto")).lower()
+    if _BACKEND is not None and force is None:
+        if (choice in ("auto", "bedrock") and not isinstance(_BACKEND, Bedrock) and _BEDROCK_ERROR
+                and "credential" not in _BEDROCK_ERROR.lower() and time.time() - _LAST_PROBE > RETRY_SECONDS):
+            _LAST_PROBE = time.time()
+            threading.Thread(target=_retry_bedrock, daemon=True, name="bedrock-retry").start()
+        return _BACKEND
     order: list[Backend]
     if choice == "bedrock":
         order = [Bedrock()]
@@ -340,6 +401,8 @@ def get_backend(force: str | None = None) -> Backend:
         if b.available():
             chosen = b
             break
+        if isinstance(b, Bedrock):
+            _BEDROCK_ERROR, _LAST_PROBE = b.error or "unavailable", time.time()
     _BACKEND = chosen
     return chosen
 
@@ -359,7 +422,7 @@ def vision_json(system: str, prompt: str, image: bytes, mime: str = "image/png")
         if "micro" in model_id:  # Nova Micro is text-only
             model_id = model_id.replace("nova-micro", "nova-lite")
         try:
-            resp = backend._client.converse(
+            resp = backend._converse(
                 modelId=model_id,
                 system=[{"text": system}],
                 messages=[{"role": "user", "content": [

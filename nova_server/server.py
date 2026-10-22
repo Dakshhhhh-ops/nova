@@ -23,8 +23,7 @@ from typing import Annotated, Any, Literal
 import anyio
 from mcp.server.apps import Apps
 from mcp.server.auth.middleware.auth_context import get_access_token
-from mcp.server.auth.provider import AccessToken
-from mcp.server.auth.settings import AuthSettings
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.elicitation import AcceptedElicitation, ElicitationResult
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.resolve import Elicit, Resolve
@@ -38,6 +37,7 @@ from starlette.responses import JSONResponse
 from . import insights as ins
 from . import vision
 from .engine import CareEngine
+from .oauth import NovaOAuthProvider
 from .seed import DEMO_TOKENS, ensure_seeded, seed
 from .store import SHARING_CATEGORIES, Store, clock_speed, iso, now, parse, set_clock
 
@@ -52,6 +52,9 @@ PUBLIC_URL = os.getenv("NOVA_PUBLIC_URL", f"http://{HOST}:{PORT}")
 store = Store(DB_PATH)
 ensure_seeded(store)
 engine = CareEngine(store)
+# OAuth 2.1 account linking (dynamic registration, PKCE); demo bearer tokens keep working.
+oauth = NovaOAuthProvider(store=store, demo_tokens=DEMO_TOKENS, issuer=os.getenv("NOVA_AUTH_ISSUER", PUBLIC_URL),
+                          resource=f"{PUBLIC_URL}/mcp")
 RING_SECRET = os.getenv("NOVA_RING_SECRET", "nova-demo-ring")
 
 NOVA_ICON = Icon(
@@ -80,24 +83,6 @@ Privacy: the older adult controls what the circle sees (set_sharing). Respect `n
 # Identity
 # ---------------------------------------------------------------------------
 _STDIO_USER: str | None = None
-
-
-class CircleTokenVerifier:
-    """Maps bearer tokens to circle members.
-
-    Demo tokens live in seed.py. In production this is where an Alexa+
-    account-linking token (OAuth 2.1, e.g. Login with Amazon or Amazon Cognito)
-    is introspected and mapped to a circle member.
-    """
-
-    async def verify_token(self, token: str) -> AccessToken | None:
-        person_id = DEMO_TOKENS.get(token)
-        if not person_id or not store.person(person_id):
-            return None
-        return AccessToken(
-            token=token, client_id="alexa-plus", scopes=["nova.care"], subject=person_id,
-            resource=f"{PUBLIC_URL}/mcp",
-        )
 
 
 def caller() -> dict[str, Any]:
@@ -180,12 +165,15 @@ mcp = MCPServer(
     website_url="https://github.com/Dakshhhhh-ops/nova",
     icons=[NOVA_ICON],
     version="0.1.0",
-    token_verifier=CircleTokenVerifier(),
+    auth_server_provider=oauth,
     auth=AuthSettings(
         issuer_url=os.getenv("NOVA_AUTH_ISSUER", PUBLIC_URL),
         resource_server_url=f"{PUBLIC_URL}/mcp",
         required_scopes=["nova.care"],
         validate_token_resource=True,
+        client_registration_options=ClientRegistrationOptions(enabled=True, valid_scopes=["nova.care"],
+                                                              default_scopes=["nova.care"]),
+        revocation_options=RevocationOptions(enabled=True),
     ),
     extensions=[apps],
 )
@@ -1182,6 +1170,21 @@ def apply_care_changes(
 # ---------------------------------------------------------------------------
 # Plain HTTP routes for operators (not part of MCP)
 # ---------------------------------------------------------------------------
+@mcp.custom_route("/link", methods=["GET", "POST"])
+async def link(request: Request):
+    """Account linking: the person says who they are, then goes back to the MCP client with a code."""
+    from starlette.responses import HTMLResponse, RedirectResponse
+
+    if request.method == "GET":
+        status, page = oauth.link_page(request.query_params.get("session", ""))
+        return HTMLResponse(page, status_code=status)
+    form = await request.form()
+    target = oauth.complete_link(str(form.get("session", "")), str(form.get("person", "")))
+    if not target:
+        return HTMLResponse(oauth.link_page("")[1], status_code=400)
+    return RedirectResponse(target, status_code=302)
+
+
 @mcp.custom_route("/healthz", methods=["GET"])
 async def healthz(_: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "server": "nova", "people": len(store.people())})

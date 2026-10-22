@@ -116,7 +116,7 @@ flowchart LR
 
 ### MCP features used
 - **Streamable HTTP**; negotiates **2026-07-28** and serves **2025-11-25** clients (what Alexa+ speaks today; verified with an `initialize` against the Docker image).
-- **Identity per person** from the bearer token (`TokenVerifier`), with **OAuth 2.0 Protected Resource Metadata** (RFC 9728). The same tool answers differently for Rose and Maya.
+- **Account linking with OAuth 2.1**: protected-resource metadata (RFC 9728), authorization-server metadata (RFC 8414), dynamic client registration (RFC 7591), PKCE, refresh-token rotation and revocation. The `/link` page is where a person says who they are in the circle (Login with Amazon or Cognito in production). Identity comes from the token, so the same tool answers differently for Rose and Maya. Demo bearer tokens still work for the simulator.
 - **Structured output** with an `outputSchema` on every tool; each result carries a `speech` line written for TTS.
 - **Tool annotations** and **icons**.
 - **MCP Apps** (`io.modelcontextprotocol/ui`): five `ui://` views (today, briefing, visit brief, pill check, reconciliation) that render on the Echo Show screens and call tools back through the host. Camera-only tools use `_meta.ui.visibility: ["app"]` so the model never sees them.
@@ -157,7 +157,7 @@ Open the simulator in Chrome (for the microphone and camera). Try:
 **Which brain?** `NOVA_LLM=auto` (default) uses Amazon Bedrock when your AWS credentials work; otherwise a local Ollama model; otherwise a deterministic offline router. The active brain is shown in the top bar. `NOVA_CLOCK=08:20` starts the household clock at a given time.
 
 ### Connect other MCP clients
-- **MCP Inspector**: `npx @modelcontextprotocol/inspector`, URL `http://127.0.0.1:8765/mcp`, header `Authorization: Bearer nova-demo-maya` (or `nova-demo-rose`, `nova-demo-leo`, `nova-demo-grace`).
+- **MCP Inspector**: `npx @modelcontextprotocol/inspector`, URL `http://127.0.0.1:8765/mcp`. Either run its OAuth flow (it registers itself and opens Nova's account-linking page), or set the header `Authorization: Bearer nova-demo-maya` (or `nova-demo-rose`, `nova-demo-leo`, `nova-demo-grace`).
 - **stdio** (Claude Desktop, Kiro, Claude Code): `uv run python -m nova_server --stdio --as rose`.
 - **Docker**: `docker build -t nova-mcp . && docker run -p 8765:8765 -e NOVA_PUBLIC_URL=https://your.host nova-mcp`.
 
@@ -171,13 +171,14 @@ It drives the story in real Chrome, captures Alexa's spoken replies, adds an Ama
 ```bash
 uv run pytest -q
 ```
-32 tests cover:
+35 tests cover:
 - the escalation ladder (and that taking the dose stops it), snooze, time jumps, check-in and wellness prompts;
 - Ring events, live message delivery;
 - pill checks (wrong time, already taken, outdated strength), reconciliation and approval;
 - BP limits read from the doctor's notes, the dizziness insight with its BP evidence;
 - privacy, grounded answers, red flags, Bedrock request shapes;
-- a real Streamable HTTP round trip with bearer auth and a consent elicitation.
+- a real Streamable HTTP round trip with bearer auth and a consent elicitation;
+- the full OAuth account-linking flow (discovery, registration, PKCE, linking, token exchange, single-use codes, refresh rotation).
 
 ## Tools
 

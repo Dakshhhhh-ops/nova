@@ -7,6 +7,7 @@ import socket
 import tempfile
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -19,10 +20,13 @@ from mcp import Client  # noqa: E402
 from nova_server import insights as ins  # noqa: E402
 from nova_server import server  # noqa: E402
 from nova_server.seed import seed  # noqa: E402
+from nova_server import store as store_mod  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def fresh_household():
+    # Freeze the household clock at 9:30 PM so results don't depend on when tests run.
+    store_mod.freeze(datetime.now().replace(hour=21, minute=30, second=0, microsecond=0))
     seed(server.store)
     server.set_stdio_user("rose")
     yield

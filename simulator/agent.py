@@ -26,6 +26,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp_types import ElicitRequestParams, ElicitResult, Implementation
 
 from nova_server.llm import Backend, get_backend
+from nova_server.store import now as household_now
 
 from .rules import RulesBrain
 
@@ -161,7 +162,7 @@ class Device:
 
 def system_prompt(device: Device) -> str:
     p = device.person
-    t = datetime.now()
+    t = household_now()
     if p["role"] == "elder":
         who = (f"{p['name']} ({p['short_name']}), 81, who lives alone in {p['location']}. She is the person being cared for. "
                "Speak slowly and simply, be warm and patient, never patronizing.")

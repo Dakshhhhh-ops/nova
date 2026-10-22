@@ -8,6 +8,7 @@ appointments, care notes and alerts.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -108,8 +109,35 @@ CREATE TABLE IF NOT EXISTS alerts (
 SHARING_CATEGORIES = ("medications", "wellbeing", "appointments", "messages")
 
 
+# The household clock. Real time by default; NOVA_CLOCK=HH:MM shifts it so a demo
+# can be recorded "at 8:20 in the morning" at any hour, and tests can freeze it.
+_FROZEN: datetime | None = None
+_OFFSET = timedelta(0)
+
+
+def set_clock(hhmm: str | None) -> None:
+    """Make 'now' start at HH:MM today (and keep ticking)."""
+    global _OFFSET
+    if not hhmm:
+        _OFFSET = timedelta(0)
+        return
+    hh, mm = (int(v) for v in hhmm.split(":"))
+    real = datetime.now()
+    _OFFSET = real.replace(hour=hh, minute=mm, second=0, microsecond=0) - real
+
+
+def freeze(at: datetime | None) -> None:
+    global _FROZEN
+    _FROZEN = at
+
+
 def now() -> datetime:
-    return datetime.now().replace(microsecond=0)
+    if _FROZEN is not None:
+        return _FROZEN
+    return (datetime.now() + _OFFSET).replace(microsecond=0)
+
+
+set_clock(os.getenv("NOVA_CLOCK"))
 
 
 def iso(dt: datetime) -> str:

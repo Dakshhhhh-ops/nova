@@ -122,6 +122,8 @@ Open http://127.0.0.1:8080 in Chrome (for the microphone). Use the suggestion ch
 
 **Which brain?** `NOVA_LLM=auto` (default) uses Amazon Bedrock if your AWS credentials work and Amazon Nova is enabled in the region; otherwise a local Ollama model (`OLLAMA_MODEL`, default `qwen3:8b`); otherwise a deterministic offline router. The active brain is shown in the top bar.
 
+**Recording a demo?** `NOVA_CLOCK=08:20` starts the household clock at 8:20 AM today (it keeps ticking), so the morning or evening story plays out whenever you record.
+
 ### Connect other MCP clients
 - **MCP Inspector**: `npx @modelcontextprotocol/inspector`, URL `http://127.0.0.1:8765/mcp`, header `Authorization: Bearer nova-demo-maya` (or `nova-demo-rose`, `nova-demo-leo`, `nova-demo-grace`).
 - **stdio** (Claude Desktop, Kiro, Claude Code): `uv run python -m nova_server --stdio --as rose`.

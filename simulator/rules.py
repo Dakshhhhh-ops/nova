@@ -37,6 +37,16 @@ def _med_phrase(text: str) -> str:
 
 def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     t = text.lower().strip()
+    for message in reversed(history or []):
+        if message.get("name") == "confirm_visit":
+            break
+        if message.get("visit_signal_id"):
+            expected = re.escape(message.get("expected_who") or "")
+            if re.fullmatch(rf"(?:yes[, ]+)?it['’]?s {expected}[.!]?", t):
+                return _call("confirm_visit", signal_id=message["visit_signal_id"], confirmed=True)
+            if re.fullmatch(r"it['’]?s someone else[.!]?", t):
+                return _call("confirm_visit", signal_id=message["visit_signal_id"], confirmed=False)
+            break
     if re.search(r"what (should|do|can) i take (now|today|tonight)|which pills|what pills (now|today)|what('s| is) due", t):
         return _call("get_today")
     if re.search(r"appointment|doctor'?s? visit|see (the )?doctor|who'?s coming|anyone coming|coming (today|tomorrow|this week)", t) \
@@ -44,7 +54,11 @@ def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> 
         return _call("list_appointments", days=14)
     if re.search(r"blood pressure|\bbp\b", t) and not re.search(r"\d{2,3}\s*(over|/)\s*\d{2,3}", t):
         return _call("get_vitals", days=7)
-    if role != "elder" and re.search(r"(mark|resolve|clear).*(alert|handled)|i'?ve? handled it|i called (the )?(doctor|office)", t):
+    if role != "elder" and re.search(r"i['’]?ll handle (this|it)|i will handle (this|it)|claim (this|the) (alert|task)", t):
+        return _call("update_care_task", alert_id=0, action="claim")
+    if role != "elder" and re.search(r"^record (?:an? )?action[: ]|^i called (the )?(doctor|office|rose|mom)", t):
+        return _call("update_care_task", alert_id=0, action="record_action", note=text)
+    if role != "elder" and re.search(r"(mark|resolve|clear).*(alert|handled)|i'?ve? handled it", t):
         return _call("resolve_alert", alert_id=0, note=text if re.search(r"called", t) else "")
     m = re.search(r"(\d{2,3})\s*(?:over|/)\s*(\d{2,3})", t)
     if m:
@@ -104,7 +118,7 @@ def route(text: str, role: str, history: list[dict[str, Any]] | None = None) -> 
     if re.search(r"(any|new|read|my|check) messages|messages for me|anything from", t):
         return _call("read_messages")
     if re.search(r"alert", t) and re.search(r"handled|resolve|done|clear", t):
-        return _call("list_alerts")
+        return _call("list_alerts", include_resolved=True)
     if re.search(r"alert", t):
         return _call("list_alerts")
     if role != "elder" and re.search(r"how('s| is| are| was)|doing|briefing|update|anything i should know|week|"

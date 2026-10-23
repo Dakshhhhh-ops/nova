@@ -95,7 +95,7 @@ def test_morning_checkin_prompt_and_wellness_escalation():
 
 def test_ring_visitor_and_night_door():
     eng = freeze_and_seed(at(10, 2))
-    out = eng.on_ring_event("ding", "grace")
+    out = eng.on_ring_event("ding", "grace", identity_confirmed=True)
     assert out["ok"] and any("maya" in k for k in out["announced"])
     store_mod.freeze(at(23, 40))
     night = eng.on_ring_event("door_open", "rose")
@@ -163,7 +163,7 @@ async def test_reconcile_after_visit_summary_then_catch_old_bottle():
 
 async def test_recent_activity_reports_ring():
     eng = freeze_and_seed(at(10, 5))
-    eng.on_ring_event("ding", "grace")
+    eng.on_ring_event("ding", "grace", identity_confirmed=True)
     out = await call("recent_activity", {}, as_person="maya")
     assert "grace" in out["speech"].lower()
 
@@ -218,7 +218,8 @@ async def test_low_supply_nudge_refill_and_pharmacy_ready():
     assert "Elm Street Pharmacy" in out["speech"] and out["refill"]["status"] == "requested"
     again = await call("request_refill", {"medication": "metformin"})
     assert "already" in again["speech"]
-    assert any(a["title"] == "Refill ordered" for a in server.store.announcements("maya"))
+    assert out["simulated"] is True and "simulated" in out["speech"]
+    assert any(a["title"] == "Refill handoff (simulation)" for a in server.store.announcements("maya"))
     fired = run(eng, at(10, 10), at(12, 20), step_min=10)
     assert any(k.startswith("refill-ready:") for k in fired)
     today = await call("get_today", {})
@@ -256,7 +257,7 @@ async def test_appointments_vitals_and_resolving_the_top_alert():
 
 async def test_grace_gets_a_visit_checklist_at_the_door():
     eng = freeze_and_seed(at(10, 5))
-    out = eng.on_ring_event("ding", "grace")
+    out = eng.on_ring_event("ding", "grace", identity_confirmed=True)
     assert any("blood pressure sitting and standing" in i for i in out["checklist"])
     assert any(a["title"] == "Visit checklist" for a in server.store.announcements("grace"))
     tool = await call("visit_checklist", {}, as_person="grace")

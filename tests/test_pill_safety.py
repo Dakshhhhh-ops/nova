@@ -85,3 +85,22 @@ def test_exact_product_rules():
     assert not vision.exact_product("Metformin ER", "Metformin")
     assert not vision.exact_product("Metoprolol", "Metformin")
     assert not vision.exact_product(None, "Metformin")
+
+
+@pytest.mark.parametrize("confidence", [float("nan"), float("inf"), -1, 101])
+def test_invalid_model_confidence_never_approves_a_dose(rose, confidence):
+    assert rose({"name": "Metformin", "strength": "500 mg", "confidence": confidence})["verdict"] != "ok_now"
+
+
+def test_another_patients_bottle_is_not_approved(rose):
+    out = rose({"name": "Metformin", "strength": "500 mg", "confidence": 0.99, "patient": "Someone Else"})
+    assert out["verdict"] == "check_first" and "name" in out["speech"]
+
+
+def test_image_results_disclose_fixtures_and_confidence_limits(rose):
+    label = {"name": "Metformin", "strength": "500 mg", "confidence": 0.99}
+    live = rose(label)
+    assert live["provenance"]["mode"] == "live_model"
+    assert "not measured accuracy" in live["provenance"]["confidence_note"]
+    fixture = rose(label, by="Sample photo fixture (offline)")
+    assert fixture["provenance"]["mode"] == "sample_fixture" and fixture["provenance"]["simulated"]

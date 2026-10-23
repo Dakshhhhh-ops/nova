@@ -509,7 +509,7 @@ function render() {
     for (const s of supply) {
       const days = Number(s.days_left), left = Number(s.left), low = Number.isFinite(days) && days <= 5;
       const r = refillFor(s.name);
-      const side = r ? `<span class="g-tag ${r.status === "ready" ? "ok" : ""}">${r.status === "ready" ? "Refill ready" : "Refill requested"}</span>` : low ? '<span class="g-tag warn">Running low</span>' : "";
+      const side = r ? `<span class="g-tag">${r.status === "ready" ? "Ready (simulation)" : "Refill handoff (simulation)"}</span>` : low ? '<span class="g-tag warn">Running low</span>' : "";
       if (!low && !r) continue;
       items.push(gRow(`<span class="pill-tile sm">${pillSVG((doses.find((x) => x.med_id && x.med_id === s.med_id) || {}).appearance)}</span>`,
         `<b>${esc(s.name || s.med_id)}</b><small>${esc([Number.isFinite(left) ? `${left} left` : "", Number.isFinite(days) ? `${days} day${days === 1 ? "" : "s"}` : "", r && r.pharmacy ? r.pharmacy : ""].filter(Boolean).join(" · "))}</small>`, side));

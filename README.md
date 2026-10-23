@@ -44,12 +44,18 @@ Nova brings them together on the devices the household already uses. It connects
 | Place | Device | Role |
 |---|---|---|
 | **The living room** | Rose's Echo Show 8 | Reminders, pill checks, daily check-ins, consent |
-| **The front door** | Rose's Ring doorbell | Visits, deliveries, a quiet morning, a door opening at night |
+| **The front door** | Rose's Ring doorbell; separate door sensor | Doorbell activity, expected visits to confirm, and door-opening signals |
 | **The cloud** | Maya's Echo Show 15, and Nova | Briefings, escalations, plan changes, the visit brief |
 
 Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard Alexa+ uses for third-party experiences. This repository also includes a **simulated Alexa+** (two Echo Shows and a Ring doorbell in the browser) whose agent runs on **Amazon Nova in Amazon Bedrock**, because Alexa+ developer preview access isn't generally available.
 
 ## What Nova does
+
+Care follow-ups have an owner and a history: caregivers can claim an alert, record an action, and resolve it. Other caregivers see who is handling it. Existing databases migrate automatically, preserving their alerts.
+
+Ring doorbell events never establish a visitor's identity. A scheduled visitor prompts a confirmation; the aide checklist and arrival notifications are sent only after someone confirms. Door-opening signals are labelled separately as door-sensor events.
+
+Image cards disclose whether a model or a bundled sample fixture read the image. Label confidence is a heuristic, not measured accuracy, and a patient-name mismatch blocks approval. Pharmacy handoffs and their ready times are explicitly simulated; Nova does not send requests to a pharmacy.
 
 **It speaks first.** A care engine runs on the household clock and turns the care plan into announcements on the right device.
 
@@ -60,7 +66,7 @@ Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard
 | 7:30 PM, still not taken | Maya's Echo: *"Mom hasn't taken her 6 PM Metformin. I reminded her at 6 PM and 6:30 PM."* |
 | 9:00 AM | The morning check-in: *"How are you feeling today?"* |
 | 11:00 AM, a quiet home | No pills logged and no movement at the door: a wellness check, then an urgent alert to the family |
-| A bottle running low | A refill nudge, sent to the pharmacy with a pickup plan |
+| A bottle running low | A refill nudge and simulated handoff; the family contacts the pharmacy |
 
 **It sees.** Rose holds a bottle up to the Echo Show camera. Amazon Nova reads the label and Nova checks it against her plan: the right pill at the right time, a pill already taken, an outdated strength, or a medicine her doctor said to avoid (*"Please don't take ibuprofen, Rose…"*). Nova says *take it* only when it is sure: the exact product (not a combination or extended-release version), the strength read and matching the plan, and a confident read. Otherwise it asks her to check with the pharmacist, and it refuses outright when it can't read the label. Maya photographs an after-visit summary, and Nova proposes the plan changes (*change, start, stop, continue*, with the doctor's reasons). Nothing changes until she approves.
 
@@ -70,7 +76,7 @@ Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard
 
 Insights come from deterministic, tested rules, and each one carries its evidence. Amazon Nova writes the words. Nova never diagnoses.
 
-**It reads the front door.** Nova calls the **Ring Partner API** for the linked doorbell's status and event history, and takes Ring's signed webhooks in real time. A doorbell press at the time of a scheduled visit tells Nova the home aide has arrived, and she gets her visit checklist.
+**It reads the front door.** Nova calls the **Ring Partner API** for the linked doorbell's status and event history, and takes Ring's signed webhooks in real time. A doorbell press near a scheduled visit prompts Rose to check who is there. Once she confirms the visitor, the aide gets her checklist and the family hears about the arrival.
 
 **It stays respectful.** Spoken replies are one or two sentences, with the details one *"tell me more"* away. Rose is asked before her family hears about a symptom, and she decides what the circle can see. Emergencies skip every question.
 
@@ -111,7 +117,7 @@ flowchart LR
     V["Amazon Polly voice"]
   end
   subgraph Nova["nova_server/ (MCP server)"]
-    T["25 tools · 8 resources · 2 prompts<br/>5 MCP Apps views"]
+    T["27 tools · 8 resources · 2 prompts<br/>5 MCP Apps views"]
     E["Care engine<br/>(household clock)"]
     X["Insight engine"]
     S["Vision: pill check,<br/>reconciliation"]
@@ -191,7 +197,7 @@ uv run python -m simulator    # simulator    http://127.0.0.1:8080  (story at /,
 1. Open **/live** and press **Reset**.
 2. **Rose:** **Show Alexa → Ibuprofen**. Nova reads the label and stops her, citing her doctor's notes.
 3. **Maya:** *"How's Mom doing?"*, then *"Tell me more."*
-4. **Front door → Grace arrives.** The aide gets her checklist and the family is told.
+4. **Front door → Grace arrives**, then Rose says **Yes, it's Grace** after checking who is there. The aide gets her checklist and the family is told.
 5. **Maya:** **Scan paperwork → after-visit summary → Approve.** Then Rose shows the old lisinopril bottle.
 6. Drag the sun to just before 6 PM and press **Fast-forward** to watch the reminder escalate to Maya.
 
@@ -224,7 +230,7 @@ All settings are environment variables (see [.env.example](.env.example)).
 
 ## MCP reference
 
-**Tools (25)**
+**Tools (27)**
 
 | Tool | Who | What |
 |---|---|---|
@@ -235,7 +241,7 @@ All settings are environment variables (see [.env.example](.env.example)).
 | `log_vitals` / `get_vitals` | both | Blood pressure by voice, checked against the doctor's limits |
 | `list_appointments` | both | Upcoming visits, with who's driving and where |
 | `visit_checklist` | aide, family | What to do at Rose's today; sent to the aide when she arrives |
-| `request_refill` | both | Refill to the pharmacy with a pickup plan |
+| `request_refill` | both | Simulated refill handoff with a pickup plan; no pharmacy request is sent |
 | `send_message` / `read_messages` | both | Messages within the circle, delivered live |
 | `read_notifications` / `snooze_reminder` | both | "What are my notifications?", "Remind me in 10 minutes" |
 | `ask_care_notes` | both | Answers grounded in the doctors' notes, with sources |
@@ -247,6 +253,8 @@ All settings are environment variables (see [.env.example](.env.example)).
 | `read_care_document` (UI, camera) | family | Amazon Nova reads the paperwork; reconciliation proposal |
 | `apply_care_changes` | family | Approve or discard proposed plan changes |
 | `list_alerts` / `resolve_alert` | family | Open alerts; mark one handled |
+| `update_care_task` | family, aide | Claim a follow-up or record an action; ownership and audit history persist |
+| `confirm_visit` | both | Confirm or reject an expected visitor after checking who's at the door |
 | `set_sharing` | Rose | What the circle can see |
 | `acknowledge_notification` (app only) | both | Device screens acknowledge announcements |
 
@@ -258,7 +266,7 @@ All settings are environment variables (see [.env.example](.env.example)).
 uv run pytest -q
 ```
 
-81 tests run in CI on every push. They cover:
+The pytest suite runs in CI on every push. It covers:
 - the care engine (the escalation ladder, snooze, check-ins and wellness checks);
 - pill checks, including the safety rules for unreadable labels, low-confidence reads, missing strengths and look-alike products, and reconciliation;
 - the dizziness insight and its evidence, BP limits, privacy, grounded answers and red flags;
@@ -288,7 +296,7 @@ nova/
 ├── samples/            Demo images and fixtures
 ├── skills/nova-care/   Agent Skill
 ├── scripts/            Demo-video recorder, UI checks
-├── tests/              pytest suite (81 tests)
+├── tests/              pytest suite
 ├── docs/               Architecture, design, demo script, submission notes
 ├── serve.py            Single-port server for deployment
 └── run.py              Local launcher

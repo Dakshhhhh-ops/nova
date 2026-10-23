@@ -17,6 +17,7 @@ household clock skip past triggers instead of replaying them.
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -316,15 +317,15 @@ class CareEngine:
                     fired += self._fire(
                         f"low:{m['id']}:{t.date()}", elder["id"], "info", "Running low",
                         f"{elder['short_name']}, you have about {days} days of {m['name']} left. "
-                        "Want me to order a refill from Elm Street Pharmacy?",
+                        "Want me to save a refill handoff? You'll need to contact the pharmacy to place the request.",
                         due_at=ten, expects_reply=True, replies=["Yes, order a refill", "Not now"],
                     )
         for r in self.store.refills(elder["id"], ("requested",)):
             if r["ready_at"] and self._crossed(parse(r["ready_at"]), last, t):
                 self.store.x("UPDATE refills SET status = 'ready' WHERE id = ?", (r["id"],))
                 for to in [elder["id"]] + [p["id"] for p in self.store.caregivers()]:
-                    fired += self._fire(f"refill-ready:{r['id']}:{to}", to, "info", "Refill ready",
-                                        f"The {r['name']} refill is ready at {r['pharmacy']}.")
+                    fired += self._fire(f"refill-ready:{r['id']}:{to}", to, "info", "Simulated refill update",
+                                        f"In this simulation, the {r['name']} refill is ready. Please contact {r['pharmacy']} for actual availability.")
         return fired
 
     # -- aide handoff -----------------------------------------------------------
@@ -343,8 +344,7 @@ class CareEngine:
             items.append(f"She's reported dizziness {len(dizzy)} time{'s' if len(dizzy) > 1 else ''} in three days: "
                          "please check her blood pressure sitting and standing.")
         for r in self.store.refills(elder["id"]):
-            items.append(f"The {r['name']} refill is {'ready for pickup' if r['status'] == 'ready' else 'ordered'} "
-                         f"at {r['pharmacy']}.")
+            items.append(f"The {r['name']} refill handoff is simulated; contact {r['pharmacy']} to confirm the request and availability.")
         low = [m for m in self.store.medications(elder["id"]) if m.get("supply") is not None
                and m["supply"] // max(1, len(m["times"])) <= 5]
         if low:
@@ -357,7 +357,7 @@ class CareEngine:
 
     # -- Ring (front door) ----------------------------------------------------
     def on_ring_event(self, kind: str, who: str | None, *, at: datetime | None = None,
-                      announce: bool = True) -> dict[str, Any]:
+                      announce: bool = True, identity_confirmed: bool = False) -> dict[str, Any]:
         """Turn a front-door event into a signal plus the right announcements.
 
         `at` is when it happened (events pulled from Ring's history API arrive late); `announce=False` records
@@ -369,14 +369,30 @@ class CareEngine:
         elder = elders[0]
         t = at or now()
         who = (who or "unknown").lower()
+        expected = who if kind == "ding" and self.store.person(who) and not identity_confirmed else None
+        if kind == "ding" and not identity_confirmed:
+            who = "unknown"
         label = {"grace": "Grace", "delivery": "A delivery driver", "rose": elder["short_name"], "unknown": "Someone"}.get(who, who.title())
         text = {
             "ding": f"{label} rang the doorbell",
             "motion": "Motion at the front door",
             "door_open": f"{label} opened the front door" if who != "rose" else f"{elder['short_name']} went out the front door",
         }.get(kind, f"Front door: {kind}")
-        sid = self.store.add_signal(elder["id"], "ring", kind, who, text, at=t)
+        source = "door_sensor" if kind == "door_open" else "ring"
+        sid = self.store.add_signal(elder["id"], source, kind, who, text, at=t)
         out = {"ok": True, "signal": {"id": sid, "at": iso(t), "kind": kind, "who": who, "text": text}, "announced": []}
+        if expected:
+            person = self.store.person(expected)
+            name = person["short_name"] if person else "your visitor"
+            text = f"Someone rang the doorbell during {name}'s expected visit; identity unconfirmed"
+            self.store.x("UPDATE signals SET expected_who = ?, text = ? WHERE id = ?", (expected, text, sid))
+            out["signal"].update(text=text, expected_who=expected, identity_confirmed=False)
+            if announce:
+                out["announced"] += self._fire(f"ring:{sid}:confirm", elder["id"], "visitor_confirmation", "Who's at the door?",
+                                               f"Someone rang during {name}'s expected visit. Please check who is there, then tell me if it's {name}.",
+                                               expects_reply=True, replies=[f"Yes, it's {name}", "It's someone else"],
+                                               related={"visit_signal_id": sid, "expected_who": expected})
+            return out
         if not announce:
             return out
         key = f"ring:{sid}"
@@ -407,3 +423,29 @@ class CareEngine:
             self.store.add_alert(elder["id"], "urgent", f"night-door-{sid}",
                                  f"Front door opened at {ins.time_label(t)}, late at night.")
         return out
+
+    def confirm_visit(self, signal_id: int, elder_id: str, by: str, confirmed: bool) -> dict[str, Any]:
+        with self.store._lock:
+            signal = self.store.one("SELECT * FROM signals WHERE id = ? AND person_id = ?", (signal_id, elder_id))
+            if not signal or not signal["expected_who"]:
+                return {"speech": "I couldn't find that expected visit.", "error": True}
+            if signal["confirmed_at"]:
+                return {"speech": "That visitor check was already recorded.", "status": "already_recorded"}
+            if not timedelta(0) <= now() - parse(signal["at"]) <= timedelta(hours=2):
+                return {"speech": "That doorbell event is too old to confirm as a current visit.", "error": True}
+            person = self.store.person(signal["expected_who"])
+            name = person["short_name"] if person else "the expected visitor"
+            text = f"{name}'s arrival confirmed" if confirmed else "Visitor was not the expected person"
+            self.store.x("UPDATE signals SET confirmed_by = ?, confirmed_at = ?, who = ?, text = ? WHERE id = ?",
+                         (by, iso(now()), signal["expected_who"] if confirmed else "unknown", text, signal_id))
+            for a in self.store.q("SELECT id, related FROM announcements WHERE kind = 'visitor_confirmation'"):
+                if json.loads(a["related"] or "{}").get("visit_signal_id") == signal_id:
+                    self.store.set_announcement_status(a["id"], "acknowledged")
+            if confirmed:
+                # The confirmed event is distinct from the original anonymous doorbell press.
+                out = self.on_ring_event("ding", signal["expected_who"], identity_confirmed=True)
+                self.store.x("UPDATE signals SET kind = 'visit_confirmed', source = 'echo', confirmed_by = ?, confirmed_at = ?, text = ? WHERE id = ?",
+                             (by, iso(now()), text, out["signal"]["id"]))
+                out["signal"].update(kind="visit_confirmed", source="echo", text=text, confirmed_by=by)
+                return {"speech": f"Thanks. {name}'s arrival is confirmed.", "status": "confirmed", **out}
+            return {"speech": "Thanks. I won't mark the expected visitor as arrived.", "status": "rejected"}

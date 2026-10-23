@@ -83,8 +83,8 @@ def test_sync_imports_care_events_and_device_health(household):
     res = ring_api.sync(store, engine, api_with(fake), real_now=NOW)
     assert res["ok"] and res["account"] == {"id": "ava1.ring.account.ROSE7X2Q", "first_name": "Rose"}  # no email kept
     by_id = {e["id"]: e for e in res["imported"]}
-    # A doorbell press two minutes before Grace's 10:00 visit is Grace; it's fresh, so it's announced.
-    assert by_id["evt_8f2c1a_ding"]["who"] == "grace" and by_id["evt_8f2c1a_ding"]["announced"]
+    # A scheduled visit is context, not proof of the visitor's identity.
+    assert by_id["evt_8f2c1a_ding"]["who"] == "unknown" and by_id["evt_8f2c1a_ding"]["announced"]
     assert by_id["evt_8f2b90_motion"]["event_type"] == "motion.human"
     # Page 2 (followed via links.next): yesterday's press goes on the timeline without an announcement.
     assert by_id["evt_7a0e12_ding"]["announced"] is False and by_id["evt_7a0e12_ding"]["who"] == "unknown"
@@ -95,7 +95,8 @@ def test_sync_imports_care_events_and_device_health(household):
     kinds = [s["kind"] for s in store.q("SELECT kind FROM signals ORDER BY id")]
     assert kinds.count("ding") == 2 and "motion" in kinds and "device_offline" in kinds
     grace_note = store.q("SELECT * FROM announcements WHERE to_id = 'grace'")
-    assert grace_note and "visit" in grace_note[0]["speech"].lower()
+    assert not grace_note
+    assert any(a["kind"] == "visitor_confirmation" for a in store.announcements("rose"))
     paths = [c["path"] for c in res["calls"]]
     assert paths[0] == "/v1/users/me" and "/v1/devices" in paths
     assert f"/v1/history/devices/{FRONT}/events?event_types=ding,motion.human" in paths

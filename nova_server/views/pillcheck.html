@@ -392,8 +392,6 @@ function render(d) {
     sub = idf.strength && med && med.dose ? `This bottle is ${idf.strength}, but your plan is now ${med.dose}.` : "The strength doesn't match your current plan.";
   }
   const due = arr(d.due_now).filter((x) => obj(x));
-  const conf = num(idf.confidence);
-  const confPct = conf === null ? null : Math.round(Math.max(0, Math.min(1, conf > 1 ? conf / 100 : conf)) * 100);
   paintCard((per, level) => {
     let lead = "";
     if (level < 2) {
@@ -405,7 +403,7 @@ function render(d) {
       `<b>${esc(x.name || "")}</b><small>${esc([x.time_label, gCap(x.appearance)].filter(Boolean).join(" · "))}</small>`, `<span class="g-tag">${label}</span>`));
     const items = dueRows.slice(0, 2);
     items.push(gRow(ICON.bottle, `On the bottle: <b>${esc(idf.name || "Unknown")}${idf.strength ? " " + esc(idf.strength) : ""}</b>${idf.directions ? `<small>${esc(idf.directions)}</small>` : ""}`,
-      confPct !== null ? `${confPct}% sure` : ""));
+      ""));
     items.push(med
       ? gRow(`<span class="pill-tile sm">${pillSVG(med.appearance)}</span>`, `Your list: <b>${esc(med.name || "")}${med.dose ? " " + esc(med.dose) : ""}</b><small>${esc([times.join(", "), gCap(med.purpose)].filter(Boolean).join(" · "))}</small>`)
       : gRow(ICON.list, `<b>${verdict === "unclear" ? "Nothing to compare yet" : verdict === "avoid" ? "Flagged in your care notes" : "No match on your list"}</b><small>${verdict === "avoid" ? "Your doctors asked you to avoid this one." : "Check with your pharmacist or doctor."}</small>`));
@@ -414,7 +412,7 @@ function render(d) {
     return {
       tone: verdict,
       kicker: `${ICON[verdict]}${esc(KICKER[verdict])}`,
-      head: esc(title), sub: esc(sub), lead, items,
+      head: esc(title), sub: esc(sub) + `<small style="display:block;font-size:14px;margin-top:8px">${esc(d.generated_by || "Image source unavailable")}</small>`, lead, items,
     };
   }, d);
 }

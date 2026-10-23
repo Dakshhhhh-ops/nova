@@ -418,7 +418,7 @@ function render() {
       tone: "pending",
       kicker: `${ICON.doc}Care plan update<span class="soft">${src.provider ? " · " + esc(src.provider) : ""}</span>`,
       head: n ? `${n} medicine change${n === 1 ? "" : "s"} to review` : esc(src.title || "Care document"),
-      sub: esc([src.title, src.date].filter(Boolean).join(" · ")) + (changes.length ? " · nothing changes until you approve" : ""),
+      sub: esc([src.title, src.date].filter(Boolean).join(" · ")) + (changes.length ? " · nothing changes until you approve" : "") + `<small style="display:block;font-size:14px;margin-top:8px">${esc(d.generated_by || "Image source unavailable")}</small>`,
       lead: "", items, actions,
     };
   }, model);

@@ -83,6 +83,18 @@ def test_vision_ring_clock_and_notifications(sim):
     assert "now" in clock and clock["speed"] == 1
 
     notes = sim.get("/api/announcements", params={"device": "maya"}).json()["items"]
+    assert not any("Grace arrived" in n["speech"] for n in notes)
+    from mcp import Client
+    import asyncio
+
+    async def confirm():
+        server.set_stdio_user("rose")
+        async with Client(server.mcp) as c:
+            result = await c.call_tool("confirm_visit", {"signal_id": ring["signal"]["id"], "confirmed": True})
+            assert not result.is_error and result.structured_content["status"] == "confirmed"
+
+    asyncio.run(confirm())
+    notes = sim.get("/api/announcements", params={"device": "maya"}).json()["items"]
     assert any("Grace arrived" in n["speech"] for n in notes)
     ann_id = notes[0]["id"]
     assert sim.post(f"/api/announcements/{ann_id}/ack", json={"device": "maya", "action": "dismissed"}).json()["ok"]

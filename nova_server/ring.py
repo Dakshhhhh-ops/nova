@@ -104,9 +104,9 @@ def handle(store: Store, engine: Any, payload: dict[str, Any], hint_who: str | N
     at = datetime.fromtimestamp(ts / 1000) if isinstance(ts, (int, float)) else now()
     if rtype == "button_press":
         who = hint_who or expected_visitor(store, elder["id"], at) or "unknown"
-        out = engine.on_ring_event("ding", who)
+        out = engine.on_ring_event("ding", who, at=at, identity_confirmed=False)
     elif rtype == "motion_detected":
-        out = engine.on_ring_event("motion", hint_who or "unknown")
+        out = engine.on_ring_event("motion", "unknown", at=at, identity_confirmed=False)
     elif rtype in ("device_online", "device_offline"):
         state = "back online" if rtype == "device_online" else "offline"
         store.add_signal(elder["id"], "ring", rtype, None, f"Front door camera is {state}")

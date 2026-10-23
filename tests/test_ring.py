@@ -62,7 +62,7 @@ def test_bad_signature_is_rejected_with_4xx(client):
     assert r.status_code == 401  # 4xx: Ring will not retry a forged event
 
 
-def test_button_press_near_grace_visit_is_grace(client):
+def test_button_press_near_grace_visit_requires_confirmation(client):
     # Grace's visit is tomorrow at 10:00; a doorbell press at 9:55 is probably her.
     store_mod.freeze(TOMORROW_10.replace(hour=9, minute=55))
     ev = ring.make_event("ding", at=TOMORROW_10.replace(hour=9, minute=55))
@@ -70,8 +70,15 @@ def test_button_press_near_grace_visit_is_grace(client):
     assert r.status_code == 200, r.text
     out = r.json()
     assert out["ring_type"] == "button_press" and out["device"] == "ring-front-door-1"
-    assert out["signal"]["who"] == "grace"
-    assert out["checklist"], "Grace gets her visit checklist"
+    assert out["signal"]["who"] == "unknown"
+    assert out["signal"]["expected_who"] == "grace"
+    assert "checklist" not in out
+    assert not any(a["title"] == "Visit checklist" for a in server.store.announcements("grace"))
+    confirmed = server.engine.confirm_visit(out["signal"]["id"], "rose", "rose", True)
+    assert confirmed["status"] == "confirmed" and confirmed["checklist"]
+    before = len(server.store.announcements("grace"))
+    assert server.engine.confirm_visit(out["signal"]["id"], "rose", "rose", True)["status"] == "already_recorded"
+    assert len(server.store.announcements("grace")) == before
 
 
 def test_button_press_with_no_visit_is_someone(client):
@@ -79,6 +86,28 @@ def test_button_press_with_no_visit_is_someone(client):
     out = post(client, ev).json()
     assert out["signal"]["who"] == "unknown"
     assert "Someone" in out["signal"]["text"]
+
+
+def test_rejected_and_stale_visits_do_not_send_checklists(client):
+    store_mod.freeze(TOMORROW_10)
+    pending = post(client, ring.make_event("ding", at=TOMORROW_10)).json()
+    sid = pending["signal"]["id"]
+    rejected = server.engine.confirm_visit(sid, "rose", "rose", False)
+    assert rejected["status"] == "rejected"
+    assert not server.store.announcements("grace")
+    assert server.engine.confirm_visit(sid, "someone-else", "maya", True)["error"]
+    pending = post(client, ring.make_event("ding", at=TOMORROW_10)).json()
+    store_mod.freeze(TOMORROW_10 + timedelta(hours=3))
+    assert server.engine.confirm_visit(pending["signal"]["id"], "rose", "rose", True)["error"]
+    assert not server.store.announcements("grace")
+
+
+def test_offline_conversation_routes_explicit_visitor_confirmation():
+    from simulator.rules import route
+    history = [{"role": "assistant", "visit_signal_id": 42, "expected_who": "grace"}]
+    assert route("Yes, it's Grace", "elder", history)["args"] == {"signal_id": 42, "confirmed": True}
+    assert route("It's someone else", "elder", history)["args"]["confirmed"] is False
+    assert route("Yes, it's Leo", "elder", history) is None
 
 
 def test_motion_and_duplicates(client):

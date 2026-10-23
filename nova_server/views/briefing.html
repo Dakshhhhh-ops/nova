@@ -490,8 +490,13 @@ function bpChart(rows, topInsight) {
 
 /* ---------- state + rendering ---------- */
 let model = null;
+let activeTaskId = null;
 const alertBusy = new Set();
 const alertDone = new Set();
+const actionDrafts = new Map();
+$app.addEventListener("input", (e) => {
+  if (e.target.matches("[data-note]")) actionDrafts.set(e.target.dataset.note, e.target.value);
+});
 
 
 const gCap = (s) => { s = String(s || ""); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; };
@@ -544,13 +549,34 @@ function paintCard(spec, key, steps) {
     if (cardFits()) break;
   }
 }
-function repaint() { if (lastSpec) paintCard(lastSpec, lastKey, lastSteps); }
+function repaint() { if (lastSpec) { paintCard(lastSpec, lastKey, lastSteps); restoreDrafts(); } }
+function restoreDrafts() {
+  for (const input of $app.querySelectorAll("[data-note]")) input.value = actionDrafts.get(input.dataset.note) || "";
+}
 $app.addEventListener("click", (e) => {
   const p = e.target.closest("[data-page]");
   if (p) { pageNo = Number(p.getAttribute("data-page")) || 0; repaint(); }
 });
 function render() {
   const d = model || {};
+  const active = arr(d.alerts).find((a) => String(a.id) === activeTaskId);
+  if (active) {
+    const id = String(active.id), done = active.status === "handled", busy = alertBusy.has(id);
+    const otherOwner = active.claimed_by && d.viewer && active.claimed_by !== d.viewer.id;
+    const disabled = busy || otherOwner ? "disabled" : "";
+    paintCard((per, level) => ({
+      tone: done ? "steady" : "watch", kicker: done ? "Follow-up resolved" : "Care follow-up",
+      head: esc(active.owner_name ? `${active.owner_name} is handling this` : "Who can follow up?"),
+      sub: esc(active.message || "Alert"),
+      lead: done ? "" : `<label style="display:block;font-size:16px">What did you do?<textarea data-note="${esc(id)}" aria-label="Follow-up action" maxlength="2000" rows="2" placeholder="e.g. Called Rose and checked in" ${disabled} style="display:block;box-sizing:border-box;width:100%;resize:none;padding:8px;margin-top:5px;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:8px"></textarea></label>`,
+      items: arr(active.activity).slice().reverse().map((a) => gRow("", `<b>${esc(a.action === "claim" ? "Follow-up claimed" : a.action === "resolve" ? "Resolved" : "Action recorded")}</b>${a.note ? `<small>${esc(a.note)}</small>` : ""}<small>${esc([a.by_name, ago(a.at)].filter(Boolean).join(" ? "))}</small>`)),
+      actions: `<button class="btn ghost" data-task-back>Back</button>` + (done ? "" :
+        (!active.claimed_by ? `<button class="btn" data-task="${esc(id)}" data-task-action="claim" ${disabled}>I'll handle this</button>` :
+        `<button class="btn" data-task="${esc(id)}" data-task-action="record_action" ${disabled}>Save action</button><button class="btn ghost" data-resolve="${esc(id)}" ${disabled}>Resolve</button>`)),
+    }), activeTaskId);
+    restoreDrafts();
+    return;
+  }
   const person = d.person || {};
   const status = ["steady", "watch", "urgent"].includes(d.status) ? d.status : "steady";
   const who = person.short_name || person.name || "";
@@ -559,7 +585,7 @@ function render() {
   const top = insights[0] || null;
   const w = d.wellbeing || {};
   const alerts = arr(d.alerts).filter(gObj);
-  const openAlerts = alerts.filter((al) => !alertDone.has(String(al.id)));
+  const openAlerts = alerts.filter((al) => al.status !== "handled" && !alertDone.has(String(al.id)));
   const upcoming = arr(d.upcoming).filter(gObj);
   const docAppt = upcoming.find((u) => /\bdr\.?\s/i.test(String(u.provider || "")));
   const a = d.adherence || {};
@@ -580,10 +606,10 @@ function render() {
       items.push(gRow(ICON[s], `<b>${esc(i.title || "")}</b>${e0 ? `<small>${esc(e0)}</small>` : ""}`, `<span class="g-tag ${s === "urgent" ? "bad" : s === "watch" ? "warn" : ""}">${sevName(s)}</span>`));
     }
     for (const al of alerts) {
-      const id = String(al.id), s = sevOf(al.severity), done = alertDone.has(id), isBusy = alertBusy.has(id);
+      const id = String(al.id), s = sevOf(al.severity), done = alertDone.has(id) || al.status === "handled";
       const side = done ? `<span class="g-tag ok">Handled</span>`
-        : `<button class="btn ghost" type="button" data-resolve="${esc(id)}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Saving' : "Mark handled"}</button>`;
-      items.push(gRow(ICON[s], `<span class="clip2">${esc(al.message || "Alert")}</span><small>${esc(ago(al.at))}</small>`, side));
+        : `<button class="btn ghost" type="button" data-open-task="${esc(id)}">Follow up</button>`;
+      items.push(gRow(ICON[s], `<span class="clip2">${esc(al.message || "Alert")}</span><small>${esc(al.owner_name ? "Handling: " + al.owner_name : "Awaiting a caregiver")} · ${esc(ago(al.at))}</small>${al.action_note ? `<small>${esc(al.action_note)}</small>` : ""}`, side));
     }
     if (num(a.pct) !== null) {
       const bits = [num(a.morning_pct) !== null ? `Morning ${clampPct(a.morning_pct)}%` : "", num(a.evening_pct) !== null ? `Evening ${clampPct(a.evening_pct)}%` : ""].filter(Boolean).join(" · ");
@@ -604,7 +630,7 @@ function render() {
     if (docAppt) actions = `<button class="btn" type="button" data-visit="${esc(docAppt.title || "")}" data-provider="${esc(docAppt.provider || "")}">${ICON.arrow}Prepare visit brief</button>`;
     else if (openAlerts[0]) {
       const id = String(openAlerts[0].id), isBusy = alertBusy.has(id);
-      actions = `<button class="btn" type="button" data-resolve="${esc(id)}" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Saving' : "Mark top alert handled"}</button>`;
+      actions = `<button class="btn" type="button" data-task="${esc(id)}" data-task-action="claim" ${isBusy ? "disabled" : ""}>${isBusy ? '<span class="spinner"></span>Saving' : "I'll handle the top alert"}</button>`;
     }
     return {
       tone: status,
@@ -613,6 +639,7 @@ function render() {
       lead, items, take: 0, actions,
     };
   }, model);
+  restoreDrafts();
 }
 
 function renderSkeleton() {
@@ -631,15 +658,18 @@ function showState(title, detail) {
 /* ---------- actions ---------- */
 async function resolveAlert(id) {
   if (alertBusy.has(id) || alertDone.has(id)) return;
+  const note = actionDrafts.get(id) || "";
   alertBusy.add(id);
   render();
   try {
     const original = arr(model && model.alerts).find((x) => String(x.id) === id);
     const alertId = original && typeof original.id === "number" ? original.id : (isFinite(+id) ? +id : id);
-    const res = await bridge.request("tools/call", { name: "resolve_alert", arguments: { alert_id: alertId } });
-    if (!res || res.isError) throw new Error(textFrom(res) || "Couldn't update that alert.");
-    alertDone.add(id);
+    const res = await bridge.request("tools/call", { name: "resolve_alert", arguments: { alert_id: alertId, note } });
     const sc = structuredFrom(res) || {};
+    if (!res || res.isError || sc.error || !sc.alert) throw new Error(sc.speech || textFrom(res) || "Couldn't update that alert.");
+    if (original) Object.assign(original, sc.alert);
+    alertDone.add(id);
+    actionDrafts.delete(id);
     toast(sc.speech || "Marked as handled");
   } catch (err) {
     toast(String(err && err.message || err), "error");
@@ -649,7 +679,31 @@ async function resolveAlert(id) {
   }
 }
 
+async function updateTask(id, action) {
+  if (alertBusy.has(id)) return;
+  const input = Array.from($app.querySelectorAll("[data-note]")).find((el) => el.dataset.note === id);
+  const note = (input ? input.value : actionDrafts.get(id) || "").trim();
+  if (action === "record_action" && !note) { toast("Describe what you did first.", "error"); return; }
+  alertBusy.add(id);
+  try {
+    const res = await bridge.request("tools/call", { name: "update_care_task", arguments: { alert_id: Number(id), action, note: action === "record_action" ? note : "" } });
+    const sc = structuredFrom(res) || {};
+    if (!res || res.isError || sc.error || !sc.alert) throw new Error(sc.speech || "Couldn't update this follow-up.");
+    const original = arr(model && model.alerts).find((x) => String(x.id) === id);
+    if (original) Object.assign(original, sc.alert);
+    activeTaskId = id;
+    toast(sc.speech || "Follow-up updated");
+    if (action === "record_action") actionDrafts.delete(id);
+  } catch (err) { toast(String(err.message || err), "error"); }
+  finally { alertBusy.delete(id); render(); }
+}
+
 $app.addEventListener("click", (e) => {
+  if (e.target.closest("[data-task-back]")) { activeTaskId = null; render(); return; }
+  const open = e.target.closest("[data-open-task]");
+  if (open) { activeTaskId = open.dataset.openTask; render(); return; }
+  const task = e.target.closest("[data-task]");
+  if (task) { updateTask(task.dataset.task, task.dataset.taskAction); return; }
   const r = e.target.closest("[data-resolve]");
   if (r) { resolveAlert(r.getAttribute("data-resolve")); return; }
   const v = e.target.closest("[data-visit]");

@@ -225,7 +225,7 @@ def build_today(me: dict[str, Any], elder: dict[str, Any]) -> dict[str, Any]:
         "unread_messages": len(store.inbox(me["id"])),
         "next_dose": None,
         "supply": supply_status(elder["id"]) if shared(me, elder, "medications") else [],
-        "refills": [{"name": r["name"], "status": r["status"], "pharmacy": r["pharmacy"]} for r in store.refills(elder["id"])],
+        "refills": [{"name": r["name"], "status": r["status"], "pharmacy": r["pharmacy"], "simulated": True} for r in store.refills(elder["id"])],
     }
     if shared(me, elder, "medications"):
         out["doses"] = ins.doses_for_day(store, elder["id"], t, t)
@@ -677,17 +677,18 @@ def get_help(reason: Annotated[str, Field(description="What's happening, in the 
     annotations=READ,
 )
 @spoken
-def list_alerts() -> dict[str, Any]:
+def list_alerts(include_resolved: Annotated[bool, Field(description="Include handled alerts and their action history")] = False) -> dict[str, Any]:
     me = caller()
     elder = care_recipient(me)
     found = ins.detect_insights(store, elder["id"])
     ins.sync_alerts(store, elder["id"], found)
-    alerts = store.alerts(elder["id"])
+    alerts = store.alerts(elder["id"], None if include_resolved else "open")
     if not alerts:
-        return {"speech": "There are no open alerts.", "alerts": []}
+        return {"speech": "There are no alert records." if include_resolved else "There are no open alerts.", "alerts": []}
     top = alerts[0]
+    label = "alert records" if include_resolved else "open alerts"
     return {
-        "speech": f"There {'is' if len(alerts) == 1 else 'are'} {len(alerts)} open alert{'s' if len(alerts) > 1 else ''}. The top one: {top['message']}",
+        "speech": f"There {'is' if len(alerts) == 1 else 'are'} {len(alerts)} {label if len(alerts) > 1 else label[:-1]}. The top one: {top['message']}",
         "alerts": alerts,
     }
 
@@ -709,12 +710,48 @@ def resolve_alert(
         if not open_alerts:
             return {"speech": "There are no open alerts.", "alert": None}
         alert_id = open_alerts[0]["id"]
-    a = store.handle_alert(alert_id, me["id"])
-    if not a:
-        return {"speech": "I couldn't find that alert.", "alert": None}
+    try:
+        a = store.update_alert(alert_id, care_recipient(me)["id"], me["id"], "resolve", note)
+    except ValueError as exc:
+        return {"speech": str(exc), "alert": None, "error": True}
     if note:
         store.add_message(me["id"], "circle", f"Handled: {a['message'][:80]}… {note}")
     return {"speech": "Marked as handled. I've let the circle know." if note else "Marked as handled.", "alert": a}
+
+
+@mcp.tool(name="update_care_task", title="Take ownership or record a care action", annotations=WRITE,
+          description="Claim an open alert or record what you did. Ownership prevents duplicate family follow-up. Use resolve_alert when finished.")
+@spoken
+def update_care_task(
+    alert_id: Annotated[int, Field(description="The alert id; 0 means the most important open alert", ge=0)],
+    action: Literal["claim", "record_action"],
+    note: Annotated[str, Field(max_length=2000)] = "",
+) -> dict[str, Any]:
+    me = caller()
+    if me["role"] == "elder":
+        return {"speech": "A caregiver can take ownership of this follow-up.", "alert": None, "error": True}
+    if not alert_id:
+        alerts = store.alerts(care_recipient(me)["id"])
+        if not alerts:
+            return {"speech": "There are no open alerts.", "alert": None}
+        alert_id = alerts[0]["id"]
+    try:
+        a = store.update_alert(alert_id, care_recipient(me)["id"], me["id"], action, note)
+    except ValueError as exc:
+        return {"speech": str(exc), "alert": None, "error": True}
+    speech = ("This alert is already resolved." if a["status"] == "handled" else
+              "You're handling this follow-up." if action == "claim" else "Your action is recorded. Resolve the alert when the follow-up is complete.")
+    if a["status"] != "handled":
+        store.add_message(me["id"], "circle", f"{me['short_name']} is handling: {a['message'][:160]}" + (f" Action: {note}" if note else ""))
+    return {"speech": speech, "alert": a}
+
+
+@mcp.tool(name="confirm_visit", title="Confirm an expected visitor", annotations=WRITE,
+          description="Confirm or reject an expected visitor after checking who is at the door. Ring events alone do not identify people. Use the pending signal ID returned by recent_activity.")
+@spoken
+def confirm_visit(signal_id: int, confirmed: bool) -> dict[str, Any]:
+    me = caller()
+    return engine.confirm_visit(signal_id, care_recipient(me)["id"], me["id"], confirmed)
 
 
 @mcp.tool(
@@ -818,6 +855,7 @@ async def care_briefing(
         "status": status,
         "person": person_ref(elder),
         "period": period,
+        "viewer": person_ref(me),
         "generated_by": ins.generated_by(),
         **facts,
     }
@@ -920,7 +958,7 @@ def timeline(hours: int = 48) -> list[dict[str, Any]]:
                       "severity": a["severity"], "status": a["status"]})
     for elder in store.elders():
         for sig in store.signals(elder["id"], since):
-            items.append({"at": sig["at"], "kind": "ring", "signal": sig["kind"], "who": "Ring · Front door",
+            items.append({"at": sig["at"], "kind": "ring", "signal": sig["kind"], "who": {"echo": "Care circle · Visit confirmed", "door_sensor": "Door sensor · Front door"}.get(sig["source"], "Ring · Front door"),
                           "text": sig["text"]})
     for a in store.q("SELECT * FROM announcements WHERE due_at >= ? AND due_at <= ? AND kind IN "
                      "('caregiver_escalation', 'care_plan_change', 'dose_reminder', 'dose_followup', 'wellness_check')",
@@ -1054,9 +1092,9 @@ def supply_status(elder_id: str) -> list[dict[str, Any]]:
 
 @mcp.tool(
     name="request_refill",
-    title="Order a refill",
-    description=("'Order a refill of my metformin' / 'We're running low'. Sends the refill request to the pharmacy on file "
-                 "and tells the circle who can pick it up. Empty medication means whatever is running lowest."),
+    title="Plan a refill (simulated pharmacy)",
+    description=("Create a local refill handoff for the care circle. No request is sent to a pharmacy. "
+                 "The pharmacy and pickup timing are simulated. Empty medication means whatever is running lowest."),
     annotations=NOTIFY,
 )
 @spoken
@@ -1073,8 +1111,8 @@ def request_refill(medication: Annotated[str, Field(description="Which medicatio
         return {"speech": "I couldn't tell which medication to refill.", "refill": None}
     existing = next((r for r in store.refills(elder["id"]) if r["med_id"] == pick["med_id"]), None)
     if existing:
-        state = f"is ready for pickup at {PHARMACY}" if existing["status"] == "ready" else f"was already sent to {PHARMACY}"
-        return {"speech": f"The {pick['name']} refill {state}.", "refill": existing}
+        return {"speech": f"There's already a simulated {pick['name']} refill handoff. Please contact {PHARMACY} to confirm it.",
+                "refill": {**existing, "simulated": True}, "simulated": True}
     t = now()
     rid = store.x("INSERT INTO refills (med_id, person_id, requested_at, requested_by, pharmacy, ready_at) VALUES (?, ?, ?, ?, ?, ?)",
                   (pick["med_id"], elder["id"], iso(t), me["id"], PHARMACY, iso(t + timedelta(hours=2))))
@@ -1083,12 +1121,13 @@ def request_refill(medication: Annotated[str, Field(description="Which medicatio
     pickup = f" {aide['short_name']} can pick it up {ins.mid_sentence(ins.when_label(parse(nxt['at']), t))}." if nxt else ""
     for p in store.caregivers():
         if p["id"] != me["id"]:
-            store.announce(p["id"], "info", "Refill ordered",
-                           f"{me['short_name']} ordered a {pick['name']} refill for {elder['short_name']} at {PHARMACY}.{pickup}",
+            store.announce(p["id"], "info", "Refill handoff (simulation)",
+                           f"{me['short_name']} created a simulated {pick['name']} refill handoff. Please contact {PHARMACY} to place the request.{pickup}",
                            dedupe=f"refill:{rid}:{p['id']}")
-    return {"speech": f"Done, I've sent the {pick['name']} refill to {PHARMACY}.{pickup}",
-            "more": "They usually have it ready in about two hours.",
-            "refill": {"id": rid, "name": pick["name"], "pharmacy": PHARMACY, "status": "requested"}, "supply": pick}
+    return {"speech": f"I've saved a simulated {pick['name']} refill handoff. Please contact {PHARMACY} to place the request.",
+            "more": "No request has been sent to the pharmacy." + pickup,
+            "simulated": True,
+            "refill": {"id": rid, "name": pick["name"], "pharmacy": PHARMACY, "status": "requested", "simulated": True}, "supply": pick}
 
 
 # ---------------------------------------------------------------------------
@@ -1255,7 +1294,10 @@ async def recent_activity(hours: Annotated[int, Field(description="How far back"
     doses = [i for i in items if i["kind"] == "dose"]
     if doses:
         parts.append(f"Last dose logged: {doses[0]['text']}, {ins.mid_sentence(ins.when_label(parse(doses[0]['at']), t))}.")
-    return {"speech": " ".join(parts) or f"{len(items)} events in the last {hours} hours.", "items": items[:20],
+    pending_visits = store.q("SELECT id AS signal_id, expected_who, at, text FROM signals WHERE person_id = ? "
+                            "AND expected_who IS NOT NULL AND confirmed_at IS NULL AND at >= ? ORDER BY at DESC",
+                            (elder["id"], iso(t - timedelta(hours=2))))
+    return {"speech": " ".join(parts) or f"{len(items)} events in the last {hours} hours.", "items": items[:20], "pending_visits": pending_visits,
             "ring": ring_note}
 
 

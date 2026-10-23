@@ -165,6 +165,14 @@ CREATE TABLE IF NOT EXISTS alerts (
     handled_by TEXT,
     handled_at TEXT
 );
+CREATE TABLE IF NOT EXISTS alert_activity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alert_id INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    by_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT ''
+);
 """
 
 SHARING_CATEGORIES = ("medications", "wellbeing", "appointments", "messages")
@@ -239,6 +247,15 @@ class Store:
         if "supply" not in cols:  # databases created before refill tracking
             self._db.execute("ALTER TABLE medications ADD COLUMN supply INTEGER")
             self._db.commit()
+        for table, additions in {
+            "alerts": {"claimed_by": "TEXT", "claimed_at": "TEXT", "action_note": "TEXT"},
+            "signals": {"expected_who": "TEXT", "confirmed_by": "TEXT", "confirmed_at": "TEXT"},
+        }.items():
+            existing = {r[1] for r in self._db.execute(f"PRAGMA table_info({table})")}
+            for column, datatype in additions.items():
+                if column not in existing:
+                    self._db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {datatype}")
+        self._db.commit()
 
     # -- low level -----------------------------------------------------------
     def q(self, sql: str, args: tuple | list = ()) -> list[dict[str, Any]]:
@@ -263,7 +280,7 @@ class Store:
             for table in (
                 "people", "sharing", "medications", "dose_events", "checkins",
                 "messages", "appointments", "care_notes", "alerts", "announcements", "signals", "ring_events", "change_sets", "vitals",
-                "refills",
+                "refills", "alert_activity",
             ):
                 self._db.execute(f"DELETE FROM {table}")
             self._db.execute("DELETE FROM sqlite_sequence")
@@ -489,14 +506,49 @@ class Store:
             sql += " AND status = ?"
             args.append(status)
         sql += " ORDER BY CASE severity WHEN 'urgent' THEN 0 WHEN 'watch' THEN 1 ELSE 2 END, at DESC"
-        return self.q(sql, args)
+        rows = self.q(sql, args)
+        for row in rows:
+            row["activity"] = self.q("SELECT a.*, p.short_name AS by_name FROM alert_activity a "
+                                     "LEFT JOIN people p ON p.id = a.by_id WHERE a.alert_id = ? ORDER BY a.id", (row["id"],))
+            owner = self.person(row["claimed_by"]) if row["claimed_by"] else None
+            row["owner_name"] = owner["short_name"] if owner else None
+            row["workflow"] = "resolved" if row["status"] == "handled" else (
+                "action_recorded" if row["action_note"] else "claimed" if owner else "open")
+        return rows
+
+    def update_alert(self, alert_id: int, person_id: str, by: str, action: str, note: str = "") -> dict[str, Any]:
+        """Serialize ownership checks and mutations so two caregivers cannot claim the same task."""
+        with self._lock:
+            a = self.one("SELECT * FROM alerts WHERE id = ? AND person_id = ?", (alert_id, person_id))
+            if not a:
+                raise ValueError("I couldn't find that alert in your care circle.")
+            if a["status"] == "handled":
+                return next(r for r in self.alerts(person_id, None) if r["id"] == alert_id)
+            if a["claimed_by"] and a["claimed_by"] != by:
+                owner = self.person(a["claimed_by"])
+                raise ValueError(f"{owner['short_name'] if owner else 'Another caregiver'} is already handling this alert.")
+            if action not in ("claim", "record_action", "resolve"):
+                raise ValueError("Unknown care task action.")
+            note = note.strip()
+            if action == "record_action" and not note:
+                raise ValueError("Describe what you did before recording an action.")
+            if action == "claim" and a["claimed_by"] == by:
+                return next(r for r in self.alerts(person_id, None) if r["id"] == alert_id)
+            at = iso(now())
+            with self._db:
+                self._db.execute("UPDATE alerts SET claimed_by = ?, claimed_at = COALESCE(claimed_at, ?), "
+                                 "action_note = CASE WHEN ? != '' THEN ? ELSE action_note END WHERE id = ?",
+                                 (by, at, note, note, alert_id))
+                if action == "resolve":
+                    self._db.execute("UPDATE alerts SET status = 'handled', handled_by = ?, handled_at = ? WHERE id = ?",
+                                     (by, at, alert_id))
+                self._db.execute("INSERT INTO alert_activity (alert_id, at, by_id, action, note) VALUES (?, ?, ?, ?, ?)",
+                                 (alert_id, at, by, action, note))
+            return next(r for r in self.alerts(person_id, None) if r["id"] == alert_id)
 
     def handle_alert(self, alert_id: int, by: str) -> dict[str, Any] | None:
-        self.x(
-            "UPDATE alerts SET status = 'handled', handled_by = ?, handled_at = ? WHERE id = ?",
-            (by, iso(now()), alert_id),
-        )
-        return self.one("SELECT * FROM alerts WHERE id = ?", (alert_id,))
+        a = self.one("SELECT person_id FROM alerts WHERE id = ?", (alert_id,))
+        return self.update_alert(alert_id, a["person_id"], by, "resolve") if a else None
 
 
     # -- announcements (Nova speaks first) -------------------------------------

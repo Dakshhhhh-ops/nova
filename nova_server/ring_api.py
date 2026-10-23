@@ -287,11 +287,11 @@ def sync(store: Store, engine: Any, api: RingAPI, *, real_now: datetime | None =
                         continue
                     fresh = timedelta(0) <= wall - at <= FRESH
                     who = (expected_visitor(store, elder["id"], at) or "unknown") if kind == "ding" else "unknown"
-                    out = engine.on_ring_event(kind, who, at=at, announce=fresh)
+                    out = engine.on_ring_event(kind, who, at=at, announce=fresh, identity_confirmed=False)
                     sid = (out.get("signal") or {}).get("id")
                     store.mark_ring_event(eid, did, etype, at, sid)
                     result["imported"].append({"id": eid, "device": dev["name"], "event_type": etype, "at": iso(at),
-                                               "who": who, "announced": fresh, "text": (out.get("signal") or {}).get("text")})
+                                               "who": (out.get("signal") or {}).get("who"), "announced": fresh, "text": (out.get("signal") or {}).get("text")})
                 result["devices"].append(dev)
         except RingAPIError as exc:
             result.update(ok=False, error=str(exc), status=exc.status,

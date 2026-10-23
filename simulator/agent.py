@@ -177,7 +177,7 @@ class Device:
 SPEECH_FIRST = os.getenv("NOVA_SPEECH_FIRST", "1") not in ("0", "false", "no")
 # Tools for the family and the aide; Rose's Echo doesn't offer them to the model.
 CAREGIVER_ONLY = {"care_briefing", "list_alerts", "resolve_alert", "visit_checklist", "recent_activity",
-                  "apply_care_changes"}
+                  "apply_care_changes", "update_care_task"}
 OFFER = "Want the details?"
 
 HOUSEHOLD: dict[str, Any] = {"now": None, "speed": 1.0}  # kept fresh by the simulator's clock poller
@@ -200,6 +200,8 @@ def system_prompt(device: Device) -> str:
         "- When Rose says how she feels, call daily_checkin with her exact words.\n"
         "- When Rose says she took (or skipped) a pill, call log_medication. If she asks whether she took it, call check_medication.\n"
         "- 'How is Mom doing?' and similar from family: call care_briefing.\n"
+        "- 'I'll handle this' means update_care_task with action claim. Record follow-up actions without resolving until asked.\n"
+        "- Ring cannot identify visitors. Call confirm_visit only after the person explicitly confirms who is at the door, using the announcement's visit_signal_id.\n"
         "- To tell someone something, call send_message.\n"
         "- Replies to Nova's reminders ('I took it', 'remind me in 10 minutes', 'not yet') refer to the latest "
         "announcement in the conversation; 'remind me later' means snooze_reminder.\n"

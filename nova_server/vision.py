@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import re
 import uuid
 from datetime import timedelta
@@ -118,7 +119,16 @@ def _confidence(data: dict[str, Any], by: str) -> float:
         c = float(c)
     except (TypeError, ValueError):
         return 1.0 if "fixture" in by.lower() else 0.6  # a model that doesn't say how sure it is: treat as unsure
+    if not math.isfinite(c) or c < 0 or c > 100:
+        return 0.0
     return c / 100 if c > 1 else c
+
+
+def provenance(by: str) -> dict[str, Any]:
+    fixture = "fixture" in by.lower()
+    return {"image_read": by, "mode": "sample_fixture" if fixture else "unavailable" if by == "none" else "live_model",
+            "simulated": fixture, "decision": "Deterministic checks against the stored care plan",
+            "confidence_note": "Model-reported confidence is a heuristic, not measured accuracy."}
 
 
 def match_medication(store: Store, person_id: str, name: str | None) -> dict[str, Any] | None:
@@ -142,7 +152,8 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
     today = ins.doses_for_day(store, elder["id"], t, t)
     due_now = [d for d in today if d["status"] in ("due", "missed")]
     due_view = [{"name": d["name"], "appearance": d["appearance"], "time_label": d["time_label"], "status": d["status"]} for d in due_now]
-    base = {"identified": data or {}, "matched_med": None, "due_now": due_view, "generated_by": by}
+    base = {"identified": data or {}, "matched_med": None, "due_now": due_view, "generated_by": by,
+            "provenance": provenance(by)}
     confidence = _confidence(data or {}, by)
     base["confidence"] = round(confidence, 2)
     if not data or not data.get("name") or confidence < READ_CONFIDENCE:
@@ -150,6 +161,10 @@ def check_pill(store: Store, elder: dict[str, Any], image: bytes, mime: str) -> 
                                                          "Hold it closer to the camera, in good light, or ask the pharmacist.",
                 "speech": f"I can't read that label clearly, {name}, so please don't take it yet. "
                           "Hold it a little closer to the camera, or ask Maya or the pharmacist."}
+    if data.get("patient") and _norm(data["patient"]) not in {_norm(elder["name"]), _norm(elder["short_name"])}:
+        return {**base, "verdict": "check_first", "reasons": ["The patient name on the label does not match your care profile"],
+                "advice": "Set this bottle aside and ask your pharmacist to check the patient name.",
+                "speech": f"The name on this bottle doesn't match your profile, {name}. Please set it aside and check with your pharmacist."}
     med = match_medication(store, elder["id"], data.get("name"))
     avoid = avoid_note(store, elder["id"], data.get("name") or "")
     if avoid and not med:
@@ -276,7 +291,7 @@ def read_document(store: Store, elder: dict[str, Any], by: dict[str, Any], image
     if not data or not data.get("medications"):
         return {"speech": "I couldn't find a medication list in that photo. Try a closer, flatter shot of the page.",
                 "change_set_id": None, "status": "unreadable", "source": {}, "changes": [], "instructions": [],
-                "generated_by": who}
+                "generated_by": who, "provenance": provenance(who)}
     current = {m["id"]: m for m in store.medications(elder["id"])}
     changes = []
     mentioned: set[str] = set()
@@ -322,7 +337,7 @@ def read_document(store: Store, elder: dict[str, Any], by: dict[str, Any], image
     else:
         speech = "I read the document. The medications match the current plan, so nothing needs to change."
     return {"speech": speech, "change_set_id": cs_id, "status": "pending", "source": source,
-            "changes": changes, "instructions": instructions, "generated_by": who}
+            "changes": changes, "instructions": instructions, "generated_by": who, "provenance": provenance(who)}
 
 
 def apply_change_set(store: Store, cs_id: str, approver: dict[str, Any], approve: bool) -> dict[str, Any]:

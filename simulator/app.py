@@ -236,7 +236,13 @@ async def poll_announcements() -> None:
                         if (item.get("related") or {}).get("more"):
                             d.pending_more = item["related"]["more"]
                         # Keep the conversation aware of what Nova just said, so "I took it" makes sense.
-                        d.history.append({"role": "assistant", "text": f"(Nova announcement) {item['speech']}"})
+                        related = item.get("related") or {}
+                        visit_id = related.get("visit_signal_id")
+                        if visit_id:
+                            d.pending_more = None
+                        context = f" [visit_signal_id={visit_id}]" if visit_id else ""
+                        d.history.append({"role": "assistant", "text": f"(Nova announcement) {item['speech']}{context}",
+                                          "visit_signal_id": visit_id, "expected_who": related.get("expected_who")})
                     if items:
                         await hub.emit({"type": "circle", "item": {"device": d.id}})
             if tick % 2 == 0:

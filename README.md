@@ -12,7 +12,7 @@ for an older adult who lives alone and the people who care for her.
 ![MCP 2026-07-28](https://img.shields.io/badge/MCP-2026--07--28-0aa)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)
 
-[**Live demo**](https://nova-6kte.onrender.com/live) · [Story page](https://nova-6kte.onrender.com) · [Lite (no 3D)](https://nova-6kte.onrender.com/?flat=1) · [Architecture](docs/ARCHITECTURE.md) · [Submission notes](docs/SUBMISSION.md)
+[**Demo video**](https://youtu.be/moWaHEvPZAU) · [**Live demo**](https://nova-6kte.onrender.com/live) · [Story page](https://nova-6kte.onrender.com) · [Lite (no 3D)](https://nova-6kte.onrender.com/?flat=1) · [Architecture](docs/ARCHITECTURE.md) · [Submission notes](docs/SUBMISSION.md)
 
 </div>
 
@@ -47,7 +47,7 @@ Nova brings them together on the devices the household already uses. It connects
 | **The front door** | Rose's Ring doorbell; separate door sensor | Doorbell activity, expected visits to confirm, and door-opening signals |
 | **The cloud** | Maya's Echo Show 15, and Nova | Briefings, escalations, plan changes, the visit brief |
 
-Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard Alexa+ uses for third-party experiences. This repository also includes a **simulated Alexa+** (two Echo Shows and a Ring doorbell in the browser) whose agent runs on **Amazon Nova in Amazon Bedrock**, because Alexa+ developer preview access isn't generally available.
+Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard Alexa+ uses for third-party experiences. This repository also includes a **simulated Alexa+** (two Echo Shows and a Ring doorbell in the browser) whose agent is built for **Amazon Nova on Amazon Bedrock**, with a deterministic rules engine for the same tools, because Alexa+ developer preview access isn't generally available.
 
 ## What Nova does
 
@@ -61,11 +61,11 @@ Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard
 
 One sequence shows vision, state that persists, human approval, two identities from two tokens, voice and screen, and MCP. In the live demo, **Start the story** walks through it step by step.
 
-Care follow-ups have an owner and a history: caregivers can claim an alert, record an action, and resolve it. Other caregivers see who is handling it. Existing databases migrate automatically, preserving their alerts.
-
-Ring doorbell events never establish a visitor's identity. A scheduled visitor prompts a confirmation; the aide checklist and arrival notifications are sent only after someone confirms. Door-opening signals are labelled separately as door-sensor events.
-
-Image cards disclose whether a model or a bundled sample fixture read the image. Label confidence is a heuristic, not measured accuracy, and a patient-name mismatch blocks approval. Pharmacy handoffs and their ready times are explicitly simulated; Nova does not send requests to a pharmacy.
+**Safeguards around the story:**
+- **Follow-ups have an owner.** A caregiver can claim an alert, record what they did and resolve it, so the family doesn't double up. Everyone sees who is handling it.
+- **A doorbell is not an identity.** A press near a scheduled visit asks Rose to confirm who is there; the aide's checklist and the family's arrival notice go out only after she does. Door-opening signals are labelled as door-sensor events.
+- **Every image card names its reader**: Amazon Nova, or the sample label reader for the bundled demo photos. A patient-name mismatch on paperwork blocks approval.
+- **Refills are a handoff.** Nova records the request and tells the family which pharmacy to contact; it doesn't place pharmacy orders itself.
 
 **It speaks first.** A care engine runs on the household clock and turns the care plan into announcements on the right device.
 
@@ -82,7 +82,7 @@ Image cards disclose whether a model or a bundled sample fixture read the image.
 
 **It connects the dots, with evidence.** *"How's Mom doing?"* gets a one-sentence answer and a card that fits one screen:
 
-> **Dizziness began after her lisinopril change.** Home BP averaged 152/91 before the change and 110/66 since. Rose has mentioned dizziness four times since Oct 15. Grace saw her unsteady. Dr. Patel's notes say to call about dizziness.
+> **Dizziness began after her lisinopril change.** Home BP averaged 152/91 before the change and 110/66 since. Rose has mentioned dizziness four times since Oct 16. Grace saw her unsteady. Dr. Patel's notes say to call about dizziness.
 
 Insights come from deterministic, tested rules, and each one carries its evidence. Amazon Nova writes the words. Nova never diagnoses.
 
@@ -106,9 +106,9 @@ We showed the demo to a friend and asked what's hardest and what worries them. U
 
 One person's view, not a study; caregivers, nurses and pharmacists are next.
 
-| Rose is asked before her family is told, while Maya sees the evidence | A doctor-visit brief, one request away |
+| The old bottle: Rose is told to set it aside, and Maya can request the new dose in one tap | A doctor-visit brief, one request away |
 |---|---|
-| ![The live demo: a consent question on Rose's Echo Show and the briefing card on Maya's](docs/img/live-demo.jpg) | ![A visit brief on Maya's Echo Show](docs/img/visit-brief.jpg) |
+| ![The live demo: Rose's Echo Show says to set the old 20 mg bottle aside, while Maya's Echo Show offers a 10 mg refill](docs/img/live-demo.jpg) | ![A visit brief on Maya's Echo Show](docs/img/visit-brief.jpg) |
 
 ## Architecture
 
@@ -207,7 +207,7 @@ Open **/live** and press **Start the story** (top left). It runs the main story 
 1. **Maya: Scan paperwork → after-visit summary.** Nova reads the lisinopril change.
 2. **Approve.** Rose's Echo explains the change.
 3. **Rose: Show Alexa → the old lisinopril bottle.** Nova tells her to set it aside.
-4. **Maya: Order a 10 mg lisinopril refill**, from the alert on her Echo.
+4. **Maya: Order a 10 mg lisinopril refill**, from the alert on her Echo. Nova records the refill handoff.
 5. **Fast-forward to 6 PM.** A missed dose: a reminder, a follow-up, then Maya is told.
 
 Then try the rest: **Rose: Show Alexa → Ibuprofen** (Nova stops her, citing her doctor's notes), **Maya:** *"How's Mom doing?"* then *"Tell me more"*, and **Front door → Grace arrives**, then Rose says **Yes, it's Grace** after checking who is there.
@@ -277,7 +277,7 @@ All settings are environment variables (see [.env.example](.env.example)).
 uv run pytest -q
 ```
 
-The pytest suite runs in CI on every push. It covers:
+94 tests run in CI on every push. They cover:
 - the care engine (the escalation ladder, snooze, check-ins and wellness checks);
 - pill checks, including the safety rules for unreadable labels, low-confidence reads, missing strengths and look-alike products, and reconciliation;
 - the dizziness insight and its evidence, BP limits, privacy, grounded answers and red flags;

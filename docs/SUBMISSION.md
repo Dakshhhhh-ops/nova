@@ -40,7 +40,7 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 - `tests/test_bedrock_shape.py`: Converse requests (tool use and plain) are validated against the botocore API model.
 
 ## Open Source: required fields
-- **Contribution URL:** the pull request to `modelcontextprotocol/ext-apps` (paste its link once opened; branch: https://github.com/Dakshhhhh-ops/ext-apps/tree/fix/spec-allow-attribute-separator). It fixes the official MCP Apps spec: both the 2026-01-26 and draft versions build the iframe `allow` attribute with `join(' ')`, which grants neither camera nor microphone in Chromium, and leave out `clipboard-write`. The SDK's own `buildAllowAttribute()` was already right; the spec now matches it.
+- **Contribution URL:** https://github.com/modelcontextprotocol/ext-apps/pull/823 (a fix to the official MCP Apps spec). It fixes the official MCP Apps spec: both the 2026-01-26 and draft versions build the iframe `allow` attribute with `join(' ')`, which grants neither camera nor microphone in Chromium, and leave out `clipboard-write`. The SDK's own `buildAllowAttribute()` was already right; the spec now matches it.
 - **Supporting library:** https://github.com/Dakshhhhh-ops/mcp-apps-lite-host (v0.2.0, MIT, CI green), where the bug was found and proven with a browser test.
 - **Primary repo URL:** https://github.com/Dakshhhhh-ops/nova
 - **GitHub username:** Dakshhhhh-ops

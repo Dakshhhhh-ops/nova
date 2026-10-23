@@ -127,7 +127,7 @@ flowchart LR
     V["Amazon Polly voice"]
   end
   subgraph Nova["nova_server/ (MCP server)"]
-    T["27 tools · 8 resources · 2 prompts<br/>5 MCP Apps views"]
+    T["25+ tools · 8 resources · 2 prompts<br/>5 MCP Apps views"]
     E["Care engine<br/>(household clock)"]
     X["Insight engine"]
     S["Vision: pill check,<br/>reconciliation"]
@@ -241,7 +241,7 @@ All settings are environment variables (see [.env.example](.env.example)).
 
 ## MCP reference
 
-**Tools (27)**
+**Tools (25+)**
 
 | Tool | Who | What |
 |---|---|---|

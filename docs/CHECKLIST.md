@@ -25,7 +25,7 @@ Deadline: **Oct 23, 2026, 12:00 PM PDT** (Oct 24, 12:30 AM IST). Submit at least
 | Try-it link | https://nova-6kte.onrender.com (open it once a minute before judging: free hosting sleeps). For Amazon Nova there, add `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION=us-east-1` in the Render dashboard (never in the repo). Don't rely on `RING_ACCESS_TOKEN` there: Playground tokens expire in about 30 minutes, and the recorded Playground sync covers it. |
 | Video URL | your YouTube link |
 | Track | **Alexa+** only (one track prize per project); Ring is described as part of it |
-| Mini challenges | **AWS Builder** and **Open Source** (`mcp-apps-lite-host` is public) |
+| Mini challenges | **Open Source** first (Contribution URL: the library; mention ext-apps#823), then **AWS Builder** if the form allows both |
 | AWS Builder: services and how | `docs/SUBMISSION.md` → "AWS Builder: integrations" |
 | Product feedback | `docs/SUBMISSION.md` → "Product feedback" |
 | Friction log (up to a 10% bonus) | `docs/SUBMISSION.md` → "Friction log" table |

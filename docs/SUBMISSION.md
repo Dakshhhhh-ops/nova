@@ -9,8 +9,8 @@ Copy each section into the matching Devpost field.
 ## Tracks
 - Track: **Alexa+** (self-hosted MCP server over Streamable HTTP, plus a simulated Alexa+ experience in a web app). One track prize per project, and Alexa+ is where Nova is strongest.
 - Ring is part of the Alexa+ entry, not a separate one: Nova calls the Ring Partner API at runtime (`users/me`, `devices`, device `status`, event `history`) and takes signed Webhook v1.1 events, so the front door becomes a care signal.
-- Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova models, including multimodal; Amazon Polly)
-- Mini challenge: **Open Source** (`mcp-apps-lite-host`, see below)
+- Mini challenge: **Open Source** (`mcp-apps-lite-host`, plus the upstream spec fix it led to; see below). This is the stronger of the two.
+- Mini challenge: **AWS Builder** (Amazon Bedrock with Amazon Nova models, including multimodal; Amazon Polly). Only one of the two can win; if the form allows just one, choose Open Source, since our Bedrock quota is still zero.
 
 ## Project description
 
@@ -40,8 +40,8 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 - `tests/test_bedrock_shape.py`: Converse requests (tool use and plain) are validated against the botocore API model.
 
 ## Open Source: required fields
-- **Contribution URL:** https://github.com/modelcontextprotocol/ext-apps/pull/823 (a fix to the official MCP Apps spec). It fixes the official MCP Apps spec: both the 2026-01-26 and draft versions build the iframe `allow` attribute with `join(' ')`, which grants neither camera nor microphone in Chromium, and leave out `clipboard-write`. The SDK's own `buildAllowAttribute()` was already right; the spec now matches it.
-- **Supporting library:** https://github.com/Dakshhhhh-ops/mcp-apps-lite-host (v0.2.0, MIT, CI green), where the bug was found and proven with a browser test.
+- **Contribution URL:** https://github.com/Dakshhhhh-ops/mcp-apps-lite-host (v0.2.0, MIT, 41 tests: 35 unit + 6 browser tests against the official SDK, CI green)
+- **Upstream fix it led to:** https://github.com/modelcontextprotocol/ext-apps/pull/823. The library's browser tests showed that the official MCP Apps spec (both the 2026-01-26 and draft versions) builds the iframe `allow` attribute with `join(' ')`, which grants neither camera nor microphone in Chromium, and leaves out `clipboard-write`. The SDK's own `buildAllowAttribute()` was already right; the PR makes the spec match it.
 - **Primary repo URL:** https://github.com/Dakshhhhh-ops/nova
 - **GitHub username:** Dakshhhhh-ops
 - **What the library is:** `mcp-apps-lite-host` (v0.2) is a dependency-free ES module (MIT) that renders MCP Apps (`ui://`) views in any web page. It implements the full 2026-01-26 View ↔ Host message set (initialize, tool input including partial input, tool result, cancel, size and display modes, host-context changes, `tools/call` proxy with tool-visibility checks, `resources/read` and `list`, `ui/message`, model context, open-link, and a teardown that waits for the view) in a sandboxed iframe. It enforces the view's `_meta.ui.csp`, sets the iframe permissions `allow` attribute, and has a sandbox-proxy mode (a static `sandbox-proxy.html` on a second origin, as the spec requires for web hosts). It ships with 35 unit tests and 6 browser tests that run views built with the official `@modelcontextprotocol/ext-apps` SDK in Chromium; CI runs both.

@@ -75,7 +75,7 @@ def test_a_model_that_does_not_say_how_sure_it_is_is_unsure(rose):
 
 
 def test_sample_fixtures_still_work_offline(rose):
-    out = rose({"name": "Metformin", "strength": "500 mg"}, by="Sample photo fixture (offline)")
+    out = rose({"name": "Metformin", "strength": "500 mg"}, by=vision.SAMPLE_READER)
     assert out["verdict"] == "ok_now"
 
 

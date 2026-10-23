@@ -79,11 +79,11 @@ def test_quota_hit_mid_session_falls_back(fresh):
     assert "quota" in llm.bedrock_note()
 
 
-def test_offline_label_says_why():
+def test_rules_label_names_no_fault():
     from simulator.rules import RulesBrain
 
     llm._BEDROCK_ERROR, saved = "ThrottlingException: Too many tokens per day", llm._BEDROCK_ERROR
     try:
-        assert RulesBrain("elder").label == "Nova offline router (Amazon Nova daily quota reached, retrying)"
+        assert RulesBrain("elder").label == "Nova rules engine"
     finally:
         llm._BEDROCK_ERROR = saved

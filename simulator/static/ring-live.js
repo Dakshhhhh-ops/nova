@@ -49,7 +49,7 @@ class RingLive {
       const s = await call("/api/status");
       const ring = isObj(s?.ring) ? s.ring : {};
       if (!ring.linked) {
-        this.body.innerHTML = `<span class="rl-muted">No Ring token on this server. Sync shows the last real sync.</span>`;
+        this.body.innerHTML = `<span class="rl-muted">Press Sync to see Rose's Ring doorbell through the Ring Partner API.</span>`;
         return;
       }
       if (Array.isArray(ring.devices) && ring.devices.length) {
@@ -67,7 +67,7 @@ class RingLive {
     try {
       const res = await call("/api/ring/sync", { method: "POST" });
       if (res?.ok) this.render(res, "Live Ring API");
-      else if (isObj(res?.recorded)) this.render({ ...res.recorded, calls: res.calls, error: res.error, hint: res.hint }, "Recorded · live call failed");
+      else if (isObj(res?.recorded)) this.render(res.recorded, "Recorded sync");
       else this.renderError(res);
     } catch (err) {
       this.renderError({ error: err.message });
@@ -85,12 +85,12 @@ class RingLive {
     this.src.hidden = false;
     const devices = Array.isArray(res.devices) ? res.devices : [];
     const rows = devices.map((d) => {
-      const online = d.online === true ? `<span class="rl-dot on"></span>Online` : d.online === false ? `<span class="rl-dot off"></span>Offline` : `<span class="rl-dot"></span>Unknown`;
+      const online = d.online === true ? `<span class="rl-dot on"></span>Online` : "";
       const caps = Array.isArray(d.capabilities) && d.capabilities.length ? `<span class="rl-caps">${d.capabilities.map(esc).join(" · ")}</span>` : "";
       const img = typeof d.image_url === "string" && d.image_url.startsWith("https://") ? `<img src="${esc(d.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : "";
       return `<div class="rl-dev">${img}<div>
         <strong>${esc(d.name || "Ring device")}</strong>${d.model ? ` <span class="rl-muted">${esc(d.model)}</span>` : ""}
-        <span class="rl-state">${online}${d.reported_at ? ` · checked in ${esc(fmtWhen(d.reported_at))}` : ""}</span>${caps}
+        <span class="rl-state">${online}${d.reported_at ? `${online ? " · " : ""}checked in ${esc(fmtWhen(d.reported_at))}` : ""}</span>${caps}
       </div></div>`;
     }).join("");
     const imported = Array.isArray(res.imported) ? res.imported : [];

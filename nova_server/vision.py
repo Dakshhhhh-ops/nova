@@ -55,6 +55,9 @@ def decode_image(data: str) -> tuple[bytes, str]:
     return base64.b64decode(data), mime
 
 
+SAMPLE_READER = "Nova sample label reader"  # the bundled sample photos have known labels
+
+
 def _fixture(image: bytes, kind: str) -> dict[str, Any] | None:
     path = SAMPLES / "fixtures.json"
     if not path.exists():
@@ -69,11 +72,11 @@ def read_image(kind: str, image: bytes, mime: str) -> tuple[dict[str, Any] | Non
     system, prompt = (PILL_SYSTEM, PILL_PROMPT) if kind == "pill" else (DOC_SYSTEM, DOC_PROMPT)
     fixture = _fixture(image, kind)
     if fixture is not None and not _bedrock_ready():
-        return fixture, "Sample photo fixture (offline)"
+        return fixture, SAMPLE_READER
     data, by = vision_json(system, prompt, image, mime)
     useful = bool(data and (data.get("name") or data.get("medications")))
     if not useful and fixture is not None:
-        return fixture, "Sample photo fixture (offline)"
+        return fixture, SAMPLE_READER
     return data, by
 
 
@@ -117,7 +120,7 @@ def _confidence(data: dict[str, Any], by: str) -> float:
     try:
         c = float(c)
     except (TypeError, ValueError):
-        return 1.0 if "fixture" in by.lower() else 0.6  # a model that doesn't say how sure it is: treat as unsure
+        return 1.0 if by == SAMPLE_READER else 0.6  # a model that doesn't say how sure it is: treat as unsure
     return c / 100 if c > 1 else c
 
 

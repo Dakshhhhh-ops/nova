@@ -51,6 +51,16 @@ Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard
 
 ## What Nova does
 
+**The main story: a prescription change, from paper to the pill bottle.** After a cardiology visit, Dr. Patel lowers Rose's lisinopril from 20 mg to 10 mg.
+
+1. **Maya scans the new instructions.** She photographs the after-visit summary on her Echo Show. Amazon Nova reads it, and Nova reconciles it with Rose's plan: *change lisinopril 20 → 10 mg, because of dizziness when standing and low blood pressure*.
+2. **She reviews and approves.** Nothing changes until she does.
+3. **Rose hears the update.** Her Echo explains it in plain words: *"Rose, Dr. Patel changed your lisinopril from 20 mg once daily to 10 mg."*
+4. **Rose shows the old bottle.** She holds her old 20 mg bottle up to the camera: *"Careful, Rose: this is the old 20 mg lisinopril. Your plan is now 10 mg, so please set this bottle aside."*
+5. **Maya sees what happened and handles the follow-up.** Her Echo tells her, and she orders the new 10 mg dose in one tap: *"Done, I've sent the Lisinopril refill to Elm Street Pharmacy."*
+
+One sequence shows vision, state that persists, human approval, two identities from two tokens, voice and screen, and MCP. In the live demo, **Start the story** walks through it step by step.
+
 Care follow-ups have an owner and a history: caregivers can claim an alert, record an action, and resolve it. Other caregivers see who is handling it. Existing databases migrate automatically, preserving their alerts.
 
 Ring doorbell events never establish a visitor's identity. A scheduled visitor prompts a confirmation; the aide checklist and arrival notifications are sent only after someone confirms. Door-opening signals are labelled separately as door-sensor events.
@@ -193,12 +203,14 @@ uv run python -m simulator    # simulator    http://127.0.0.1:8080  (story at /,
 ```
 
 ### A five-minute walkthrough
-1. Open **/live** and press **Reset**.
-2. **Rose:** **Show Alexa → Ibuprofen**. Nova reads the label and stops her, citing her doctor's notes.
-3. **Maya:** *"How's Mom doing?"*, then *"Tell me more."*
-4. **Front door → Grace arrives**, then Rose says **Yes, it's Grace** after checking who is there. The aide gets her checklist and the family is told.
-5. **Maya:** **Scan paperwork → after-visit summary → Approve.** Then Rose shows the old lisinopril bottle.
-6. Drag the sun to just before 6 PM and press **Fast-forward** to watch the reminder escalate to Maya.
+Open **/live** and press **Start the story** (top left). It runs the main story one step at a time:
+1. **Maya: Scan paperwork → after-visit summary.** Nova reads the lisinopril change.
+2. **Approve.** Rose's Echo explains the change.
+3. **Rose: Show Alexa → the old lisinopril bottle.** Nova tells her to set it aside.
+4. **Maya: Order a 10 mg lisinopril refill**, from the alert on her Echo.
+5. **Fast-forward to 6 PM.** A missed dose: a reminder, a follow-up, then Maya is told.
+
+Then try the rest: **Rose: Show Alexa → Ibuprofen** (Nova stops her, citing her doctor's notes), **Maya:** *"How's Mom doing?"* then *"Tell me more"*, and **Front door → Grace arrives**, then Rose says **Yes, it's Grace** after checking who is there.
 
 ### Connect an MCP client
 - **MCP Inspector:** `npx @modelcontextprotocol/inspector`, URL `http://127.0.0.1:8765/mcp`. Use its OAuth flow (Nova's account-linking page opens), or send the header `Authorization: Bearer nova-demo-maya` (also `nova-demo-rose`, `nova-demo-leo` and `nova-demo-grace`).

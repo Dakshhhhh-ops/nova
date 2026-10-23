@@ -16,7 +16,11 @@ Copy each section into the matching Devpost field.
 
 **Nova catches medication mistakes before they happen, and connects the dots**, like a dose change and new dizziness, for an older adult who lives alone and the family who worry about her. It links the living room (Rose's Echo Show), the front door (her Ring doorbell) and the cloud (Maya's Echo Show in Seattle, and Nova on AWS) into one care circle on Alexa+.
 
-Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits between them on Alexa+:
+Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits between them on Alexa+.
+
+**The main story: a prescription change, from paper to the pill bottle.** After a cardiology visit, Dr. Patel lowers Rose's lisinopril from 20 mg to 10 mg. Maya photographs the after-visit summary on her Echo Show; Amazon Nova reads it and Nova proposes the change, with the doctor's reason. Nothing changes until Maya approves. Rose's Echo then explains it in plain words. Later, Rose holds her old 20 mg bottle up to the camera: *"Careful, Rose: this is the old 20 mg lisinopril. Your plan is now 10 mg, so please set this bottle aside."* Maya's Echo tells her what happened, and she orders the new 10 mg dose in one tap. One sequence shows vision, state that persists, human approval, two identities, voice and screen, and MCP. In the live demo, **Start the story** runs it step by step.
+
+Around that story, Nova also:
 
 - **It speaks first.** A care engine runs on the household clock. At 6 PM Rose's Echo says *"Time for your Metformin with your meal. That's the large white oblong pill."* At 6:30 it checks in gently. At 7:30, if she still hasn't taken it, Maya's Echo glows yellow: *"Mom hasn't taken her 6 PM Metformin. I reminded her at 6 and 6:30."* It also prompts the morning check-in, reminds about appointments (*"Leo is driving you"*), and runs a wellness check when the home has been quiet all morning, escalating to the family if Rose doesn't answer.
 - **It sees, with Amazon Nova multimodal.** Rose holds a pill bottle up to the Echo Show camera: *"That's atorvastatin, your bedtime pill. Put it back. Right now it's time for your lisinopril, the small pink one."* When her knee hurts and she reaches for ibuprofen, Nova stops her, quoting her doctor's instructions and the safe alternative. Maya photographs the after-visit summary. Nova reconciles it with the current plan (lisinopril 20 → 10 mg, with the doctor's reason) and waits for her approval. Then it tells Rose in plain words, and later catches the old 20 mg bottle.

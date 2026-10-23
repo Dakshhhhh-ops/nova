@@ -46,16 +46,12 @@ LINES: dict[str, str] = {
     "hook": "Fifty-three million Americans care for a family member, unpaid. Many of them, from far away.",
     "landing": "Rose is eighty-one and lives alone in Columbus, Ohio. Her daughter Maya lives in Seattle. "
                "Nova links Rose's Echo Show, her Ring doorbell and Maya's Echo.",
-    "morning": "Nova speaks first. At eight, Rose's Echo reminds her about her pills. If she misses a dose, it "
-               "follows up, and only then tells Maya.",
-    "ibuprofen": "Her knee hurts, so she holds up the ibuprofen. Nova reads the label, and checks it against her "
-                 "doctor's notes.",
-    "checkin": "At nine, Nova checks in. Before her family hears about a symptom, Rose decides.",
-    "briefing": "In Seattle, Maya asks how her mom is doing. One sentence first, then the evidence.",
-    "ring": "At ten, the Ring doorbell. The care calendar says it's Grace, the home aide.",
-    "reconcile": "Maya photographs the after-visit summary. Nothing changes until she approves.",
-    "oldbottle": "Later, Rose picks up her old twenty-milligram bottle.",
-    "evening": "That night, a pill is missed. Nova reminds Rose, follows up, and only then tells Maya.",
+    "reconcile": "After a cardiology visit, Dr. Patel lowers Rose's lisinopril. In Seattle, Maya photographs the "
+                 "after-visit summary, and Nova reads the change.",
+    "approve": "Nothing changes until Maya approves. Then Rose hears it, in plain words.",
+    "oldbottle": "Later, Rose reaches for her old twenty-milligram bottle.",
+    "followup": "Maya hears what happened, and orders the new dose with one tap.",
+    "evening": "Nova also speaks first. When a pill is missed, it reminds Rose, follows up, and only then tells Maya.",
     "hood": "Under the hood: an MCP server for Alexa+ with twenty-five tools, a token for each person, and consent "
             "by elicitation, with Amazon Nova on Bedrock for language and vision.",
     "end": "Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge.",
@@ -63,23 +59,22 @@ LINES: dict[str, str] = {
 
 # Chapter label shown at the start of a beat: (kicker, title).
 CHAPTERS: dict[str, tuple[str, str]] = {
-    "morning": ("8:00 AM · Rose's kitchen, Columbus", "Nova speaks first"),
-    "ibuprofen": ("Vision · pill bottle check", "It sees what's in her hand"),
-    "checkin": ("9:00 AM · Check-in", "She decides what her family hears"),
-    "briefing": ("Maya's Echo · Seattle", "Short for the ear, evidence on request"),
-    "ring": ("10:00 AM · Ring doorbell", "The front door is a care signal"),
-    "reconcile": ("After the cardiology visit", "Nothing changes until someone approves"),
-    "evening": ("9:00 PM · Time-lapse", "Remind, follow up, then tell the family"),
+    "reconcile": ("Maya's Echo · Seattle", "A new prescription, read from paper"),
+    "approve": ("Two people, one plan", "Nothing changes until someone approves"),
+    "oldbottle": ("Rose's kitchen · Columbus", "It catches the old bottle"),
+    "followup": ("Maya's Echo · Seattle", "The family hears, and acts"),
+    "evening": ("6:00 PM · Time-lapse", "Remind, follow up, then tell the family"),
     "hood": ("Under the hood", "An MCP server for Alexa+"),
 }
 
 # How much idle footage to keep around a cut, per beat: (after the last sound, before the next one).
 GAPS: dict[str, tuple[float, float]] = {
     "landing": (1.0, 0.6),
-    "ibuprofen": (1.6, 0.5),
-    "oldbottle": (0.5, 0.4),
     "reconcile": (1.6, 0.5),
-    "evening": (2.5, 0.8),
+    "approve": (1.2, 0.5),
+    "oldbottle": (1.4, 0.5),
+    "followup": (1.4, 0.5),
+    "evening": (2.0, 0.8),
 }
 GAP_DEFAULT = (0.4, 0.3)
 XF_CUT = 0.3     # dissolve at a cut inside the take
@@ -89,13 +84,13 @@ TITLE_SECONDS = 3.3
 END_SECONDS = 6.5
 
 # Edit choices for this take: beats left out, replies left out, and spoken tails trimmed where nobody answers them.
-DROP_BEATS = {"oldbottle", "evening"}
+DROP_BEATS: set[str] = set()
 DROP_REPLIES = [r"^Just checking, Rose: have you taken your 6 PM", r"^Got it, I've logged", r"^Sent to Rose",
                 r"^Message from Maya"]
-DROP_UTTER = {"I took it", "Remind Mom again"}
-KEEP_SENTENCES = {r"^Her home blood pressure": 2, r"^Rose, Dr. Patel changed": 1}
-TRIM_TAILS = ["Want the details?"]
-KEEP_TAILS = [r"^Rose is mostly okay"]  # Maya does answer this one ("Tell me more")
+DROP_UTTER: set[str] = set()
+KEEP_SENTENCES = {r"^Rose, Dr. Patel changed": 1}
+TRIM_TAILS = ["Want the details?"]  # nobody answers it in this story
+KEEP_TAILS: list[str] = []
 
 DEVICE_NAMES = {"kitchen": "Rose's Echo", "maya": "Maya's Echo"}
 
@@ -279,6 +274,17 @@ class Take:
         print(f"  ! waited {timeout:.0f}s: {len(self.plays) - n0}/{expect} replies played")
         return False
 
+    async def wait_plays(self, n: int, timeout: float = 60) -> bool:
+        t_end = time.monotonic() + timeout
+        while time.monotonic() < t_end:
+            if self.page.is_closed():
+                raise RuntimeError("page closed")
+            if len(self.plays) >= n:
+                return True
+            await asyncio.sleep(0.05)
+        print(f"  ! waited {timeout:.0f}s for {n - len(self.plays)} more replies to start")
+        return False
+
     async def wait_ann(self, device: str, a0: int, timeout: float = 30) -> bool:
         t_end = time.monotonic() + timeout
         while time.monotonic() < t_end:
@@ -316,83 +322,19 @@ class Take:
         await page.goto(self.base + "/live", wait_until="domcontentloaded")
         await js("window.NovaDemo.ready", 40)
         await js("(window.NovaDemo.onAnnouncement((d, item) => window.__novaAnn(String(d), String((item && (item.title || item.text)) || ''))), true)")
-        await js("window.NovaDemo.setClock('07:59', 1)")
         await page.wait_for_timeout(2500)
 
-        # 8:00 AM: Nova speaks first.
-        self.mark("morning")
-        await js("window.NovaDemo.focus('kitchen')")
-        await self.say_line("morning")
-        n0, a0 = len(self.plays), len(self.anns)
-        await js("window.NovaDemo.setClock(null, 30)")
-        await self.wait_ann("kitchen", a0, 20)
-        await js("window.NovaDemo.setClock(null, 1)")
-        await self.settle(n0, 1, 30)
-        n0 = len(self.plays)
-        self.user("Rose", "I took it")
-        self.fire("window.NovaDemo.tapReply('kitchen', 'I took it')")
-        await self.settle(n0, 0, 15)
-
-        # The ibuprofen bottle.
-        self.mark("ibuprofen")
-        await self.say_line("ibuprofen")
-        n0 = len(self.plays)
-        self.fire("window.NovaDemo.showSample('kitchen', 'pill-ibuprofen')")
-        await self.settle(n0, 1, 180)
-        await self.hold(2.5)
-
-        # 9:00 AM check-in, with consent before the family hears.
-        self.mark("checkin")
-        await self.say_line("checkin")
-        n0, a0 = len(self.plays), len(self.anns)
-        await js("window.NovaDemo.setClock('08:58', 30)")
-        await self.wait_ann("kitchen", a0, 30)
-        await js("window.NovaDemo.setClock(null, 1)")
-        await self.settle(n0, 1, 30)
-        n0 = len(self.plays)
-        self.user("Rose", "A bit dizzy again")
-        self.fire("window.NovaDemo.tapReply('kitchen', 'A bit dizzy again')")
-        await self.settle(n0, 1, 90)
-        n0 = len(self.plays)
-        await page.wait_for_timeout(600)
-        self.user("Rose", "Yes, tell them")
-        self.fire("window.NovaDemo.answer('kitchen', true)")
-        await self.settle(n0, 1, 40)
-        await self.hold(1.0)
-
-        # Maya in Seattle.
-        self.mark("briefing")
-        await js("window.NovaDemo.focus('maya')")
-        await self.say_line("briefing")
-        n0 = len(self.plays)
-        self.user("Maya", "How's Mom doing?")
-        self.fire("window.NovaDemo.say('maya', \"How's Mom doing?\")", 120)
-        await self.settle(n0, 1, 120)
-        await page.wait_for_timeout(500)
-        n0 = len(self.plays)
-        self.user("Maya", "Tell me more")
-        self.fire("window.NovaDemo.say('maya', 'Tell me more')", 120)
-        await self.settle(n0, 1, 120)
-        await self.hold(2.5)
-
-        # 10:00 AM: the Ring doorbell.
-        self.mark("ring")
-        await js("window.NovaDemo.focus(null)")
-        await js("window.NovaDemo.setClock('09:59', 1)")
-        await self.say_line("ring")
-        n0 = len(self.plays)
-        self.fire("window.NovaDemo.ring('ding', 'grace')")
-        await self.settle(n0, 2, 45, quiet=1.5)
-        await self.hold(1.5)
-
-        # The after-visit summary.
+        # The main story: a prescription change, from paper to plan to the kitchen and back to Maya.
         self.mark("reconcile")
         await js("window.NovaDemo.focus('maya')")
         await self.say_line("reconcile")
         n0 = len(self.plays)
         self.fire("window.NovaDemo.showSample('maya', 'after-visit-summary')")
         await self.settle(n0, 1, 180)
-        await self.hold(2.5)
+        await self.hold(2.0)
+
+        self.mark("approve")
+        await self.say_line("approve")
         n0 = len(self.plays)
         self.fire("window.NovaDemo.approveChanges()")
         await self.hold(1.6)
@@ -400,15 +342,23 @@ class Take:
         await self.settle(n0, 1, 45, quiet=1.5)
         await self.hold(1.0)
 
-        # The old 20 mg bottle.
         self.mark("oldbottle")
         await self.say_line("oldbottle")
         n0 = len(self.plays)
         self.fire("window.NovaDemo.showSample('kitchen', 'pill-lisinopril')")
-        await self.settle(n0, 1, 180)
-        await self.hold(2.5)
+        await self.wait_plays(n0 + 2, 120)  # Rose's warning, then Maya's alert starts speaking
 
-        # 6 PM: missed pill, follow-up, escalation (time-lapse).
+        self.mark("followup")
+        await js("window.NovaDemo.focus('maya')")  # cut to Maya's Echo as her alert is spoken
+        await self.settle(n0, 2, 40, quiet=1.0)
+        await self.say_line("followup")
+        n0 = len(self.plays)
+        self.user("Maya", "Order a 10 mg lisinopril refill")
+        self.fire("window.NovaDemo.tapReply('maya', 'Order a 10 mg lisinopril refill')")
+        await self.settle(n0, 1, 60)
+        await self.hold(1.5)
+
+        # A second, shorter example: 6 PM, a missed pill, follow-up, escalation (time-lapse).
         self.mark("evening")
         await js("window.NovaDemo.focus(null)")
         await js("window.NovaDemo.setClock('17:58', 1)")
@@ -420,11 +370,7 @@ class Take:
         await js("window.NovaDemo.setClock(null, 1)")
         self.keeps.append((t_lapse, self.now()))
         await self.settle(len(self.plays), 0, 30, quiet=1.2)
-        n0 = len(self.plays)
-        self.user("Maya", "Remind Mom again")
-        self.fire("window.NovaDemo.tapReply('maya', 'Remind Mom again')")
-        await self.settle(n0, 1, 40)
-        await self.hold(1.5)
+        await self.hold(2.0)
 
         # Under the hood.
         self.mark("hood")
@@ -465,6 +411,9 @@ async def capture_async(url: str) -> None:
                                         record_video_dir=str(BUILD / "video"),
                                         record_video_size={"width": 1920, "height": 1080})
         await ctx.add_init_script(AUDIO_HOOK)
+        # the recorder drives the story itself, so the on-page story guide stays out of the shot
+        await ctx.add_init_script("document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style');"
+                                  " s.textContent = '.story { display: none !important; }'; document.head.appendChild(s); });")
         holder: dict = {}
         await ctx.expose_function("__novaAudio", lambda kind, dur: holder["take"].on_audio(kind, dur))
         await ctx.expose_function("__novaAnn", lambda d, title: holder["take"].on_ann(d, title))
@@ -517,8 +466,8 @@ async def landing_async(url: str, seconds: float) -> None:
     span = seconds - LANDING_HOLD - 0.3
     out = BUILD / "landing.mp4"
     enc = subprocess.Popen([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-f", "image2pipe", "-framerate",
-                            str(FPS), "-c:v", "mjpeg", "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "13",
-                            "-pix_fmt", "yuv420p", "-r", str(FPS), str(out)], stdin=subprocess.PIPE)
+                            str(FPS), "-c:v", "mjpeg", "-i", "-", "-vf", "scale=in_range=pc:out_range=tv,format=yuv420p", "-c:v", "libx264",
+                            "-preset", "veryfast", "-crf", "13", "-color_range", "tv", "-r", str(FPS), str(out)], stdin=subprocess.PIPE)
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(channel="chrome", headless=True,
                                            args=["--headless=new", "--use-angle=d3d11", "--enable-gpu",
@@ -1182,7 +1131,7 @@ def edit() -> None:
     video = BUILD / "video.mp4"
     run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", *inputs, "-filter_complex", ";".join(f),
          "-map", "[vout]", "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "slow", "-crf", "17",
-         "-pix_fmt", "yuv420p", "-r", str(FPS), "-movflags", "+faststart", str(video)], cwd=BUILD)
+         "-pix_fmt", "yuv420p", "-color_range", "tv", "-r", str(FPS), "-movflags", "+faststart", str(video)], cwd=BUILD)
 
     # -- sound: narration, Alexa (a touch of 'speaker' EQ), music ducked under both, then loudness
     music = BUILD / "music.wav"

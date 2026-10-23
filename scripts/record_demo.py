@@ -37,8 +37,8 @@ SCENES: list[tuple[str, str, float]] = [
     ("Rose is eighty-one and lives alone in Columbus, Ohio. Her daughter Maya lives in Seattle. Nova links Rose's "
      "Echo, her Ring doorbell and Maya's Echo, to catch medication mistakes before they happen.", "landing", 1.0),
     ("Nova speaks first. At eight, Rose's Echo reminds her about her morning pills.", "morning", 4.0),
-    ("Her knee hurts, so she shows Alexa the ibuprofen. Amazon Nova reads the label, and Nova checks it against "
-     "her doctor's notes.", "pill_avoid", 5.0),
+    ("Her knee hurts, so she shows Alexa the ibuprofen. Nova reads the label and checks it against her doctor's "
+     "notes.", "pill_avoid", 5.0),
     ("At nine, Nova checks in. Before her family hears about a symptom, Nova asks Rose.", "checkin", 3.0),
     ("In Seattle, Maya asks how Mom is doing. One sentence first, the evidence when she asks.", "briefing", 1.5),
     ("Nova reads the front door from Ring's own API. When Grace, the home aide, rings the bell, Nova knows "
@@ -48,7 +48,8 @@ SCENES: list[tuple[str, str, float]] = [
     ("In the evening, the six o'clock pill is missed. Nova reminds Rose, follows up, and only then tells Maya.",
      "evening", 2.0),
     ("Under the hood: twenty-five MCP tools over Streamable HTTP, a token for each person, MCP Apps on the Echo "
-     "Show, consent by elicitation, Ring, and Amazon Nova on Bedrock.", "hood", 3.0),
+     "Show, consent by elicitation, and Ring. Amazon Nova on Bedrock is the brain; this recording runs on Nova's "
+     "offline router, because our new AWS account's Bedrock quota is still zero.", "hood", 3.0),
     ("Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge.", "end", 2.0),
 ]
 

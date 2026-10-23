@@ -136,14 +136,16 @@ class Story {
     if (this.idx < 0 || this.idx >= STEPS.length) { await this.start(); if (this.idx === 0) await this.go(); return; }
     const step = STEPS[this.idx];
     this.setBusy(true, `${step.action}…`);
+    let problem = null;
     try {
       await step.run(this.demo, this);
       this.idx += 1;
     } catch (err) {
-      this.note(/No care plan update/.test(err.message) ? "Scan the summary first, or start over." : err.message);
+      problem = /No care plan update/.test(err.message) ? "The summary wasn't read. Press Start over and try again." : err.message;
     } finally {
       this.setBusy(false);
     }
+    if (problem) this.note(problem); // after the re-render, so the message stays on the card
   }
 
   setBusy(on, label) {

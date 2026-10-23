@@ -12,7 +12,7 @@ for an older adult who lives alone and the people who care for her.
 ![MCP 2026-07-28](https://img.shields.io/badge/MCP-2026--07--28-0aa)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)
 
-[**Live demo**](https://nova-6kte.onrender.com/live) · [Story page](https://nova-6kte.onrender.com) · [Architecture](docs/ARCHITECTURE.md) · [Submission notes](docs/SUBMISSION.md)
+[**Live demo**](https://nova-6kte.onrender.com/live) · [Story page](https://nova-6kte.onrender.com) · [Lite (no 3D)](https://nova-6kte.onrender.com/?flat=1) · [Architecture](docs/ARCHITECTURE.md) · [Submission notes](docs/SUBMISSION.md)
 
 </div>
 

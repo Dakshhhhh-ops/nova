@@ -86,7 +86,16 @@ One sequence shows vision, state that persists, human approval, two identities f
 
 Insights come from deterministic, tested rules, and each one carries its evidence. Amazon Nova writes the words. Nova never diagnoses.
 
-**It reads the front door.** Nova calls the **Ring Partner API** for the linked doorbell's status and event history, and takes Ring's signed webhooks in real time. A doorbell press near a scheduled visit prompts Rose to check who is there. Once she confirms the visitor, the aide gets her checklist and the family hears about the arrival.
+**It reads the front door, with Ring.** Rose's Ring doorbell is a care signal, not a security camera:
+- **Ring Partner API.** Nova reads the linked account's devices, whether the doorbell is online, its capabilities and its event history (doorbell presses and people at the door only). In the live demo, **Front door ⋯ → Sync from Ring** shows each call to `api.amazonvision.com` with its status, from a real Ring Developer Playground Doorbell Pro.
+- **Ring webhooks in real time.** Webhook v1.1 events are verified with the `X-Signature` HMAC before they're parsed, and deduplicated by request ID.
+- **Expected visitors.** A doorbell press during Grace's scheduled visit asks Rose *"Who's at the door?"*. Once she confirms, Grace gets her visit checklist and the family hears she arrived.
+- **Signals a family would miss.** A door opening at 2 AM sends an urgent alert; a morning with no pills and no movement at the door starts a wellness check; a doorbell going offline is noted on the timeline.
+- **Minimum necessary.** Nova asks Ring only for the events it needs and stores no Ring email or address.
+
+| Ring Partner API: the account, the Doorbell Pro and each API call | A doorbell press during Grace's visit: Rose confirms who is there |
+|---|---|
+| <img src="docs/img/ring-panel.png" alt="The Ring account panel: a Playground Doorbell Pro, online, with five successful Ring Partner API calls and a signed Webhook v1.1 event" width="300"> | ![Rose's Echo Show asks who is at the door during Grace's expected visit](docs/img/ring-visit.jpg) |
 
 **It stays respectful.** Spoken replies are one or two sentences, with the details one *"tell me more"* away. Rose is asked before her family hears about a symptom, and she decides what the circle can see. Emergencies skip every question.
 

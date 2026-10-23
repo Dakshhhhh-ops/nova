@@ -50,7 +50,7 @@ LINES: dict[str, str] = {
                  "after-visit summary, and Nova reads the change.",
     "approve": "Nothing changes until Maya approves. Then Rose hears it, in plain words.",
     "oldbottle": "Later, Rose reaches for her old twenty-milligram bottle.",
-    "followup": "Maya hears what happened, and orders the new dose with one tap.",
+    "followup": "Maya hears what happened, and requests the new dose with one tap.",
     "evening": "Nova also speaks first. When a pill is missed, it reminds Rose, follows up, and only then tells Maya.",
     "hood": "Under the hood: an MCP server for Alexa+ with twenty-five tools, a token for each person, and consent "
             "by elicitation, with Amazon Nova on Bedrock for language and vision.",
@@ -274,6 +274,17 @@ class Take:
         print(f"  ! waited {timeout:.0f}s: {len(self.plays) - n0}/{expect} replies played")
         return False
 
+    async def wait_tts(self, device: str, k0: int, timeout: float = 60) -> bool:
+        t_end = time.monotonic() + timeout
+        while time.monotonic() < t_end:
+            if self.page.is_closed():
+                raise RuntimeError("page closed")
+            if any(r["device"] == device for r in self.tts[k0:]):
+                return True
+            await asyncio.sleep(0.03)
+        print(f"  ! no voice line for {device} within {timeout:.0f}s")
+        return False
+
     async def wait_plays(self, n: int, timeout: float = 60) -> bool:
         t_end = time.monotonic() + timeout
         while time.monotonic() < t_end:
@@ -298,6 +309,10 @@ class Take:
 
     async def story(self) -> None:
         page, js = self.page, self.js
+        # Paint at once: the screencast starts at the first painted frame, so a slow reset before the first
+        # page load would otherwise shift the whole video against the take's clock.
+        await page.set_content('<html><body style="margin:0;background:#0a0b10"></body></html>')
+        await page.wait_for_timeout(300)
         # A clean household at 7:55 AM, normal speed (the reset re-seeds at the current household time).
         status = await (await page.request.get(self.base + "/api/status")).json()
         mcp = status["mcp"]["url"].rsplit("/mcp", 1)[0]
@@ -344,9 +359,10 @@ class Take:
 
         self.mark("oldbottle")
         await self.say_line("oldbottle")
-        n0 = len(self.plays)
+        n0, k0 = len(self.plays), len(self.tts)
         self.fire("window.NovaDemo.showSample('kitchen', 'pill-lisinopril')")
-        await self.wait_plays(n0 + 2, 120)  # Rose's warning, then Maya's alert starts speaking
+        # one voice at a time: Maya's alert is fetched only once Rose's warning has finished
+        await self.wait_tts("maya", k0, 120)
 
         self.mark("followup")
         await js("window.NovaDemo.focus('maya')")  # cut to Maya's Echo as her alert is spoken

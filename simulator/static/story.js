@@ -36,7 +36,7 @@ const STEPS = [
   },
   {
     title: "Maya acts",
-    text: "Maya's Echo tells her what happened. She orders the new 10 mg dose in one tap.",
+    text: "Maya's Echo tells her what happened. She requests the new 10 mg dose in one tap.",
     action: "Order the 10 mg refill",
     async run(D) {
       D.focus("maya");
@@ -163,7 +163,7 @@ class Story {
     this.$(".story-k").textContent = fresh ? "Start here" : done ? "The story" : `Step ${this.idx + 1} of ${STEPS.length}`;
     this.$(".story-title").textContent = fresh ? "A prescription change, start to finish" : done ? "That's the story" : step.title;
     this.$(".story-text").textContent = fresh
-      ? "Five steps, about two minutes: Maya scans the new prescription, approves it, Rose shows her old bottle, and Maya orders the right dose."
+      ? "Five steps, about two minutes: Maya scans the new prescription, approves it, Rose shows her old bottle, and Maya requests the right dose."
       : done ? "Now try anything: talk to either Echo, show Alexa another bottle, or open Under the hood to see every MCP call."
         : step.text;
     this.$$dots();

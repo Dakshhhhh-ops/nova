@@ -18,7 +18,7 @@ Copy each section into the matching Devpost field.
 
 Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits between them on Alexa+.
 
-**The main story: a prescription change, from paper to the pill bottle.** After a cardiology visit, Dr. Patel lowers Rose's lisinopril from 20 mg to 10 mg. Maya photographs the after-visit summary on her Echo Show; Amazon Nova reads it and Nova proposes the change, with the doctor's reason. Nothing changes until Maya approves. Rose's Echo then explains it in plain words. Later, Rose holds her old 20 mg bottle up to the camera: *"Careful, Rose: this is the old 20 mg lisinopril. Your plan is now 10 mg, so please set this bottle aside."* Maya's Echo tells her what happened, and she orders the new 10 mg dose in one tap. One sequence shows vision, state that persists, human approval, two identities, voice and screen, and MCP. In the live demo, **Start the story** runs it step by step.
+**The main story: a prescription change, from paper to the pill bottle.** After a cardiology visit, Dr. Patel lowers Rose's lisinopril from 20 mg to 10 mg. Maya photographs the after-visit summary on her Echo Show; Amazon Nova reads it and Nova proposes the change, with the doctor's reason. Nothing changes until Maya approves. Rose's Echo then explains it in plain words. Later, Rose holds her old 20 mg bottle up to the camera: *"Careful, Rose: this is the old 20 mg lisinopril. Your plan is now 10 mg, so please set this bottle aside."* Maya's Echo tells her what happened, and she requests the new 10 mg dose in one tap. One sequence shows vision, state that persists, human approval, two identities, voice and screen, and MCP. In the live demo, **Start the story** runs it step by step.
 
 Around that story, Nova also:
 

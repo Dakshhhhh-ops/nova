@@ -3565,6 +3565,7 @@ window.NovaDemo = {
   async tapReply(device, text, { waitForSpeech = true } = {}) {
     const d = deviceFor(device);
     await waitFor(() => !!d.announcement, 60_000);
+    await waitFor(() => !d.busy, 60_000); // a busy Echo ignores input: let it finish speaking first
     const want = str(text).toLowerCase();
     const reply = arr(d.announcement.replies).map(str).find((r) => r.toLowerCase() === want) || text;
     return untilReply(d, () => d.replyAnnouncement(reply), waitForSpeech);

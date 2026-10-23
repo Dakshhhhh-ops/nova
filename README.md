@@ -57,7 +57,7 @@ Nova is a self-hosted **Model Context Protocol (MCP) server**, the open standard
 2. **She reviews and approves.** Nothing changes until she does.
 3. **Rose hears the update.** Her Echo explains it in plain words: *"Rose, Dr. Patel changed your lisinopril from 20 mg once daily to 10 mg."*
 4. **Rose shows the old bottle.** She holds her old 20 mg bottle up to the camera: *"Careful, Rose: this is the old 20 mg lisinopril. Your plan is now 10 mg, so please set this bottle aside."*
-5. **Maya sees what happened and handles the follow-up.** Her Echo tells her, and she orders the new 10 mg dose in one tap: *"Done, I've sent the Lisinopril refill to Elm Street Pharmacy."*
+5. **Maya sees what happened and handles the follow-up.** Her Echo tells her, and one tap starts the new 10 mg refill: *"I've saved a simulated Lisinopril refill handoff. Please contact Elm Street Pharmacy to place the request."*
 
 One sequence shows vision, state that persists, human approval, two identities from two tokens, voice and screen, and MCP. In the live demo, **Start the story** walks through it step by step.
 

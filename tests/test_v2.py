@@ -157,7 +157,12 @@ async def test_reconcile_after_visit_summary_then_catch_old_bottle():
     # Rose later shows the old 20 mg bottle: Nova catches the outdated strength.
     out = await call("check_pill_photo", {"image_base64": b64("pill-lisinopril.png")})
     assert out["verdict"] == "dose_mismatch"
-    again = await call("apply_care_changes", {"change_set_id": doc["change_set_id"]}, as_person="maya")
+    # Maya hears what happened and can order the new dose in one tap.
+    alert = next(a for a in server.store.announcements("maya") if "old" in a["title"].lower())
+    assert "set it aside" in alert["speech"] and "Order a 10 mg lisinopril refill" in alert["replies"]
+    refill = await call("request_refill", {"medication": "lisinopril"}, as_person="maya")
+    assert refill["refill"]["name"] == "Lisinopril"
+    again =await call("apply_care_changes", {"change_set_id": doc["change_set_id"]}, as_person="maya")
     assert again["status"] == "applied" and not again["applied"]
 
 

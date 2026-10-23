@@ -1349,7 +1349,25 @@ async def check_pill_photo(
     me = caller()
     elder = care_recipient(me)
     data, mime = vision.decode_image(image_base64)
-    return await in_thread(vision.check_pill, store, elder, data, mime if image_base64.startswith("data:") else mime_type)
+    out = await in_thread(vision.check_pill, store, elder, data, mime if image_base64.startswith("data:") else mime_type)
+    if out.get("verdict") == "dose_mismatch" and me["id"] == elder["id"]:
+        _tell_family_about_old_bottle(elder, out)
+    return out
+
+
+def _tell_family_about_old_bottle(elder: dict[str, Any], out: dict[str, Any]) -> None:
+    """Rose picked up an outdated bottle: the family hears what happened and can order the right dose in one tap."""
+    med = out["matched_med"]
+    name, dose = med["name"].lower(), med["dose"]
+    old = out["identified"].get("strength") or "old"
+    for p in store.caregivers():
+        if (p.get("relation") or "").startswith("home aide"):
+            continue
+        store.announce(p["id"], "caregiver_escalation", f"Mom picked up her old {name}",
+                       f"Mom picked up her old {old} {name} bottle. I told her to set it aside: her plan is {dose} now.",
+                       severity="watch", expects_reply=True,
+                       replies=[f"Order a {dose} {name} refill", "Tell Mom I'll call her"],
+                       dedupe=f"old-bottle:{med['id']}:{now().date()}:{p['id']}")
 
 
 @ui_tool(

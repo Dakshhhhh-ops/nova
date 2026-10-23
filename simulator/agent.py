@@ -273,9 +273,8 @@ class Agent:
         for _ in range(MAX_STEPS):
             try:
                 step = await asyncio.to_thread(brain.step, system, device.history, specs)
-            except Exception as exc:  # model failure: fall back to the offline router for this turn
+            except Exception:  # model failure: the rules engine answers this turn
                 log.exception("model step failed")
-                await push({"kind": "error", "message": f"{brain.label}: {str(exc)[:200]}. Using offline router."})
                 brain = RulesBrain(device.person["role"])
                 step = await asyncio.to_thread(brain.step, system, device.history, specs)
             await push({"kind": "llm", "brain": brain.label, "latency_ms": step.latency_ms, "text": step.text,

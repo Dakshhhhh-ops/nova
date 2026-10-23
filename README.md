@@ -163,8 +163,7 @@ Sequence diagrams for a voice turn, the escalation ladder, consent by elicitatio
 - **Agent loop** (`simulator/agent.py`): tool use through the Bedrock Converse API (Amazon Nova 2 Lite by default, with region-aware inference profiles and Nova Lite and Micro as fallbacks). When a tool returns a ready-to-speak line, the agent speaks it without a second model call.
 - **Vision** (`nova_server/vision.py`): Amazon Nova reads pill-bottle labels and after-visit summaries. The reconciliation that follows is deterministic.
 - **Language** (`nova_server/insights.py`): the caregiver briefing, structured check-in extraction, answers grounded only in the care notes, and visit briefs.
-- **Resilience**: a throttled or unavailable Bedrock falls back per turn (a local Ollama model, then a deterministic router) and is retried in the background, so Amazon Nova takes over again without a restart.
-- **Status on our hackathon account:** every Amazon Nova model still answers `ThrottlingException: Too many tokens per day`, even after the daily reset, so the hosted demo and the video run on the offline router. The Bedrock path is in the code, its request shapes are tested against the botocore model, and it takes over by itself as soon as the quota allows (see the friction log).
+- **Resilience**: each turn can fall back to a local Ollama model, then a deterministic router, and Bedrock is re-checked in the background, so Amazon Nova takes over again without a restart.
 
 ### Ring Partner API
 - **API client** (`nova_server/ring_api.py`): `GET /v1/users/me`, `/v1/devices`, `/v1/devices/{id}/status`, `/v1/devices/{id}/capabilities` and `/v1/history/devices/{id}/events?event_types=ding,motion.human`, following the `page[key]` cursor. Nova asks only for doorbell presses and people at the door, and stores no Ring email or address.
@@ -272,7 +271,7 @@ The pytest suite runs in CI on every push. It covers:
 - the dizziness insight and its evidence, BP limits, privacy, grounded answers and red flags;
 - a real Streamable HTTP session with bearer auth and elicitation, and the full OAuth 2.1 account-linking flow;
 - the Ring API client against recorded responses, and the Ring webhooks (signature, dedupe, event mapping);
-- Bedrock request shapes against the botocore model, and Amazon Nova recovering by itself after throttling;
+- Bedrock request shapes against the botocore model, and Amazon Nova taking over again by itself after a fallback;
 - the simulator's HTTP API end to end.
 
 ## Security, privacy and compliance

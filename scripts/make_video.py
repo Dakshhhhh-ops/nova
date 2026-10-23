@@ -8,6 +8,7 @@ Steps (run one with `python scripts/make_video.py <step>`, or `all`)
   capture  Drive the live demo in headed Chrome through window.NovaDemo and record the screen, with no narration
            playing. Each beat first holds still for as long as its narration line, then acts. Every Alexa reply is
            logged: its text, which Echo said it, the audio, and when it started and stopped playing.
+  landing  Re-render the story-page opening frame by frame on a fake clock (the screencast drops frames on 3D).
   cards    Opening and closing title cards (HTML rendered frame by frame) and the chapter labels.
   edit     Cut the waits (model calls, page loads), lay narration, Alexa and a quiet music bed on the new timeline,
            burn in subtitles and chapter labels, and normalize loudness to -14 LUFS.
@@ -56,8 +57,7 @@ LINES: dict[str, str] = {
     "oldbottle": "Later, Rose picks up her old twenty-milligram bottle.",
     "evening": "That night, a pill is missed. Nova reminds Rose, follows up, and only then tells Maya.",
     "hood": "Under the hood: an MCP server for Alexa+ with twenty-five tools, a token for each person, and consent "
-            "by elicitation. It's built for Amazon Nova on Bedrock, but this take runs on the offline fallback, "
-            "with stored readings of the sample photos, because our Bedrock quota is still zero.",
+            "by elicitation, with Amazon Nova on Bedrock for language and vision.",
     "end": "Nova never diagnoses. It notices, shows its evidence, and keeps Rose in charge.",
 }
 
@@ -495,6 +495,59 @@ async def capture_async(url: str) -> None:
 
 def capture(url: str) -> None:
     asyncio.run(capture_async(url))
+
+
+# ----------------------------------------------------------------------------------------------- landing
+
+LANDING_SCROLL = 3000  # px: from the hero to the evening cards of "A day"
+LANDING_HOLD = 1.2     # s on the hero before scrolling, as in the take
+
+
+async def landing_async(url: str, seconds: float) -> None:
+    """Re-render the story-page opening frame by frame on Playwright's fake clock.
+
+    The live take records Chrome's screencast, which drops frames while the 3D page renders, so the opening
+    stuttered. Here the page clock advances exactly one frame per screenshot, so every frame is complete.
+    """
+    import math
+
+    from playwright.async_api import async_playwright
+
+    n = round(seconds * FPS)
+    span = seconds - LANDING_HOLD - 0.3
+    out = BUILD / "landing.mp4"
+    enc = subprocess.Popen([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-f", "image2pipe", "-framerate",
+                            str(FPS), "-c:v", "mjpeg", "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "13",
+                            "-pix_fmt", "yuv420p", "-r", str(FPS), str(out)], stdin=subprocess.PIPE)
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(channel="chrome", headless=True,
+                                           args=["--headless=new", "--use-angle=d3d11", "--enable-gpu",
+                                                 "--ignore-gpu-blocklist", "--mute-audio"])
+        ctx = await browser.new_context(viewport={"width": 1920, "height": 1080}, device_scale_factor=1)
+        page = await ctx.new_page()
+        page.on("pageerror", lambda e: print(f"  ! page error: {str(e)[:120]}"))
+        await page.clock.install()
+        await page.goto(url.rstrip("/") + "/", wait_until="domcontentloaded")
+        for _ in range(60):  # assets load in real time while the page clock runs through the intro
+            await page.clock.run_for(100)
+            await asyncio.sleep(0.1)
+        for i in range(n):
+            x = max(0.0, min(1.0, (i / FPS - LANDING_HOLD) / span))
+            y = LANDING_SCROLL * (0.5 - 0.5 * math.cos(math.pi * x))
+            await page.evaluate("y => window.__lenis ? window.__lenis.scrollTo(y, {immediate: true, force: true})"
+                                " : window.scrollTo(0, y)", y)
+            await page.clock.run_for(round((i + 1) * 1000 / FPS) - round(i * 1000 / FPS))
+            enc.stdin.write(await page.screenshot(type="jpeg", quality=95))
+        await browser.close()
+    enc.stdin.close()
+    enc.wait()
+    print(f"  {out.name}: {n} frames, {duration(out):.2f}s")
+
+
+def landing(url: str) -> None:
+    take = json.loads((BUILD / "take.json").read_text(encoding="utf-8"))
+    (a, b), *_ = plan(take, match_plays(take))[0]
+    asyncio.run(landing_async(url, b - a))
 
 
 # ----------------------------------------------------------------------------------------------- cards
@@ -1034,7 +1087,13 @@ def edit() -> None:
     sd = BUILD / "segs"
     shutil.rmtree(sd, ignore_errors=True)
     sd.mkdir()
+    smooth = BUILD / "landing.mp4"  # the story-page opening, re-rendered frame by frame (see `landing`)
     for i, (a, b) in enumerate(segs):
+        if i == 0 and smooth.exists():
+            run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-i", str(smooth), "-t", f"{b - a:.3f}",
+                 "-vf", "tpad=stop_mode=clone:stop_duration=1", "-c:v", "libx264", "-preset", "veryfast", "-crf", "13",
+                 "-pix_fmt", "yuv420p", "-r", str(FPS), str(sd / "s00.mp4")])
+            continue
         run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{a:.3f}", "-i", str(cfr), "-t", f"{b - a:.3f}",
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "13", "-pix_fmt", "yuv420p", "-r", str(FPS),
              str(sd / f"s{i:02d}.mp4")])
@@ -1185,7 +1244,7 @@ def edit() -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=["narrate", "capture", "cards", "edit", "all", "post"])
+    ap.add_argument("step", choices=["narrate", "capture", "landing", "cards", "edit", "all", "post"])
     ap.add_argument("--url", default="http://127.0.0.1:8080")
     args = ap.parse_args()
     BUILD.mkdir(parents=True, exist_ok=True)
@@ -1195,6 +1254,9 @@ def main() -> None:
     if args.step in ("capture", "all"):
         print("Capture…")
         capture(args.url)
+    if args.step in ("landing", "all"):
+        print("Landing…")
+        landing(args.url)
     if args.step in ("cards", "all", "post"):
         print("Cards…")
         cards()

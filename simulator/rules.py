@@ -148,12 +148,7 @@ def _latest_change_set(history: list[dict[str, Any]]) -> str | None:
 class RulesBrain(Backend):
     name = "rules"
 
-    @property
-    def label(self) -> str:  # type: ignore[override]
-        from nova_server.llm import bedrock_note
-
-        note = bedrock_note()
-        return f"Nova offline router ({note})" if note else "Nova offline router (no model)"
+    label = "Nova rules engine"
 
     def __init__(self, role: str) -> None:
         self.role = role

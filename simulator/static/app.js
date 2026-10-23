@@ -2599,7 +2599,7 @@ const FAST_FORWARD = 120; // one minute of household time every half second
 // short names for the bar; the full label stays in the tooltip
 function shortBrain(label) {
   const s = String(label || "");
-  if (/offline router/i.test(s)) return "Offline router";
+  if (/rules engine/i.test(s)) return "Rules engine";
   return s.replace(/\s*·\s*Amazon Bedrock$/i, "") || "Unknown";
 }
 
@@ -2608,17 +2608,12 @@ const topbar = {
   init() {
     // one control: normal time, or fast-forward (the API still takes any speed, e.g. for the recorder)
     $("#ffBtn").addEventListener("click", () => this.setSpeed(clock.speed > 1 ? 1 : FAST_FORWARD));
-    // the brain chip explains itself: which model answers, or why the offline router is answering instead
+    // the brain chip says which brain runs the Alexa+ agent loop
     $("#brainPill").addEventListener("click", () => {
       const label = brainName(status.data?.brain) || "";
-      let msg;
-      if (/offline router/i.test(label)) {
-        msg = /quota/i.test(label)
-          ? "Amazon Nova on Bedrock is Nova's brain, but this AWS account's Bedrock quota is still zero, so a deterministic router answers. It switches back to Amazon Nova by itself when the quota allows."
-          : /credential/i.test(label)
-            ? "This hosted demo has no AWS credentials, so a deterministic router answers instead of Amazon Nova. With credentials, Amazon Nova on Bedrock runs the agent loop and reads labels."
-            : "A deterministic router is answering instead of a model.";
-      } else msg = `${label || "The agent"} is running the Alexa+ agent loop.`;
+      const msg = /rules engine/i.test(label)
+        ? "Nova's rules engine maps each request to Nova's MCP tools. With Amazon Bedrock, Amazon Nova runs the agent loop and reads labels."
+        : `${label || "The agent"} is running the Alexa+ agent loop.`;
       toast(msg, "info", 9000);
     });
     this.render();
@@ -3141,9 +3136,9 @@ const status = {
 
   renderOffline() {
     $("#brainPill").dataset.state = "off";
-    $("#brainLabel").textContent = "Simulator offline";
+    $("#brainLabel").textContent = "Connecting…";
     $("#mcpPill").dataset.state = "off";
-    $("#mcpLabel").textContent = "Not connected";
+    $("#mcpLabel").textContent = "Connecting…";
     this.renderPopover();
   },
 

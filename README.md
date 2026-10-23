@@ -142,6 +142,7 @@ Sequence diagrams for a voice turn, the escalation ladder, consent by elicitatio
 - **Vision** (`nova_server/vision.py`): Amazon Nova reads pill-bottle labels and after-visit summaries. The reconciliation that follows is deterministic.
 - **Language** (`nova_server/insights.py`): the caregiver briefing, structured check-in extraction, answers grounded only in the care notes, and visit briefs.
 - **Resilience**: a throttled or unavailable Bedrock falls back per turn (a local Ollama model, then a deterministic router) and is retried in the background, so Amazon Nova takes over again without a restart.
+- **Status on our hackathon account:** every Amazon Nova model still answers `ThrottlingException: Too many tokens per day`, even after the daily reset, so the hosted demo and the video run on the offline router. The Bedrock path is in the code, its request shapes are tested against the botocore model, and it takes over by itself as soon as the quota allows (see the friction log).
 
 ### Ring Partner API
 - **API client** (`nova_server/ring_api.py`): `GET /v1/users/me`, `/v1/devices`, `/v1/devices/{id}/status`, `/v1/devices/{id}/capabilities` and `/v1/history/devices/{id}/events?event_types=ding,motion.human`, following the `page[key]` cursor. Nova asks only for doorbell presses and people at the door, and stores no Ring email or address.

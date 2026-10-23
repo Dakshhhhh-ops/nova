@@ -3519,6 +3519,16 @@ async function waitFor(test, timeout = 60_000, every = 150) {
   }
 }
 
+// Start a turn; resolve when its reply is on screen, or (by default) once the voice has finished too.
+async function untilReply(d, start, waitForSpeech = true) {
+  const seq = d.replySeq || 0;
+  const turn = start();
+  if (waitForSpeech) return turn;
+  Promise.resolve(turn).catch(() => {});
+  await Promise.race([waitFor(() => (d.replySeq || 0) > seq, 200_000, 60), turn]);
+  return d.lastReply;
+}
+
 window.NovaDemo = {
   ready: demoReady,
   // Resolves with the reply once it is on screen and the voice has finished (or at most 3 s past the
@@ -3533,12 +3543,12 @@ window.NovaDemo = {
     await Promise.race([waitFor(() => (d.replySeq || 0) > seq, 200_000, 60), turn]);
     return d.lastReply;
   },
-  async showSample(device, sampleId) {
+  async showSample(device, sampleId, { waitForSpeech = true } = {}) {
     const d = deviceFor(device);
     const s = samples.list.find((x) => str(x.id) === sampleId || str(x.url).includes(sampleId));
     if (!s) throw new Error(`Unknown sample: ${sampleId}`);
     await waitFor(() => !d.busy);
-    return tray.flyAndScan(d, s);
+    return untilReply(d, () => tray.flyAndScan(d, s), waitForSpeech);
   },
   async answer(device, yes) {
     const d = deviceFor(device);
@@ -3552,12 +3562,12 @@ window.NovaDemo = {
     }
     return d.answerYesNo(!!yes);
   },
-  async tapReply(device, text) {
+  async tapReply(device, text, { waitForSpeech = true } = {}) {
     const d = deviceFor(device);
     await waitFor(() => !!d.announcement, 60_000);
     const want = str(text).toLowerCase();
     const reply = arr(d.announcement.replies).map(str).find((r) => r.toLowerCase() === want) || text;
-    return d.replyAnnouncement(reply);
+    return untilReply(d, () => d.replyAnnouncement(reply), waitForSpeech);
   },
   async approveChanges() {
     const host = [...AppHost.all].find((h) => h.card.tool === "read_care_document");
@@ -3586,6 +3596,7 @@ window.NovaDemo = {
     return scrollFx.goTo({ stage: "#scene", story: "#circle", hood: "#hood" }[section] || "#scene");
   },
   onAnnouncement(cb) { if (typeof cb === "function") announcementCbs.push(cb); },
+  reset() { return doReset(); },
   // Debug: which on-screen boxes intersect right now (empty when the layout is clean).
   overlaps() { return overlapDebug.check().hits.map(([a, b]) => `${a.name} × ${b.name}`); },
   get mode() { return stage3d ? "3d" : "flat"; },

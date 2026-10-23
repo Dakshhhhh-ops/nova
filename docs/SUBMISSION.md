@@ -24,6 +24,23 @@ Rose, 81, lives alone in Columbus. Her daughter Maya is in Seattle. Nova sits be
 - **It listens to the front door (Ring Partner API).** Nova calls Ring's API for the linked account's devices, whether the doorbell is online, and the event history (doorbell presses and people at the door, nothing else), and takes Ring's signed webhooks for real time. Ring doesn't say who rang, so Nova checks the care calendar: *"Grace arrived at Mom's at 10:02,"* and Grace gets her visit checklist. A doorbell going offline is a care signal too. In the live demo, **Front door ⋯ → Sync from Ring** calls `api.amazonvision.com` and shows the real Playground doorbell, each API call with its status, and a Live or Recorded label (the hosted demo shows a real recorded sync, because Playground tokens last about 30 minutes). A front door opening at 2 AM triggers an urgent notification; a morning with no movement triggers a wellness check.
 - **It stays safe and respectful.** It has a double-dose guard. Answers about medications come only from the doctor's notes, with sources. Nothing changes in the plan without a person's approval. Rose is asked before her family hears about a symptom (MCP elicitation), and she controls what they can see. Emergencies skip all of that and alert everyone.
 
+**What we heard.** We showed the demo to a friend and asked two questions. Their answers, unedited:
+
+> *What's the hardest part of keeping track of an older person's medicines?* "The hardest part is making sure they take the right medicine at the right time, especially when they have multiple medicines throughout the day. Sometimes they forget whether they've already taken a dose, and family members can't always be around to check."
+>
+> *Would this help? What would you change or worry about?* "Yes, I think it could be helpful, especially for families who can't stay with their elderly parents all day. Automatic reminders and alerts for missed doses would provide peace of mind. My main concerns would be whether the camera can accurately identify the medicines, whether the system is easy for elderly people to use, and whether it protects their privacy. I'd also want to make sure it doesn't send false alerts or create confusion about whether a dose was actually taken."
+
+Each concern maps to something Nova already does:
+
+| Their concern | What Nova does |
+|---|---|
+| Can the camera identify medicines accurately? | It says "take it" only for the exact product, with a readable strength that matches the plan and a confident read. Otherwise it says to check with the pharmacist, and it refuses unreadable labels. |
+| Is it easy for elderly people to use? | Voice first, one or two sentences per reply, big on-screen answers, and "repeat that" works. |
+| Does it protect their privacy? | The older adult decides what her family can see, and Nova asks her before sharing a symptom. |
+| False alerts, or confusion about whether a dose was taken? | The family hears only after two reminders and 90 minutes. A double-dose guard answers *"you already took it at 8:14 AM."* |
+
+This is one person's view, not a study; talking to caregivers, nurses and pharmacists is the next step.
+
 **Who would ship it.** Home-care agencies (Grace's employer), Medicare Advantage and Part D plans (scored on medication adherence for diabetes drugs, RAS antagonists like lisinopril and statins: Rose's exact three prescriptions), pharmacies (refills and post-visit reconciliation), and families directly through Alexa+ account linking.
 
 **Running it for real.** Nova handles health data, so a real deployment runs in the care organization's own AWS account under a Business Associate Addendum, using HIPAA-eligible services only (Amazon Bedrock, Amazon Polly, Amazon ECS/RDS), with TLS everywhere and KMS-encrypted storage. "Minimum necessary" is already in the design: identity from the token, sharing controlled by Rose, consent before symptoms are shared, approval before plan changes, and an audit trail of who logged or handled what. Details are in the README.

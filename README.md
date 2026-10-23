@@ -74,6 +74,22 @@ Insights come from deterministic, tested rules, and each one carries its evidenc
 
 **It stays respectful.** Spoken replies are one or two sentences, with the details one *"tell me more"* away. Rose is asked before her family hears about a symptom, and she decides what the circle can see. Emergencies skip every question.
 
+### What we heard
+We showed the demo to a friend and asked what's hardest and what worries them. Unedited:
+
+> "The hardest part is making sure they take the right medicine at the right time, especially when they have multiple medicines throughout the day. Sometimes they forget whether they've already taken a dose, and family members can't always be around to check."
+>
+> "Yes, I think it could be helpful, especially for families who can't stay with their elderly parents all day. Automatic reminders and alerts for missed doses would provide peace of mind. My main concerns would be whether the camera can accurately identify the medicines, whether the system is easy for elderly people to use, and whether it protects their privacy. I'd also want to make sure it doesn't send false alerts or create confusion about whether a dose was actually taken."
+
+| Their concern | What Nova does |
+|---|---|
+| Can the camera identify medicines accurately? | It says "take it" only for the exact product, with a readable strength that matches the plan and a confident read. Otherwise it says to check with the pharmacist, and it refuses unreadable labels. |
+| Is it easy for elderly people to use? | Voice first, one or two sentences per reply, big on-screen answers, and "repeat that" works. |
+| Does it protect their privacy? | The older adult decides what her family can see, and Nova asks her before sharing a symptom. |
+| False alerts, or confusion about whether a dose was taken? | The family hears only after two reminders and 90 minutes. A double-dose guard answers *"you already took it at 8:14 AM."* |
+
+One person's view, not a study; caregivers, nurses and pharmacists are next.
+
 | Rose is asked before her family is told, while Maya sees the evidence | A doctor-visit brief, one request away |
 |---|---|
 | ![The live demo: a consent question on Rose's Echo Show and the briefing card on Maya's](docs/img/live-demo.jpg) | ![A visit brief on Maya's Echo Show](docs/img/visit-brief.jpg) |
